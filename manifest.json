@@ -4,8 +4,8 @@
     "base_template": {
       "repo": "fastapi/full-stack-fastapi-template",
       "ref": "master",
-      "commit": "TODO_PIN_EXACT_COMMIT_SHA_BEFORE_FIRST_RELEASE",
-      "verified_at": null,
+      "commit": "4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2",
+      "verified_at": "2026-07-04",
       "license": "MIT"
     }
   },
