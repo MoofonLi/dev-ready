@@ -1,0 +1,20 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Phase 5 TODO: configure PyPI trusted publishing for this repo first
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Build
+        run: uv build
+      - name: Placeholder publish
+        run: echo "Enable pypa/gh-action-pypi-publish once trusted publishing is configured"

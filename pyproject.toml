@@ -1,0 +1,31 @@
+[project]
+name = "dev-ready"
+version = "0.1.0"
+description = "Scaffold AI-development-ready FastAPI projects: pinned upstream template plus Claude Code skills, MCP config, and design docs"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+dev-ready = "dev_ready.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dev_ready"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

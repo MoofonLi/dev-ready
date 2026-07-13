@@ -1,0 +1,13 @@
+{
+  "manifest_version": 1,
+  "upstream": {
+    "base_template": {
+      "repo": "fastapi/full-stack-fastapi-template",
+      "ref": "master",
+      "commit": "TODO_PIN_EXACT_COMMIT_SHA_BEFORE_FIRST_RELEASE",
+      "verified_at": null,
+      "license": "MIT"
+    }
+  },
+  "overlay_version": "0.1.0"
+}

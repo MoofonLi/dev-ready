@@ -1,0 +1,19 @@
+name: Weekly upstream bump
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Phase 5 TODO:
+      # 1. Resolve latest upstream commit of fastapi/full-stack-fastapi-template
+      # 2. Update manifest.json pin
+      # 3. Regenerate a project and run verification
+      # 4. Open a PR with the bump (peter-evans/create-pull-request)
+      - name: Placeholder
+        run: echo "upstream-bump not yet implemented (see docs/architecture.md ADR-002)"
