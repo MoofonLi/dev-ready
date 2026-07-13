@@ -84,6 +84,13 @@ def _add_symlink(tar: tarfile.TarFile, name: str, target: str) -> None:
     tar.addfile(info)
 
 
+def _add_hardlink(tar: tarfile.TarFile, name: str, target: str) -> None:
+    info = tarfile.TarInfo(name=name)
+    info.type = tarfile.LNKTYPE
+    info.linkname = target
+    tar.addfile(info)
+
+
 def _build_tarball(tar_path: Path, build: Callable[[tarfile.TarFile], None]) -> Path:
     with tarfile.open(tar_path, "w:gz") as tar:
         build(tar)
@@ -168,6 +175,14 @@ def test_fetch_snapshot_into_existing_empty_dir(
                 _add_symlink(tar, f"{PREFIX}/link", "../../etc/passwd"),
             ),
             id="symlink-escaping-root",
+        ),
+        pytest.param(
+            lambda tar: (
+                _add_dir(tar, PREFIX),
+                _add_file(tar, f"{PREFIX}/original.txt", b"data"),
+                _add_hardlink(tar, f"{PREFIX}/link.txt", f"{PREFIX}/original.txt"),
+            ),
+            id="hardlink",
         ),
     ],
 )

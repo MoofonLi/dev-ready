@@ -47,7 +47,7 @@ def download(
     except urllib.error.HTTPError as error:
         raise FetchError(f"upstream download failed with HTTP {error.code}: {url}") from error
     except (urllib.error.URLError, OSError) as error:
-        raise FetchError(f"upstream download failed: {error}") from error
+        raise FetchError(f"upstream download failed ({url}): {error}") from error
 
     with response:
         status = getattr(response, "status", None)
@@ -76,7 +76,7 @@ def download(
                         )
                     out.write(chunk)
         except (urllib.error.URLError, OSError) as error:
-            raise FetchError(f"upstream download failed: {error}") from error
+            raise FetchError(f"upstream download failed ({url}): {error}") from error
 
 
 def _declared_content_length(response: http.client.HTTPResponse) -> int | None:

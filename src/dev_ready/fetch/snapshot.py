@@ -39,9 +39,13 @@ def _validate_target_dir(dest: Path) -> None:
     if not dest.exists():
         return
     if not dest.is_dir():
-        raise TargetDirectoryError(f"target {dest} exists and is not a directory")
+        raise TargetDirectoryError(
+            f"target {dest} exists and is not a directory — remove or rename it and retry."
+        )
     if any(dest.iterdir()):
-        raise TargetDirectoryError(f"target directory {dest} is not empty")
+        raise TargetDirectoryError(
+            f"target directory {dest} is not empty — remove or rename it and retry."
+        )
 
 
 def _finalize(staging_dir: Path, dest: Path) -> None:

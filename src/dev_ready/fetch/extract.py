@@ -43,6 +43,11 @@ def extract_snapshot(tar_path: Path, staging_dir: Path) -> None:
                 member.name = rest
                 extractable.append(member)
 
+            # filter="data" requires Python >= 3.12 (matches requires-python in
+            # pyproject.toml); it is defense-in-depth, not the only guard — see
+            # the pre-extraction checks above. It does not bound decompressed
+            # size, so a small archive can still expand to an unbounded amount
+            # of disk (known limitation; download itself is capped at 500 MiB).
             tar.extractall(path=staging_dir, members=extractable, filter="data")
     except (tarfile.TarError, OSError, EOFError) as error:
         raise FetchError(f"upstream archive is corrupt or unreadable: {error}") from error
