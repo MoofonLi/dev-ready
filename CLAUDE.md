@@ -23,7 +23,7 @@ Current phase: bootstrap. Structure and docs exist; no business logic is impleme
 
 ## Hard rules
 
-- Never fetch upstream "latest" at generation time; pins live in `manifest.json` only (ADR-002).
+- Never fetch upstream "latest" at generation time; pins live in `src/dev_ready/manifest.json` only (ADR-002).
 - Network calls only in `src/dev_ready/fetch/` (module boundary table in architecture.md).
 - Generation must be all-or-nothing: no partial output directories on failure.
 - Unit tests: no network, no filesystem outside tmp_path.

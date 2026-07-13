@@ -39,7 +39,9 @@ templates/    overlay assets copied into generated projects
 tests/        unit / integration / e2e
 .bob/         IBM Bob reviewer role definitions (QA, Security, SRE)
 .github/      CI, weekly upstream bump, release workflows
-manifest.json pinned upstream commits (lockfile for templates)
+
+Upstream pins live in src/dev_ready/manifest.json (bundled with the package,
+so a released CLI always carries the pin it was tested with).
 ```
 
 ## License
