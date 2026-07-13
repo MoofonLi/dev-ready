@@ -1,14 +1,16 @@
-# templates — overlay assets
+# templates — moved
 
-Files here are copied (with light templating: project name, options) onto the fetched base template during Stage 2 of generation.
+Overlay assets used to live here but have moved to `src/dev_ready/templates/` so they ship as package data inside the wheel (`[tool.hatch.build.targets.wheel] packages = ["src/dev_ready"]` does not include this repo-root directory).
 
-Planned layout:
+See `src/dev_ready/templates/` for the current layout:
 
 ```
-templates/
-├── claude/      CLAUDE.md template + Claude Code skills for generated projects
-├── mcp/         MCP server configuration (.mcp.json template)
-└── docs/        design-doc templates (architecture, requirements skeletons)
+src/dev_ready/templates/
+├── claude/      CLAUDE.md template + .claude/skills/ starter skill for generated projects
+├── mcp/         .mcp.json (minimal valid JSON, no credentials, safe defaults)
+└── docs/        design-doc skeletons (architecture.md, requirements.md)
 ```
 
-Empty during bootstrap; populated in Phase 2. Security note: user input must never be interpolated into agent instruction files unescaped (see .bob/security.md).
+Assets are read via `importlib.resources.files("dev_ready")`, never via a path relative to `__file__` joined with the repo root — this directory is not guaranteed to exist for an installed `uvx dev-ready`.
+
+Security note: user input must never be interpolated into agent instruction files unescaped (see `.bob/security.md`). Templating is exact-token replacement of `{{project_name}}` only, applied to files with a `.tmpl` suffix.

@@ -12,7 +12,8 @@ from pathlib import Path
 
 from dev_ready import __version__
 from dev_ready.errors import DevReadyError, InvalidArgumentsError
-from dev_ready.manifest import load_default_manifest
+from dev_ready.generate import generate
+from dev_ready.manifest import UpstreamPin, load_default_manifest
 from dev_ready.prompts import Answers
 
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
@@ -85,12 +86,31 @@ def _run_init(args: argparse.Namespace) -> int:
     answers = build_answers(args)
     manifest = load_default_manifest()
     pin = manifest.upstream["base_template"]
-    print(f"project:  {answers.project_name}")
-    print(f"target:   {answers.target_dir}")
-    print(f"upstream: {pin.repo}@{pin.commit[:12]} ({pin.ref})")
+    generate(answers, pin)
+    _print_success(answers, pin)
+    return 0
+
+
+def _print_success(answers: Answers, pin: UpstreamPin) -> None:
+    components = [
+        name
+        for name, included in (
+            ("skills", answers.include_skills),
+            ("mcp", answers.include_mcp),
+            ("docs", answers.include_docs),
+        )
+        if included
+    ]
+    overlay_parts = ["CLAUDE.md", *components]
+    print(f"project generated: {answers.project_name}")
+    print(f"location:  {answers.target_dir}")
+    print(f"upstream:  {pin.repo}@{pin.commit[:12]} ({pin.ref})")
+    print(f"overlay:   {', '.join(overlay_parts)}")
     print()
-    print("init is not implemented yet: fetch and overlay land in Phase 2 and 3.")
-    return 1
+    print("next steps:")
+    print(f"  1. cd {answers.target_dir}")
+    print("  2. docker compose watch   (see CLAUDE.md for other commands)")
+    print("  3. read CLAUDE.md for the full picture")
 
 
 def main(argv: list[str] | None = None) -> int:

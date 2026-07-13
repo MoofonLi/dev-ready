@@ -1,0 +1,29 @@
+# {{project_name}}
+
+{{project_name}} is a FastAPI full-stack project, scaffolded by [dev-ready](https://github.com/) on top of [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template): a FastAPI + SQLModel + PostgreSQL backend and a React + TypeScript + Vite frontend, wired together with Docker Compose.
+
+## Stack
+
+- **Backend**: FastAPI, SQLModel, PostgreSQL, Pydantic — `backend/`
+- **Frontend**: React, TypeScript, Vite — `frontend/`
+- **Infra**: Docker Compose, Traefik reverse proxy — `docker-compose.yml`
+
+## Commands
+
+- `docker compose up -d` — start the full stack (backend, frontend, database, proxy)
+- `docker compose watch` — start with live reload for local development
+- `docker compose down` — stop the stack
+- Backend only: `cd backend && uv run fastapi dev app/main.py`
+- Frontend only: `cd frontend && npm install && npm run dev`
+- Backend tests: `cd backend && bash scripts/test.sh`
+
+## Repo layout
+
+- `backend/` — FastAPI application, SQLModel models, Alembic migrations
+- `frontend/` — React application
+- `docker-compose.yml` — local development orchestration
+- `docs/` — design docs for this project, if generated with the docs overlay
+
+## Working with this repo
+
+Read `docs/architecture.md` and `docs/requirements.md` (if present) before making structural changes. This file and any `.claude/skills/` were added by dev-ready; everything else in the tree comes from the upstream template linked above.

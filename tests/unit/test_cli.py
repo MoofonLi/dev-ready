@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+import dev_ready.cli as cli_module
 from dev_ready import __version__
 from dev_ready.cli import build_answers, build_parser, main
-from dev_ready.errors import InvalidArgumentsError
+from dev_ready.errors import FetchError, InvalidArgumentsError, OverlayError, TargetDirectoryError
+from dev_ready.prompts import Answers
 
 
 def _init_args(**overrides) -> argparse.Namespace:
@@ -57,12 +59,102 @@ def test_init_unsafe_name_exits_2(capsys) -> None:
     assert "error:" in capsys.readouterr().err
 
 
-def test_init_not_implemented_yet_exits_1(capsys) -> None:
-    assert main(["init", "my-app", "--yes"]) == 1
+def test_init_success_exits_0_and_prints_summary(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    target_dir = tmp_path / "my-app"
+
+    def _fake_generate(answers: Answers, pin) -> list[Path]:
+        assert answers.project_name == "my-app"
+        return [Path("CLAUDE.md"), Path(".mcp.json")]
+
+    monkeypatch.setattr(cli_module, "generate", _fake_generate)
+
+    assert main(["init", "my-app", "--yes", "--dir", str(target_dir)]) == 0
     out = capsys.readouterr().out
     assert "my-app" in out
-    assert "not implemented" in out
+    assert str(target_dir) in out
     assert "fastapi/full-stack-fastapi-template" in out
+    assert "next steps" in out
+
+
+def test_init_success_omits_disabled_components_from_summary(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr(cli_module, "generate", lambda answers, pin: [Path("CLAUDE.md")])
+
+    assert (
+        main(
+            [
+                "init",
+                "my-app",
+                "--yes",
+                "--dir",
+                str(tmp_path / "my-app"),
+                "--no-skills",
+                "--no-mcp",
+                "--no-docs",
+            ]
+        )
+        == 0
+    )
+    out = capsys.readouterr().out
+    assert "skills" not in out
+    assert "mcp" not in out
+    assert "docs" not in out
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_exit_code"),
+    [
+        (FetchError("network down"), 3),
+        (TargetDirectoryError("dir taken"), 4),
+        (OverlayError("collision"), 1),
+    ],
+)
+def test_init_maps_generate_errors_to_exit_codes(
+    monkeypatch: pytest.MonkeyPatch, capsys, error: Exception, expected_exit_code: int
+) -> None:
+    def _raising_generate(answers: Answers, pin) -> list[Path]:
+        raise error
+
+    monkeypatch.setattr(cli_module, "generate", _raising_generate)
+
+    assert main(["init", "my-app", "--yes"]) == expected_exit_code
+    assert "error:" in capsys.readouterr().err
+
+
+def test_init_flags_reach_generate_via_answers(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Answers] = {}
+
+    def _capturing_generate(answers: Answers, pin) -> list[Path]:
+        captured["answers"] = answers
+        return []
+
+    monkeypatch.setattr(cli_module, "generate", _capturing_generate)
+
+    target_dir = tmp_path / "out"
+    main(
+        [
+            "init",
+            "my-app",
+            "--yes",
+            "--dir",
+            str(target_dir),
+            "--no-skills",
+            "--no-mcp",
+        ]
+    )
+
+    answers = captured["answers"]
+    assert answers.project_name == "my-app"
+    assert answers.target_dir == target_dir
+    assert answers.include_skills is False
+    assert answers.include_mcp is False
+    assert answers.include_docs is True
+    assert answers.assume_yes is True
 
 
 def test_build_answers_defaults() -> None:

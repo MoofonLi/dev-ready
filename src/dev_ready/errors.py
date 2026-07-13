@@ -33,3 +33,9 @@ class ManifestError(DevReadyError):
     """manifest.json is missing, unreadable, or fails validation."""
 
     exit_code = 1
+
+
+class OverlayError(DevReadyError):
+    """Overlay asset missing, destination collision, or templating failure."""
+
+    exit_code = 1
