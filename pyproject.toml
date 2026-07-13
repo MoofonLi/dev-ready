@@ -29,3 +29,7 @@ src = ["src", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not network'"
+markers = [
+    "network: marks tests that require real network access (deselected by default)",
+]
