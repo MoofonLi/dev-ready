@@ -6,7 +6,7 @@ Guidance for AI agents (Claude Code, GPT, IBM Bob) working in this repo.
 
 dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus an overlay of CLAUDE.md, Claude Code skills, MCP config, and design docs.
 
-Current phase: bootstrap. Structure and docs exist; no business logic is implemented yet.
+Current phase: v0.1 complete. The full pipeline (prompt -> fetch -> overlay -> verify -> report) is implemented, along with CI generate-and-verify, the weekly upstream-bump automation, and the PyPI release pipeline.
 
 ## Read before writing code
 
