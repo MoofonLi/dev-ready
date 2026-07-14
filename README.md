@@ -23,10 +23,25 @@ A generated project based on [fastapi/full-stack-fastapi-template](https://githu
 
 ## Requirements
 
-- Python >= 3.12
-- [uv](https://docs.astral.sh/uv/) (for `uvx`), or install with `pip install dev-ready`
+- Python >= 3.12 (uv can install this for you automatically)
+- git (Copier fetches the pinned template via git)
 - Network access to github.com (to fetch the pinned template snapshot)
 - Docker is **not** required to generate a project — only to run the generated one
+
+## Installation
+
+No install needed with [uv](https://docs.astral.sh/uv/) (any recent version):
+
+```bash
+uvx dev-ready init my-app
+```
+
+Or install with pip (requires Python >= 3.12):
+
+```bash
+pip install dev-ready
+dev-ready init my-app
+```
 
 ## Usage
 
@@ -63,7 +78,7 @@ Full CLI contract: [docs/cli-spec.md](docs/cli-spec.md).
 ## How it works
 
 1. **Prompt & confirm** — collect answers, show a summary before any network call or write (`--yes` skips this).
-2. **Fetch** — download the upstream template as a tarball at the commit pinned in `src/dev_ready/manifest.json` (a lockfile shipped inside the wheel), safely extracted into a staging directory.
+2. **Fetch** — run [Copier](https://copier.readthedocs.io/) against the upstream template at the commit pinned in `src/dev_ready/manifest.json` (a lockfile shipped inside the wheel), into a staging directory. Your project name and freshly generated secrets are written into the project's `.env` — no upstream `changethis` placeholders.
 3. **Overlay** — apply the AI tooling files with template-variable substitution, still in staging.
 4. **Verify** — structural checks against required paths (backend, frontend, compose files, ...).
 5. **Finalize** — move staging into the target. This is the only step that touches the target.

@@ -19,10 +19,25 @@ A generated project based on [fastapi/full-stack-fastapi-template](https://githu
 
 ## Requirements
 
-- Python >= 3.12
-- [uv](https://docs.astral.sh/uv/) (for `uvx`), or install with `pip install dev-ready`
+- Python >= 3.12 (uv can install this for you automatically)
+- git (Copier fetches the pinned template via git)
 - Network access to github.com (to fetch the pinned template snapshot)
 - Docker is **not** required to generate a project — only to run the generated one
+
+## Installation
+
+No install needed with [uv](https://docs.astral.sh/uv/) (any recent version):
+
+```bash
+uvx dev-ready init my-app
+```
+
+Or install with pip (requires Python >= 3.12):
+
+```bash
+pip install dev-ready
+dev-ready init my-app
+```
 
 ## Usage
 

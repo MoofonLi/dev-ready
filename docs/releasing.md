@@ -9,10 +9,14 @@
    - **Owner:** this repository's GitHub org/user
    - **Repository name:** this repo's name
    - **Workflow name:** `release.yml`
-   - **Environment name:** leave blank (the workflow does not use a GitHub Environment)
+   - **Environment name:** `pypi` — the publish job runs with `environment: pypi` (see `release.yml`). Leaving this blank still works (a blank publisher-side environment accepts a token from *any* environment), but naming it `pypi` is what actually restricts publishing to that environment, so set it.
 3. Save. No further action is needed — `pypa/gh-action-pypi-publish` in `release.yml` requests a short-lived OIDC token from GitHub Actions at publish time and PyPI verifies it against this configuration.
 
 This is a one-time setup per PyPI project. It does not need to be repeated for future releases.
+
+### GitHub Environment (`pypi`)
+
+The publish job declares `environment: pypi`. GitHub auto-creates the environment on first use, so nothing is strictly required up front. For real protection, pre-create it under the repo's **Settings → Environments** before the first tagged release and add a deployment branch/tag rule limiting it to `v*` tags (and optionally required reviewers). This pairs with the PyPI-side `pypi` environment above so only the release workflow, on a version tag, can publish.
 
 ## Cutting a release
 
