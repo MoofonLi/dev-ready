@@ -36,6 +36,7 @@ jobs:
       - name: Sync dependencies
         run: uv sync --dev
       - name: Generate demo project
+        id: generate
         run: uv run dev-ready init demo-app --yes
 
       - name: Build containers
@@ -66,11 +67,14 @@ jobs:
           exit 1
 
       - name: Show container logs on failure
-        if: failure()
+        # Guarded on the generate step: if setup or generation failed there is
+        # no demo-app directory and these steps would fail with a confusing
+        # "No such file or directory" instead of the real error.
+        if: failure() && steps.generate.outcome == 'success'
         working-directory: demo-app
         run: docker compose logs
 
       - name: Tear down containers
-        if: always()
+        if: always() && steps.generate.outcome == 'success'
         working-directory: demo-app
         run: docker compose down -v
