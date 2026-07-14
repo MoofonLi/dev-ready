@@ -14,3 +14,21 @@ class Answers:
     include_mcp: bool = True
     include_docs: bool = True
     assume_yes: bool = False
+
+
+@dataclass(frozen=True)
+class PartialAnswers:
+    """What the CLI flags already answered; `None`/`components_explicit=False`
+    marks what `collect_answers` still needs to fill in.
+
+    `target_dir=None` means "default to `Path.cwd() / project_name`", which
+    can only be resolved once the project name is known.
+    """
+
+    project_name: str | None
+    target_dir: Path | None
+    include_skills: bool
+    include_mcp: bool
+    include_docs: bool
+    components_explicit: bool
+    assume_yes: bool = False

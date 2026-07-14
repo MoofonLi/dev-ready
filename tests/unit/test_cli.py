@@ -1,6 +1,7 @@
 """Unit tests for dev_ready.cli."""
 
 import argparse
+import sys
 from pathlib import Path
 
 import pytest
@@ -8,7 +9,13 @@ import pytest
 import dev_ready.cli as cli_module
 from dev_ready import __version__
 from dev_ready.cli import build_answers, build_parser, main
-from dev_ready.errors import FetchError, InvalidArgumentsError, OverlayError, TargetDirectoryError
+from dev_ready.errors import (
+    AbortedError,
+    FetchError,
+    InvalidArgumentsError,
+    OverlayError,
+    TargetDirectoryError,
+)
 from dev_ready.prompts import Answers
 
 
@@ -185,3 +192,76 @@ def test_parser_accepts_all_documented_flags() -> None:
     assert args.command == "init"
     assert args.yes is True
     assert args.target_dir == Path("x")
+
+
+# --- interactive flow (no --yes): confirm / abort / questionary isolation ---
+
+
+def test_init_interactive_confirm_accept_calls_generate_once(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    target_dir = tmp_path / "my-app"
+    generate_calls: list[Answers] = []
+
+    monkeypatch.setattr(
+        cli_module,
+        "collect_answers",
+        lambda partial, **_: Answers(project_name="my-app", target_dir=target_dir),
+    )
+    monkeypatch.setattr(cli_module, "confirm_generation", lambda answers, pin, **_: True)
+
+    def _spy_generate(answers: Answers, pin) -> list[Path]:
+        generate_calls.append(answers)
+        return [Path("CLAUDE.md")]
+
+    monkeypatch.setattr(cli_module, "generate", _spy_generate)
+
+    assert main(["init", "my-app", "--dir", str(target_dir)]) == 0
+    assert len(generate_calls) == 1
+    assert "my-app" in capsys.readouterr().out
+
+
+def test_init_interactive_confirm_decline_skips_generate(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    target_dir = tmp_path / "my-app"
+    generate_calls: list[Answers] = []
+
+    monkeypatch.setattr(
+        cli_module,
+        "collect_answers",
+        lambda partial, **_: Answers(project_name="my-app", target_dir=target_dir),
+    )
+    monkeypatch.setattr(cli_module, "confirm_generation", lambda answers, pin, **_: False)
+    monkeypatch.setattr(
+        cli_module, "generate", lambda answers, pin: generate_calls.append(answers) or []
+    )
+
+    assert main(["init", "my-app", "--dir", str(target_dir)]) == 1
+    assert generate_calls == []
+    assert "aborted: nothing was written" in capsys.readouterr().err
+
+
+def test_init_interactive_cancel_aborts_with_exit_1(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    def _raise_aborted(partial, **_):
+        raise AbortedError("prompt cancelled")
+
+    monkeypatch.setattr(cli_module, "collect_answers", _raise_aborted)
+
+    assert main(["init", "my-app"]) == 1
+    err = capsys.readouterr().err
+    assert err.strip() == "aborted: nothing was written"
+
+
+def test_yes_path_never_imports_questionary(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sys.modules.pop("questionary", None)
+    monkeypatch.setattr(cli_module, "generate", lambda answers, pin: [Path("CLAUDE.md")])
+
+    target_dir = tmp_path / "my-app"
+    assert main(["init", "my-app", "--yes", "--dir", str(target_dir)]) == 0
+
+    assert "questionary" not in sys.modules

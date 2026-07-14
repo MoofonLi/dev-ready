@@ -39,3 +39,9 @@ class OverlayError(DevReadyError):
     """Overlay asset missing, destination collision, or templating failure."""
 
     exit_code = 1
+
+
+class AbortedError(DevReadyError):
+    """User cancelled an interactive prompt (Ctrl-C or an unanswered prompt)."""
+
+    exit_code = 1

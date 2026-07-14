@@ -74,6 +74,10 @@ uvx dev-ready init my-app
 - Runtime dependencies are kept minimal (target: questionary, httpx or stdlib urllib, rich optional). Every new dependency requires a note here.
 - No module reads `manifest.json` directly except `manifest`.
 
+### questionary (added phase 4)
+
+The repo's first runtime dependency, sanctioned by the "target: questionary" line above. It renders the interactive project-name text prompt, the skills/MCP/docs multi-select, and the yes/no confirmation (ADR-004). The stdlib (`input()`) is insufficient: it has no multi-select/checkbox primitive and no cross-platform line editing (arrow-key navigation, cancel-on-Ctrl-C-without-traceback) — reimplementing that is exactly the kind of undifferentiated work a dependency should absorb. Import is confined to `src/dev_ready/prompts/_questionary_asker.py`, and only via a function-local import inside `prompts/collect.py::_default_asker`, so the `--yes` flag path (which never calls into `prompts` at all) never triggers it.
+
 ## Coding Standards
 
 - Python >= 3.12, fully type-annotated public functions.
