@@ -32,6 +32,8 @@ All answers collect into a single `Answers` model shared with the flag-based pat
 
 Declining the confirmation, or cancelling any prompt (Ctrl-C), prints `aborted: nothing was written` to stderr and exits 1 — nothing has been written at that point by construction. `--yes` bypasses every prompt in this flow, including confirmation. A non-TTY stdin with missing inputs and no `--yes` fails fast with an invalid-arguments error (exit 2) instead of hanging.
 
+**Windows compatibility:** interactive prompts are tested against Windows Terminal. Legacy `cmd.exe` may render the checkbox prompt incorrectly (missing VT/ANSI support). In environments where terminal support is uncertain, use `--yes` with explicit `--no-skills`/`--no-mcp`/`--no-docs` flags instead of relying on prompts.
+
 ## Planned (not in v0.1)
 
 - `dev-ready check` — validate an existing generated project against the manifest

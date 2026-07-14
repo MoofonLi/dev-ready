@@ -24,6 +24,9 @@ def render_report(answers: Answers, pin: UpstreamPin, written: list[Path]) -> st
         "",
         "next steps:",
         f"  1. cd {answers.target_dir}",
+        # "docker compose watch" is the dev workflow for
+        # fastapi/full-stack-fastapi-template as of the manifest-pinned commit.
+        # Update when a manifest bump changes the upstream workflow.
         "  2. docker compose watch   (see CLAUDE.md for other commands)",
         "  3. read CLAUDE.md for the full picture",
     ]

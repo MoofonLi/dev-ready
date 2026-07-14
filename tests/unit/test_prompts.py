@@ -166,16 +166,49 @@ def test_name_prompt_keyboard_interrupt_raises_aborted() -> None:
 
 def test_non_tty_missing_name_raises_invalid_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(collect_module, "_is_interactive", lambda: False)
-    with pytest.raises(InvalidArgumentsError):
+    with pytest.raises(InvalidArgumentsError) as excinfo:
         collect_answers(_partial(project_name=None))
+    assert "project name is required" in str(excinfo.value)
 
 
 def test_non_tty_missing_components_raises_invalid_arguments(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(collect_module, "_is_interactive", lambda: False)
-    with pytest.raises(InvalidArgumentsError):
+    with pytest.raises(InvalidArgumentsError) as excinfo:
         collect_answers(_partial(components_explicit=False))
+    assert "component selection requires an interactive terminal" in str(excinfo.value)
+
+
+# --- interactive/flag path convergence (ADR-004) ---
+
+
+def test_interactive_and_flag_paths_produce_identical_answers(tmp_path: Path) -> None:
+    """build_answers (flags) and collect_answers (prompts, answers pre-supplied via
+    FakeAsker) must construct an equal Answers for equivalent inputs — the two
+    paths share one Answers model by construction (ADR-004)."""
+    target_dir = tmp_path / "my-app"
+
+    flag_answers = Answers(
+        project_name="my-app",
+        target_dir=target_dir,
+        include_skills=False,
+        include_mcp=True,
+        include_docs=True,
+        assume_yes=False,
+    )
+
+    asker = FakeAsker(texts=["my-app"], checkboxes=[["mcp", "docs"]])
+    prompt_answers = collect_answers(
+        _partial(
+            project_name=None,
+            target_dir=target_dir,
+            components_explicit=False,
+        ),
+        asker=asker,
+    )
+
+    assert flag_answers == prompt_answers
 
 
 def test_non_tty_with_asker_injected_still_prompts(monkeypatch: pytest.MonkeyPatch) -> None:
