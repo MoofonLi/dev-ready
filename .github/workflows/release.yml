@@ -7,9 +7,10 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: pypi # shows up under the repo's Deployments; also referenced by the PyPI trusted publisher config
     permissions:
       id-token: write # trusted publishing to PyPI — no token/password needed
-      contents: read
+      contents: write # create the GitHub Release for the pushed tag
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
@@ -35,3 +36,8 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.14.0
+
+      - name: Create GitHub Release
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes dist/*
+        env:
+          GH_TOKEN: ${{ github.token }}
