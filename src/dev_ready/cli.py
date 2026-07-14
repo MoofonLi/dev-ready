@@ -59,8 +59,9 @@ def build_parser() -> argparse.ArgumentParser:
 def build_answers(args: argparse.Namespace) -> Answers:
     """Turn parsed flags into the shared Answers model.
 
-    Interactive prompting for missing values lands in a later phase; until
-    then the project name is required on the command line.
+    Used only on the --yes path, where all values must come from the command
+    line; the interactive path goes through `_build_partial_answers` +
+    `collect_answers` instead.
     """
     name = args.project_name
     if not name:
