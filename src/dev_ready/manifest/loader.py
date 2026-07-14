@@ -16,7 +16,12 @@ from dev_ready.manifest.models import Manifest, UpstreamPin
 SUPPORTED_MANIFEST_VERSION = 1
 
 _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
-_REPO_PATTERN = re.compile(r"^[\w.-]+/[\w.-]+$")
+# owner/name, GitHub-shaped: each side must start with an alphanumeric so no
+# segment can begin with '.' (blocks traversal-shaped values like '..x/y' that
+# the old `[\w.-]+` permitted). owner is alphanumeric + hyphen; repo name also
+# allows '.' and '_'. Defense-in-depth for the URL built in fetch, hardening the
+# path before load_manifest() is ever pointed at a non-bundled manifest.
+_REPO_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]*/[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
 
 def load_manifest(path: Path) -> Manifest:

@@ -6,6 +6,7 @@ readme = "README-pypi.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.12"
 dependencies = [
+    "copier>=9.4,<10",
     "questionary>=2.0,<3",
 ]
 

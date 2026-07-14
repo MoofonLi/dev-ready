@@ -4,6 +4,8 @@ Only `cli` (or this module, which only `cli` calls) sequences `fetch`,
 `overlay`, and `verify` — see docs/architecture.md, Dependency Rules.
 """
 
+import re
+import secrets
 import shutil
 import sys
 import tempfile
@@ -35,7 +37,7 @@ def generate(answers: Answers, pin: UpstreamPin) -> list[Path]:
     staging_root = Path(tempfile.mkdtemp(prefix="dev-ready-generate-"))
     try:
         project_staging = staging_root / "project"
-        fetch_snapshot(pin, project_staging)
+        fetch_snapshot(pin, project_staging, _template_data(answers))
         written = apply_overlay(answers, project_staging)
         verify_project(project_staging)
         _finalize(project_staging, answers.target_dir)
@@ -45,6 +47,34 @@ def generate(answers: Answers, pin: UpstreamPin) -> list[Path]:
             print(f"warning: failed to remove temp directory {staging_root}", file=sys.stderr)
 
     return written
+
+
+def _template_data(answers: Answers) -> dict[str, str]:
+    """Answers for the upstream template's own copier.yml questions.
+
+    Anything not listed here falls back to the template's defaults
+    (fetch_snapshot runs Copier with defaults=True). Secrets are generated
+    per-project so a generated project never ships the upstream "changethis"
+    placeholders; the template's `_tasks` write them into the project's .env,
+    which is where users find them (including the first superuser password).
+
+    The question names are coupled to the pinned upstream commit; the weekly
+    bump CI (ADR-002) regenerates a real project, so a rename upstream fails
+    the bump PR rather than end users.
+    """
+    return {
+        "project_name": answers.project_name,
+        "stack_name": _slugify(answers.project_name),
+        "secret_key": secrets.token_urlsafe(32),
+        "postgres_password": secrets.token_urlsafe(32),
+        "first_superuser_password": secrets.token_urlsafe(16),
+    }
+
+
+def _slugify(name: str) -> str:
+    """Docker-Compose-label-safe stack name: lowercase, alnum and hyphens only."""
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    return slug or "app"
 
 
 def _validate_target_dir(target_dir: Path) -> None:

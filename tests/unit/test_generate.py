@@ -31,7 +31,9 @@ def _isolated_tempdir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return temp_root
 
 
-def _fake_fetch_ok(pin: UpstreamPin, dest: Path) -> Path:
+def _fake_fetch_ok(
+    pin: UpstreamPin, dest: Path, template_data: dict[str, str] | None = None
+) -> Path:
     dest.mkdir(parents=True)
     (dest / "README.md").write_text("hello", encoding="utf-8")
     (dest / "backend").mkdir()
@@ -70,7 +72,9 @@ def test_preflight_rejects_non_empty_target_dir_before_fetch(
 ) -> None:
     calls: list[Path] = []
 
-    def _spy_fetch(pin: UpstreamPin, dest: Path) -> Path:
+    def _spy_fetch(
+        pin: UpstreamPin, dest: Path, template_data: dict[str, str] | None = None
+    ) -> Path:
         calls.append(dest)
         return _fake_fetch_ok(pin, dest)
 
@@ -98,7 +102,9 @@ def test_preflight_rejects_target_dir_that_is_a_file(tmp_path: Path) -> None:
 def test_fetch_failure_leaves_target_untouched_and_no_leaked_temp_dirs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolated_tempdir: Path
 ) -> None:
-    def _failing_fetch(pin: UpstreamPin, dest: Path) -> Path:
+    def _failing_fetch(
+        pin: UpstreamPin, dest: Path, template_data: dict[str, str] | None = None
+    ) -> Path:
         raise FetchError("simulated network failure")
 
     monkeypatch.setattr(generate_module, "fetch_snapshot", _failing_fetch)
@@ -114,7 +120,9 @@ def test_fetch_failure_leaves_target_untouched_and_no_leaked_temp_dirs(
 def test_overlay_failure_leaves_target_untouched_and_no_leaked_temp_dirs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolated_tempdir: Path
 ) -> None:
-    def _fetch_with_preexisting_claude_md(pin: UpstreamPin, dest: Path) -> Path:
+    def _fetch_with_preexisting_claude_md(
+        pin: UpstreamPin, dest: Path, template_data: dict[str, str] | None = None
+    ) -> Path:
         dest.mkdir(parents=True)
         # upstream already ships a CLAUDE.md -> overlay must collide and fail
         (dest / "CLAUDE.md").write_text("not ours", encoding="utf-8")
@@ -143,7 +151,9 @@ def test_success_leaves_no_leaked_temp_dirs(
 def test_verification_failure_leaves_target_untouched_and_no_leaked_temp_dirs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolated_tempdir: Path
 ) -> None:
-    def _fetch_missing_frontend(pin: UpstreamPin, dest: Path) -> Path:
+    def _fetch_missing_frontend(
+        pin: UpstreamPin, dest: Path, template_data: dict[str, str] | None = None
+    ) -> Path:
         # Upstream restructured and no longer ships a frontend/ directory ->
         # verify_project must catch it before anything reaches target_dir.
         dest.mkdir(parents=True)
@@ -167,7 +177,9 @@ def test_verify_runs_after_overlay_and_before_move(
     target_dir = tmp_path / "my-app"
     answers = Answers(project_name="my-app", target_dir=target_dir)
 
-    def _spy_fetch(pin: UpstreamPin, dest: Path) -> Path:
+    def _spy_fetch(
+        pin: UpstreamPin, dest: Path, template_data: dict[str, str] | None = None
+    ) -> Path:
         call_order.append("fetch")
         return _fake_fetch_ok(pin, dest)
 
@@ -188,3 +200,26 @@ def test_verify_runs_after_overlay_and_before_move(
 
     assert call_order == ["fetch", "overlay", "verify"]
     assert target_dir.exists()
+
+
+def test_fetch_receives_template_data_with_generated_secrets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    received: dict[str, str] = {}
+
+    def _spy_fetch(
+        pin: UpstreamPin, dest: Path, template_data: dict[str, str] | None = None
+    ) -> Path:
+        received.update(template_data or {})
+        return _fake_fetch_ok(pin, dest)
+
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _spy_fetch)
+
+    generate(Answers(project_name="My_Cool-App", target_dir=tmp_path / "my-app"), PIN)
+
+    assert received["project_name"] == "My_Cool-App"
+    assert received["stack_name"] == "my-cool-app"
+    # Secrets must be generated per-project, never the upstream placeholder.
+    for key in ("secret_key", "postgres_password", "first_superuser_password"):
+        assert received[key] != "changethis"
+        assert len(received[key]) >= 16

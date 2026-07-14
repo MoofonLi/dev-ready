@@ -14,8 +14,8 @@ uvx dev-ready init my-app
 | 1. Prompt user    | --> | 2. Fetch upstream   | --> | 3. Apply overlay |
 |    (questionary)  |     |    at pinned commit |     |    (CLAUDE.md,   |
 |                   |     |    from manifest    |     |    skills, MCP,  |
-|                   |     |    (tarball, no git |     |    docs)         |
-|                   |     |    history)         |     |                  |
+|                   |     |    (Copier, no git  |     |    docs)         |
+|                   |     |    history kept)    |     |                  |
 +-------------------+     +---------------------+     +------------------+
                                                               |
                                                               v
@@ -48,6 +48,7 @@ uvx dev-ready init my-app
 - Context: The original plan was a Node CLI (`npx create-ai-stack`, degit + @clack/prompts). The project has since moved to a Python implementation named dev-ready, matching the maintainer's primary stack (Python) and the target audience (FastAPI developers who already have uv).
 - Decision: Pure Python CLI, `uvx dev-ready`. Node-specific choices are replaced: degit -> GitHub tarball download at pinned commit; @clack/prompts -> questionary (or equivalent); npm publish -> PyPI publish.
 - Consequences: Single-language repo; one less runtime assumption for the target audience. The npx name `create-ai-stack` is abandoned.
+- Amended by ADR-005: the tarball download is replaced by Copier; the pinning, staging, and all-or-nothing guarantees are unchanged.
 
 ### ADR-004: Interactive prompts with a non-interactive escape hatch
 
@@ -56,13 +57,25 @@ uvx dev-ready init my-app
 - Decision: Interactive by default; `--yes` plus explicit flags cover every prompt.
 - Consequences: All prompt logic must route through a single answers model so both paths share one code path.
 
+### ADR-005: Consume upstream via Copier, superseding the tarball fetch (v0.1.3)
+
+- Status: Accepted (2026-07-14), amends ADR-003
+- Context: v0.1 downloaded the upstream as a raw tarball. Real-world use showed two gaps: (1) the template's own copier.yml questions (project_name, stack_name, secret_key, postgres_password, first_superuser_password) were never answered, so every generated project shipped the upstream "changethis" placeholder secrets and default project name in `.env`; (2) the template's `_exclude` list was ignored. Copier is the upstream template's officially supported consumption path.
+- Decision: `fetch` runs `copier.run_copy(https://github.com/<repo>.git, staging, data=..., vcs_ref=<pinned commit>, defaults=True, unsafe=True, quiet=True)`. `generate` builds the template data from Answers, generating per-project secrets (`secrets.token_urlsafe`) that the template's `_tasks` write into the project's `.env`. Everything else — manifest pin, staging directory, all-or-nothing finalize, weekly bump CI — is unchanged. The tarball download/extract modules and their tests are removed.
+- Consequences:
+  - Generated projects get correct names and unique secrets, and carry `.copier/.copier-answers.yml`, enabling `copier update` for users later.
+  - New runtime dependency (copier, which brings jinja2/pydantic/plumbum) and a new host requirement: git must be installed (Copier clones; checked up front, mapped to FetchError/exit 3).
+  - `unsafe=True` executes the template's `_tasks` (`.copier/update_dotenv.py`) at generation time. Accepted because the executed code is pinned to a CI-verified commit (ADR-002), never floating "latest".
+  - Template question names are coupled to the pinned commit; an upstream rename is caught by the bump PR's generate-and-verify job, not by end users.
+  - Unwanted template-repo metadata files (upstream `.github/` workflows, SECURITY.md, release-notes.md) are NOT excluded by the template's `_exclude`; a manifest-driven prune list remains future work.
+
 ## Module Boundary
 
 | Module | Responsibility | Must not |
 |---|---|---|
 | `cli` | Argument parsing, command wiring, exit codes | contain generation logic |
 | `prompts` | Interactive/non-interactive collection of user answers into one model | perform I/O other than terminal |
-| `fetch` | Download and verify upstream snapshot at the manifest-pinned commit | know about overlay content |
+| `fetch` | Generate the upstream base via Copier at the manifest-pinned commit | know about overlay content |
 | `overlay` | Apply dev-ready files onto the fetched base; templating of names/values | fetch anything from the network |
 | `manifest` | Load/validate manifest.json; single source of truth for pins | be bypassed by other modules |
 | `report` | Post-generation summary and next steps | mutate the generated project |
@@ -72,7 +85,7 @@ uvx dev-ready init my-app
 
 - Direction: `cli` -> `prompts`/`manifest`/`fetch`/`overlay`/`report`/`verify`. Lower modules never import `cli`.
 - `fetch`, `overlay`, and `verify` are independent of each other; only `generate` (called only by `cli`) sequences them.
-- Runtime dependencies are kept minimal (target: questionary, httpx or stdlib urllib, rich optional). Every new dependency requires a note here.
+- Runtime dependencies are kept minimal (current: questionary, copier — see ADR-005; rich optional). Every new dependency requires a note here.
 - No module reads `manifest.json` directly except `manifest`.
 - `scripts/` (CI-only maintainer tooling, e.g. `scripts/bump_upstream.py`) is not part of the wheel and is not subject to the `fetch/`-only network-call rule above, which governs `src/dev_ready` only.
 

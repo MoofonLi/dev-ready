@@ -104,6 +104,34 @@ def test_repo_must_be_owner_slash_name() -> None:
         parse_manifest(json.dumps(data))
 
 
+@pytest.mark.parametrize(
+    "bad_repo",
+    [
+        "..x/y",  # owner segment starting with '.' (traversal-shaped)
+        "x/..y",  # name segment starting with '.'
+        ".hidden/y",  # leading dot owner
+        "-x/y",  # owner cannot start with a hyphen
+        "x/-y",  # name cannot start with a hyphen
+        "owner//name",  # empty segment
+        "owner/name/extra",  # more than one path segment
+    ],
+)
+def test_repo_rejects_traversal_shaped_values(bad_repo: str) -> None:
+    # The URL fetch builds is https://github.com/<repo>.git; each side must
+    # start with an alphanumeric so no segment can begin with '.' or '-'.
+    data = json.loads(json.dumps(VALID))
+    data["upstream"]["base_template"]["repo"] = bad_repo
+    with pytest.raises(ManifestError, match="owner/name"):
+        parse_manifest(json.dumps(data))
+
+
+def test_repo_accepts_dots_and_underscores_in_name() -> None:
+    # GitHub repo names may contain '.' and '_' (just not as the first char).
+    data = json.loads(json.dumps(VALID))
+    data["upstream"]["base_template"]["repo"] = "octo-org/my_repo.name"
+    assert parse_manifest(json.dumps(data)).upstream["base_template"].repo == "octo-org/my_repo.name"
+
+
 def test_empty_upstream_rejected() -> None:
     data = json.loads(json.dumps(VALID))
     data["upstream"] = {}

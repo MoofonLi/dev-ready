@@ -1,16 +1,16 @@
-"""Unit tests for dev_ready.fetch (no network; filesystem confined to tmp_path)."""
+"""Unit tests for dev_ready.fetch (no network; Copier is mocked)."""
 
-import io
-import tarfile
+import shutil
+import subprocess
 import tempfile
-import urllib.error
-import urllib.request
-from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
+import copier
 import pytest
+from copier.errors import CopierError
 
-import dev_ready.fetch.download as download_module
+import dev_ready.fetch.snapshot as snapshot_module
 from dev_ready.errors import FetchError, TargetDirectoryError
 from dev_ready.fetch import fetch_snapshot
 from dev_ready.manifest import UpstreamPin
@@ -21,7 +21,6 @@ PIN = UpstreamPin(
     commit="4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2",
     license="MIT",
 )
-PREFIX = "full-stack-fastapi-template-4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2"
 
 
 @pytest.fixture(autouse=True)
@@ -38,280 +37,90 @@ def _isolated_tempdir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return temp_root
 
 
-class _FakeResponse:
-    def __init__(
-        self, data: bytes, *, status: int = 200, headers: dict[str, str] | None = None
+@pytest.fixture(autouse=True)
+def _git_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unit tests never shell out; pretend git exists unless a test overrides."""
+    monkeypatch.setattr(snapshot_module.shutil, "which", lambda _name: "/usr/bin/git")
+
+
+def _install_fake_run_copy(
+    monkeypatch: pytest.MonkeyPatch, recorded: dict[str, Any]
+) -> None:
+    def _fake_run_copy(
+        src_path: str, dst_path: Path | str, data: dict[str, Any] | None = None, **kwargs: Any
     ) -> None:
-        self._buf = io.BytesIO(data)
-        self.status = status
-        self.headers = headers or {}
+        recorded["src_path"] = src_path
+        recorded["dst_path"] = Path(dst_path)
+        recorded["data"] = data
+        recorded["kwargs"] = kwargs
+        # Copier writes into an existing destination directory.
+        (Path(dst_path) / "README.md").write_text("upstream", encoding="utf-8")
+        (Path(dst_path) / "backend").mkdir()
 
-    def read(self, amt: int) -> bytes:
-        return self._buf.read(amt)
-
-    def __enter__(self) -> "_FakeResponse":
-        return self
-
-    def __exit__(self, *exc: object) -> None:
-        return None
+    monkeypatch.setattr(copier, "run_copy", _fake_run_copy)
 
 
-def _opener_for(tar_path: Path, **response_kwargs: object) -> Callable[..., _FakeResponse]:
-    data = tar_path.read_bytes()
+def test_happy_path_populates_dest_and_pins_copier_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recorded: dict[str, Any] = {}
+    _install_fake_run_copy(monkeypatch, recorded)
+    dest = tmp_path / "snapshot"
+    data = {"project_name": "My App", "secret_key": "s3cret"}
 
-    def _opener(request: object, timeout: object) -> _FakeResponse:
-        return _FakeResponse(data, **response_kwargs)
-
-    return _opener
-
-
-def _add_file(tar: tarfile.TarFile, name: str, content: bytes = b"") -> None:
-    info = tarfile.TarInfo(name=name)
-    info.size = len(content)
-    tar.addfile(info, io.BytesIO(content))
-
-
-def _add_dir(tar: tarfile.TarFile, name: str) -> None:
-    info = tarfile.TarInfo(name=name)
-    info.type = tarfile.DIRTYPE
-    tar.addfile(info)
-
-
-def _add_symlink(tar: tarfile.TarFile, name: str, target: str) -> None:
-    info = tarfile.TarInfo(name=name)
-    info.type = tarfile.SYMTYPE
-    info.linkname = target
-    tar.addfile(info)
-
-
-def _add_hardlink(tar: tarfile.TarFile, name: str, target: str) -> None:
-    info = tarfile.TarInfo(name=name)
-    info.type = tarfile.LNKTYPE
-    info.linkname = target
-    tar.addfile(info)
-
-
-def _build_tarball(tar_path: Path, build: Callable[[tarfile.TarFile], None]) -> Path:
-    with tarfile.open(tar_path, "w:gz") as tar:
-        build(tar)
-    return tar_path
-
-
-def _happy_path_layout(tar: tarfile.TarFile) -> None:
-    _add_dir(tar, PREFIX)
-    _add_dir(tar, f"{PREFIX}/backend")
-    _add_file(tar, f"{PREFIX}/README.md", b"hello")
-    _add_file(tar, f"{PREFIX}/backend/main.py", b"print('hi')")
-
-
-def test_fetch_snapshot_happy_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    tar_path = _build_tarball(tmp_path / "src.tar.gz", _happy_path_layout)
-    monkeypatch.setattr(download_module, "_default_opener", _opener_for(tar_path))
-
-    dest = tmp_path / "out"
-    result = fetch_snapshot(PIN, dest)
+    result = fetch_snapshot(PIN, dest, data)
 
     assert result == dest
-    assert (dest / "README.md").read_text() == "hello"
-    assert (dest / "backend" / "main.py").read_text() == "print('hi')"
-    # the wrapping "{name}-{sha}/" directory itself must not appear in dest
-    assert not (dest / PREFIX).exists()
+    assert (dest / "README.md").read_text(encoding="utf-8") == "upstream"
+    assert (dest / "backend").is_dir()
+    assert recorded["src_path"] == f"https://github.com/{PIN.repo}.git"
+    assert recorded["data"] == data
+    assert recorded["kwargs"]["vcs_ref"] == PIN.commit
+    assert recorded["kwargs"]["defaults"] is True
+    assert recorded["kwargs"]["unsafe"] is True
 
 
-def test_safe_internal_symlink_is_preserved(
+def test_template_data_defaults_to_empty_dict(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Symlinks resolving inside the root must survive extraction.
+    recorded: dict[str, Any] = {}
+    _install_fake_run_copy(monkeypatch, recorded)
 
-    The real upstream template ships one (.agents/skills/fastapi); rejecting
-    all symlinks outright would break every fetch of the real repo.
-    """
+    fetch_snapshot(PIN, tmp_path / "snapshot")
 
-    def build(tar: tarfile.TarFile) -> None:
-        _add_dir(tar, PREFIX)
-        _add_file(tar, f"{PREFIX}/target.txt", b"real file")
-        _add_symlink(tar, f"{PREFIX}/link.txt", "target.txt")
-
-    tar_path = _build_tarball(tmp_path / "src.tar.gz", build)
-    monkeypatch.setattr(download_module, "_default_opener", _opener_for(tar_path))
-
-    dest = tmp_path / "out"
-    fetch_snapshot(PIN, dest)
-
-    assert (dest / "target.txt").read_text() == "real file"
-    assert (dest / "link.txt").read_text() == "real file"
+    assert recorded["data"] == {}
 
 
-def test_fetch_snapshot_into_existing_empty_dir(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    tar_path = _build_tarball(tmp_path / "src.tar.gz", _happy_path_layout)
-    monkeypatch.setattr(download_module, "_default_opener", _opener_for(tar_path))
-
-    dest = tmp_path / "out"
-    dest.mkdir()
-    fetch_snapshot(PIN, dest)
-
-    assert (dest / "README.md").read_text() == "hello"
-
-
-@pytest.mark.parametrize(
-    "build",
-    [
-        pytest.param(
-            lambda tar: (_add_dir(tar, PREFIX), _add_file(tar, "/etc/passwd", b"pwned")),
-            id="absolute-path",
-        ),
-        pytest.param(
-            lambda tar: (
-                _add_dir(tar, PREFIX),
-                _add_file(tar, f"{PREFIX}/../../evil", b"pwned"),
-            ),
-            id="dot-dot-traversal",
-        ),
-        pytest.param(
-            lambda tar: (
-                _add_dir(tar, PREFIX),
-                _add_symlink(tar, f"{PREFIX}/link", "../../etc/passwd"),
-            ),
-            id="symlink-escaping-root",
-        ),
-        pytest.param(
-            lambda tar: (
-                _add_dir(tar, PREFIX),
-                _add_file(tar, f"{PREFIX}/original.txt", b"data"),
-                _add_hardlink(tar, f"{PREFIX}/link.txt", f"{PREFIX}/original.txt"),
-            ),
-            id="hardlink",
-        ),
-    ],
-)
-def test_malicious_archive_members_rejected(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    build: Callable[[tarfile.TarFile], None],
-) -> None:
-    tar_path = _build_tarball(tmp_path / "src.tar.gz", build)
-    monkeypatch.setattr(download_module, "_default_opener", _opener_for(tar_path))
-
-    dest = tmp_path / "out"
-    with pytest.raises(FetchError):
-        fetch_snapshot(PIN, dest)
-    assert not dest.exists()
-
-
-@pytest.mark.parametrize(
-    "build",
-    [
-        pytest.param(lambda tar: _add_file(tar, "README.md", b"hi"), id="no-top-level-dir"),
-        pytest.param(
-            lambda tar: (
-                _add_dir(tar, "a"),
-                _add_file(tar, "a/x", b"1"),
-                _add_dir(tar, "b"),
-                _add_file(tar, "b/y", b"2"),
-            ),
-            id="two-top-level-dirs",
-        ),
-    ],
-)
-def test_unexpected_archive_layout_rejected(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    build: Callable[[tarfile.TarFile], None],
-) -> None:
-    tar_path = _build_tarball(tmp_path / "src.tar.gz", build)
-    monkeypatch.setattr(download_module, "_default_opener", _opener_for(tar_path))
-
-    dest = tmp_path / "out"
-    with pytest.raises(FetchError, match="unexpected archive layout"):
-        fetch_snapshot(PIN, dest)
-    assert not dest.exists()
-
-
-def test_http_error_raises_fetch_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    def _opener(request: urllib.request.Request, timeout: float) -> _FakeResponse:
-        raise urllib.error.HTTPError(request.full_url, 404, "Not Found", {}, None)  # type: ignore[arg-type]
-
-    monkeypatch.setattr(download_module, "_default_opener", _opener)
-
-    dest = tmp_path / "out"
-    with pytest.raises(FetchError):
-        fetch_snapshot(PIN, dest)
-    assert not dest.exists()
-
-
-def test_timeout_raises_fetch_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    def _opener(request: object, timeout: object) -> _FakeResponse:
-        raise TimeoutError("timed out")
-
-    monkeypatch.setattr(download_module, "_default_opener", _opener)
-
-    dest = tmp_path / "out"
-    with pytest.raises(FetchError):
-        fetch_snapshot(PIN, dest)
-    assert not dest.exists()
-
-
-def test_oversized_download_raises_fetch_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(download_module, "MAX_DOWNLOAD_BYTES", 10)
-
-    def _opener(request: object, timeout: object) -> _FakeResponse:
-        return _FakeResponse(b"x" * 1000)  # no Content-Length header: streaming guard must catch it
-
-    monkeypatch.setattr(download_module, "_default_opener", _opener)
-
-    dest = tmp_path / "out"
-    with pytest.raises(FetchError):
-        fetch_snapshot(PIN, dest)
-    assert not dest.exists()
-
-
-def test_oversized_content_length_header_raises_fetch_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(download_module, "MAX_DOWNLOAD_BYTES", 10)
-
-    def _opener(request: object, timeout: object) -> _FakeResponse:
-        return _FakeResponse(b"x" * 1000, headers={"Content-Length": "1000"})
-
-    monkeypatch.setattr(download_module, "_default_opener", _opener)
-
-    dest = tmp_path / "out"
-    with pytest.raises(FetchError):
-        fetch_snapshot(PIN, dest)
-    assert not dest.exists()
-
-
-def test_non_empty_dest_raises_target_directory_error(tmp_path: Path) -> None:
-    dest = tmp_path / "out"
-    dest.mkdir()
-    (dest / "existing.txt").write_text("keep me")
-
-    with pytest.raises(TargetDirectoryError):
-        fetch_snapshot(PIN, dest)
-    assert (dest / "existing.txt").read_text() == "keep me"
-
-
-def test_dest_that_is_a_file_raises_target_directory_error(tmp_path: Path) -> None:
-    dest = tmp_path / "out"
-    dest.write_text("i am a file")
-
-    with pytest.raises(TargetDirectoryError):
-        fetch_snapshot(PIN, dest)
-
-
-def test_failure_leaves_no_leaked_temp_dirs(
+def test_success_leaves_no_leaked_temp_dirs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolated_tempdir: Path
 ) -> None:
-    def _opener(request: urllib.request.Request, timeout: float) -> _FakeResponse:
-        raise urllib.error.HTTPError(request.full_url, 500, "Server Error", {}, None)  # type: ignore[arg-type]
+    _install_fake_run_copy(monkeypatch, {})
 
-    monkeypatch.setattr(download_module, "_default_opener", _opener)
+    fetch_snapshot(PIN, tmp_path / "snapshot")
 
-    dest = tmp_path / "out"
+    assert list(_isolated_tempdir.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "raised",
+    [
+        CopierError("template broke"),
+        subprocess.CalledProcessError(returncode=128, cmd=["git", "clone"]),
+        OSError("disk full"),
+    ],
+)
+def test_copier_failure_maps_to_fetch_error_and_leaves_dest_untouched(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    _isolated_tempdir: Path,
+    raised: Exception,
+) -> None:
+    def _failing_run_copy(*args: Any, **kwargs: Any) -> None:
+        raise raised
+
+    monkeypatch.setattr(copier, "run_copy", _failing_run_copy)
+    dest = tmp_path / "snapshot"
+
     with pytest.raises(FetchError):
         fetch_snapshot(PIN, dest)
 
@@ -319,12 +128,54 @@ def test_failure_leaves_no_leaked_temp_dirs(
     assert list(_isolated_tempdir.iterdir()) == []
 
 
-def test_success_leaves_no_leaked_temp_dirs(
+def test_missing_git_fails_before_copier_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(snapshot_module.shutil, "which", lambda _name: None)
+
+    def _must_not_run(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("copier.run_copy must not be called when git is missing")
+
+    monkeypatch.setattr(copier, "run_copy", _must_not_run)
+
+    with pytest.raises(FetchError, match="git"):
+        fetch_snapshot(PIN, tmp_path / "snapshot")
+
+
+def test_rejects_dest_that_is_a_file(tmp_path: Path) -> None:
+    dest = tmp_path / "snapshot"
+    dest.write_text("i am a file", encoding="utf-8")
+
+    with pytest.raises(TargetDirectoryError):
+        fetch_snapshot(PIN, dest)
+
+    assert dest.read_text(encoding="utf-8") == "i am a file"
+
+
+def test_rejects_non_empty_dest_dir(tmp_path: Path) -> None:
+    dest = tmp_path / "snapshot"
+    dest.mkdir()
+    (dest / "existing.txt").write_text("keep me", encoding="utf-8")
+
+    with pytest.raises(TargetDirectoryError):
+        fetch_snapshot(PIN, dest)
+
+    assert (dest / "existing.txt").read_text(encoding="utf-8") == "keep me"
+
+
+def test_finalize_failure_maps_to_fetch_error_and_cleans_temp(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolated_tempdir: Path
 ) -> None:
-    tar_path = _build_tarball(tmp_path / "src.tar.gz", _happy_path_layout)
-    monkeypatch.setattr(download_module, "_default_opener", _opener_for(tar_path))
+    _install_fake_run_copy(monkeypatch, {})
 
-    fetch_snapshot(PIN, tmp_path / "out")
+    def _failing_move(src: str, dst: str) -> None:
+        raise OSError("cross-device chaos")
 
+    monkeypatch.setattr(shutil, "move", _failing_move)
+    dest = tmp_path / "snapshot"
+
+    with pytest.raises(FetchError):
+        fetch_snapshot(PIN, dest)
+
+    assert not dest.exists()
     assert list(_isolated_tempdir.iterdir()) == []
