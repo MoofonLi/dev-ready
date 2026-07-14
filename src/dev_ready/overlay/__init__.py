@@ -106,16 +106,20 @@ def _apply_file(
         raise OverlayError(f"overlay asset missing: {source}")
 
     dest = project_dir / dest_rel
-    if dest.exists():
+    # is_symlink() also catches dangling symlinks, which exists() reports as False.
+    if dest.exists() or dest.is_symlink():
         raise OverlayError(f"overlay destination already exists: {dest_rel}")
 
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if source.name.endswith(_TEMPLATE_SUFFIX):
-        content = source.read_text(encoding="utf-8").replace(_TEMPLATE_TOKEN, project_name)
-        if "{{" in content:
-            raise OverlayError(f"unresolved template marker left in {dest_rel}")
-        dest.write_text(content, encoding="utf-8")
-    else:
-        dest.write_bytes(source.read_bytes())
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if source.name.endswith(_TEMPLATE_SUFFIX):
+            content = source.read_text(encoding="utf-8").replace(_TEMPLATE_TOKEN, project_name)
+            if "{{" in content or "}}" in content:
+                raise OverlayError(f"unresolved template marker left in {dest_rel}")
+            dest.write_text(content, encoding="utf-8")
+        else:
+            dest.write_bytes(source.read_bytes())
+    except OSError as error:
+        raise OverlayError(f"failed to write {dest_rel}: {error}") from error
 
     return dest_rel

@@ -45,15 +45,30 @@ def test_happy_path_writes_every_component_with_substitution(tmp_path: Path) -> 
 
 
 @pytest.mark.parametrize(
-    ("flag", "missing_path"),
+    ("flag", "missing_path", "sibling_paths"),
     [
-        ("include_skills", Path(".claude") / "skills" / "project-orientation" / "SKILL.md"),
-        ("include_mcp", Path(".mcp.json")),
-        ("include_docs", Path("docs") / "architecture.md"),
+        (
+            "include_skills",
+            Path(".claude") / "skills" / "project-orientation" / "SKILL.md",
+            [Path(".mcp.json"), Path("docs") / "architecture.md"],
+        ),
+        (
+            "include_mcp",
+            Path(".mcp.json"),
+            [
+                Path(".claude") / "skills" / "project-orientation" / "SKILL.md",
+                Path("docs") / "architecture.md",
+            ],
+        ),
+        (
+            "include_docs",
+            Path("docs") / "architecture.md",
+            [Path(".mcp.json"), Path(".claude") / "skills" / "project-orientation" / "SKILL.md"],
+        ),
     ],
 )
 def test_component_flag_skips_exactly_its_component(
-    tmp_path: Path, flag: str, missing_path: Path
+    tmp_path: Path, flag: str, missing_path: Path, sibling_paths: list[Path]
 ) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
@@ -62,6 +77,8 @@ def test_component_flag_skips_exactly_its_component(
 
     assert (project_dir / "CLAUDE.md").exists()
     assert not (project_dir / missing_path).exists()
+    for sibling in sibling_paths:
+        assert (project_dir / sibling).exists()
 
 
 def test_claude_md_always_present_even_with_all_components_disabled(tmp_path: Path) -> None:
@@ -130,6 +147,35 @@ def test_leftover_template_marker_raises_overlay_error(tmp_path: Path) -> None:
         overlay_module._apply_file(source, project_dir, Path("out.txt"), "my-app")
 
     assert not (project_dir / "out.txt").exists()
+
+
+class _MissingAssetTraversable:
+    """Minimal Traversable stub simulating a broken install: nothing exists."""
+
+    def joinpath(self, *_parts: str) -> "_MissingAssetTraversable":
+        return self
+
+    def is_file(self) -> bool:
+        return False
+
+    def is_dir(self) -> bool:
+        return False
+
+
+def test_missing_overlay_asset_raises_overlay_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Simulates a corrupt/broken install where packaged template assets are absent."""
+    import dev_ready.overlay as overlay_module
+
+    monkeypatch.setattr(
+        overlay_module.resources, "files", lambda _package: _MissingAssetTraversable()
+    )
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    with pytest.raises(OverlayError, match="overlay asset missing"):
+        apply_overlay(_answers(tmp_path), project_dir)
 
 
 def test_asset_read_via_importlib_resources() -> None:

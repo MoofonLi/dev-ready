@@ -36,6 +36,9 @@ def fetch_snapshot(pin: UpstreamPin, dest: Path) -> Path:
 
 
 def _validate_target_dir(dest: Path) -> None:
+    # When called from generate(), dest is always a fresh subdirectory of a
+    # just-created staging root, so this check is a no-op in that path; it
+    # only bites when fetch_snapshot is called directly at an existing path.
     if not dest.exists():
         return
     if not dest.is_dir():

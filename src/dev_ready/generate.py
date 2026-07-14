@@ -5,6 +5,7 @@ Only `cli` (or this module, which only `cli` calls) sequences `fetch` and
 """
 
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -36,6 +37,8 @@ def generate(answers: Answers, pin: UpstreamPin) -> list[Path]:
         _finalize(project_staging, answers.target_dir)
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)
+        if staging_root.exists():
+            print(f"warning: failed to remove temp directory {staging_root}", file=sys.stderr)
 
     return written
 
@@ -57,6 +60,9 @@ def _finalize(staging_dir: Path, target_dir: Path) -> None:
     try:
         if target_dir.exists():
             target_dir.rmdir()
+        # shutil.move is non-atomic on cross-device moves (falls back to
+        # copy+delete); the partial-visibility window is accepted (see
+        # phase 2 SRE review).
         shutil.move(str(staging_dir), str(target_dir))
     except OSError as error:
         raise TargetDirectoryError(
