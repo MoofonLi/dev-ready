@@ -15,6 +15,7 @@ from dev_ready.errors import (
     InvalidArgumentsError,
     OverlayError,
     TargetDirectoryError,
+    VerificationError,
 )
 from dev_ready.prompts import Answers
 
@@ -117,6 +118,7 @@ def test_init_success_omits_disabled_components_from_summary(
         (FetchError("network down"), 3),
         (TargetDirectoryError("dir taken"), 4),
         (OverlayError("collision"), 1),
+        (VerificationError("missing 'frontend'"), 5),
     ],
 )
 def test_init_maps_generate_errors_to_exit_codes(

@@ -66,13 +66,15 @@ uvx dev-ready init my-app
 | `overlay` | Apply dev-ready files onto the fetched base; templating of names/values | fetch anything from the network |
 | `manifest` | Load/validate manifest.json; single source of truth for pins | be bypassed by other modules |
 | `report` | Post-generation summary and next steps | mutate the generated project |
+| `verify` | Cheap, offline, structural post-generation checks on the staging dir | perform network I/O, write to the project, or run the heavy FR-5 checks (docker build, health endpoint — those run in CI, see Deployment Architecture) |
 
 ## Dependency Rules
 
-- Direction: `cli` -> `prompts`/`manifest`/`fetch`/`overlay`/`report`. Lower modules never import `cli`.
-- `fetch` and `overlay` are independent of each other; only `cli` sequences them.
+- Direction: `cli` -> `prompts`/`manifest`/`fetch`/`overlay`/`report`/`verify`. Lower modules never import `cli`.
+- `fetch`, `overlay`, and `verify` are independent of each other; only `generate` (called only by `cli`) sequences them.
 - Runtime dependencies are kept minimal (target: questionary, httpx or stdlib urllib, rich optional). Every new dependency requires a note here.
 - No module reads `manifest.json` directly except `manifest`.
+- `scripts/` (CI-only maintainer tooling, e.g. `scripts/bump_upstream.py`) is not part of the wheel and is not subject to the `fetch/`-only network-call rule above, which governs `src/dev_ready` only.
 
 ### questionary (added phase 4)
 
@@ -94,11 +96,65 @@ dev-ready itself deploys as a PyPI package — there is no server component.
 - CI workflows: `ci.yml` (lint, test, generate-and-verify on PRs), `upstream-bump.yml` (weekly pin bump PR), `release.yml` (publish on tag).
 - Generated projects carry their own deployment story from upstream (Docker Compose); dev-ready does not modify it in v0.1.
 
-## Sequence Diagram (placeholder)
+## Sequence Diagrams
+
+### 1. `init` happy path
 
 ```
-To be completed during implementation:
-1. init command happy path (prompt -> fetch -> overlay -> verify -> report)
-2. failure path: network error during fetch (fail fast, no partial output)
-3. upstream-bump workflow: cron -> bump pin -> regenerate -> CI verify -> PR
+user            cli          prompts        generate      fetch/overlay/verify   target_dir
+ |               |               |               |                  |                |
+ |--init-------->|               |               |                  |                |
+ |               |--collect----->|               |                  |                |
+ |               |<--Answers-----|               |                  |                |
+ |               |--confirm----->|               |                  |                |
+ |               |<--True--------|               |                  |                |
+ |               |--generate(answers, pin)------->|                  |                |
+ |               |               |               |--fetch_snapshot->staging           |
+ |               |               |               |--apply_overlay-->staging           |
+ |               |               |               |--verify_project->staging (checked) |
+ |               |               |               |--move(staging)---------------->target_dir
+ |               |<--written[]---------------------|                  |                |
+ |               |--render_report(answers, pin, written)                              |
+ |<--summary-----|               |               |                  |                |
 ```
+
+### 2. Failure path — network error during fetch
+
+```
+user            cli          generate         fetch          target_dir     temp staging
+ |--init-------->|               |               |                |               |
+ |               |--generate---->|               |                |               |
+ |               |               |--fetch_snapshot(pin, staging)-->|               |
+ |               |               |               X FetchError      |               |
+ |               |               |<--raises FetchError-------------|               |
+ |               |               |--finally: rmtree(staging_root)------------------>| (removed)
+ |               |<--FetchError (propagates, target_dir never touched)              |
+ |<--"error: ..." (exit 3)                                                          |
+```
+
+Same shape for an `OverlayError` (collision/missing asset) or a `VerificationError`
+(missing upstream path) raised later in the same `try` block: whichever step fails,
+the `finally` cleans up the staging root and `target_dir` is never created or moved
+into — see `generate()`, all-or-nothing by construction.
+
+### 3. `upstream-bump.yml` workflow
+
+```
+cron (Mon 06:00 UTC)      upstream-bump.yml         manifest.json      ci.yml (PR trigger)
+       |                          |                        |                    |
+       |--trigger---------------->|                        |                    |
+       |                          |--resolve_latest_commit(repo, ref)           |
+       |                          |   (GitHub API, unauthenticated)             |
+       |                          |--update_manifest(commit, verified_at)------>| (rewritten)
+       |                          |--git diff? changed ---->|                    |
+       |                          |--open/update PR (chore/upstream-bump)------>|
+       |                          |                        |                    |
+       |                          |                        |--PR opened-------->|--generate-and-verify job
+       |                          |                        |                    |   (docker compose build/up,
+       |                          |                        |                    |    health-check poll)
+       |                          |                        |                    |--pass -> mergeable
+       |                          |                        |                    |--fail -> PR stays red
+```
+
+Verification of the bumped pin is not duplicated in `upstream-bump.yml` — it is
+entirely CI's `generate-and-verify` job, triggered by the PR (ADR-002).

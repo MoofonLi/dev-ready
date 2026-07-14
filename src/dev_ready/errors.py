@@ -45,3 +45,9 @@ class AbortedError(DevReadyError):
     """User cancelled an interactive prompt (Ctrl-C or an unanswered prompt)."""
 
     exit_code = 1
+
+
+class VerificationError(DevReadyError):
+    """Generated project failed a post-generation structural check."""
+
+    exit_code = 5

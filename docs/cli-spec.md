@@ -16,7 +16,7 @@ Generate a new project.
 | `--no-mcp` | bool | false | Skip MCP server configuration overlay |
 | `--no-docs` | bool | false | Skip design-doc templates overlay |
 
-Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict.
+Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification.
 
 ### `dev-ready --version` / `dev-ready --help`
 

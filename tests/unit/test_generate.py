@@ -6,10 +6,11 @@ from pathlib import Path
 import pytest
 
 import dev_ready.generate as generate_module
-from dev_ready.errors import FetchError, OverlayError, TargetDirectoryError
+from dev_ready.errors import FetchError, OverlayError, TargetDirectoryError, VerificationError
 from dev_ready.generate import generate
 from dev_ready.manifest import UpstreamPin
 from dev_ready.prompts import Answers
+from dev_ready.verify import REQUIRED_UPSTREAM_PATHS
 
 PIN = UpstreamPin(
     repo="fastapi/full-stack-fastapi-template",
@@ -17,6 +18,8 @@ PIN = UpstreamPin(
     commit="4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2",
     license="MIT",
 )
+
+_VERIFY_DIRECTORY_ENTRIES = {"backend", "frontend"}
 
 
 @pytest.fixture(autouse=True)
@@ -33,6 +36,15 @@ def _fake_fetch_ok(pin: UpstreamPin, dest: Path) -> Path:
     (dest / "README.md").write_text("hello", encoding="utf-8")
     (dest / "backend").mkdir()
     (dest / "backend" / "main.py").write_text("print('hi')", encoding="utf-8")
+    # Every path verify_project checks for must be present, or the happy-path
+    # tests below would fail verification rather than exercising the thing
+    # they're actually testing.
+    for rel_path in REQUIRED_UPSTREAM_PATHS:
+        path = dest / rel_path
+        if rel_path in _VERIFY_DIRECTORY_ENTRIES:
+            path.mkdir(exist_ok=True)
+        elif not path.exists():
+            path.write_text("stub", encoding="utf-8")
     return dest
 
 
@@ -126,3 +138,53 @@ def test_success_leaves_no_leaked_temp_dirs(
     generate(Answers(project_name="my-app", target_dir=tmp_path / "my-app"), PIN)
 
     assert list(_isolated_tempdir.iterdir()) == []
+
+
+def test_verification_failure_leaves_target_untouched_and_no_leaked_temp_dirs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolated_tempdir: Path
+) -> None:
+    def _fetch_missing_frontend(pin: UpstreamPin, dest: Path) -> Path:
+        # Upstream restructured and no longer ships a frontend/ directory ->
+        # verify_project must catch it before anything reaches target_dir.
+        dest.mkdir(parents=True)
+        (dest / "backend").mkdir()
+        return dest
+
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _fetch_missing_frontend)
+
+    target_dir = tmp_path / "my-app"
+    with pytest.raises(VerificationError):
+        generate(Answers(project_name="my-app", target_dir=target_dir), PIN)
+
+    assert not target_dir.exists()
+    assert list(_isolated_tempdir.iterdir()) == []
+
+
+def test_verify_runs_after_overlay_and_before_move(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    call_order: list[str] = []
+    target_dir = tmp_path / "my-app"
+    answers = Answers(project_name="my-app", target_dir=target_dir)
+
+    def _spy_fetch(pin: UpstreamPin, dest: Path) -> Path:
+        call_order.append("fetch")
+        return _fake_fetch_ok(pin, dest)
+
+    def _spy_overlay(passed_answers: Answers, project_dir: Path) -> list[Path]:
+        call_order.append("overlay")
+        return []
+
+    def _spy_verify(project_dir: Path) -> None:
+        call_order.append("verify")
+        # verify must run before the staging dir is moved into target_dir
+        assert not target_dir.exists()
+
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _spy_fetch)
+    monkeypatch.setattr(generate_module, "apply_overlay", _spy_overlay)
+    monkeypatch.setattr(generate_module, "verify_project", _spy_verify)
+
+    generate(answers, PIN)
+
+    assert call_order == ["fetch", "overlay", "verify"]
+    assert target_dir.exists()
