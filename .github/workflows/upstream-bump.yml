@@ -5,15 +5,45 @@ on:
     - cron: "0 6 * * 1" # Mondays 06:00 UTC
   workflow_dispatch:
 
+# Verification of the bumped pin is NOT duplicated here: this workflow only
+# resolves the latest upstream commit and opens a PR. That PR triggers
+# ci.yml, whose generate-and-verify job regenerates a project against the
+# new pin and runs the full docker-compose health check — that is the
+# actual gate for the bump (ADR-002).
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-bump
+  cancel-in-progress: false
+
 jobs:
   bump:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Phase 5 TODO:
-      # 1. Resolve latest upstream commit of fastapi/full-stack-fastapi-template
-      # 2. Update manifest.json pin
-      # 3. Regenerate a project and run verification
-      # 4. Open a PR with the bump (peter-evans/create-pull-request)
-      - name: Placeholder
-        run: echo "upstream-bump not yet implemented (see docs/architecture.md ADR-002)"
+
+      - name: Resolve latest upstream commit and update manifest
+        id: bump
+        run: python3 scripts/bump_upstream.py
+
+      - name: Open pull request
+        if: steps.bump.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: bump upstream pin to ${{ steps.bump.outputs.new_commit_short }}"
+          title: "chore: bump upstream pin to ${{ steps.bump.outputs.new_commit_short }}"
+          branch: chore/upstream-bump
+          delete-branch: true
+          body: |
+            Bumps the `fastapi/full-stack-fastapi-template` pin in `src/dev_ready/manifest.json`.
+
+            - old commit: `${{ steps.bump.outputs.old_commit }}`
+            - new commit: `${{ steps.bump.outputs.new_commit }}`
+            - compare: https://github.com/fastapi/full-stack-fastapi-template/compare/${{ steps.bump.outputs.old_commit }}...${{ steps.bump.outputs.new_commit }}
+
+            CI's `generate-and-verify` job regenerates a project against this pin
+            and runs the full docker-compose health check before merge — that is
+            the verification gate for this bump (ADR-002).

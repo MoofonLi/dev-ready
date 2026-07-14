@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -17,5 +20,57 @@ jobs:
         run: uv run ruff check .
       - name: Test
         run: uv run pytest
-      # Phase 4 TODO: generate a project with `uv run dev-ready init --yes`
-      # and verify it (docker compose up + health check)
+
+  # FR-5 lives here, not on the user's machine (docs/architecture.md,
+  # Deployment Architecture): generate a real project against the
+  # manifest-pinned commit, then build and boot it with Docker Compose and
+  # poll the backend health endpoint. This is the verification gate every
+  # PR — including upstream-bump PRs (ADR-002) — must pass.
+  generate-and-verify:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Sync dependencies
+        run: uv sync --dev
+      - name: Generate demo project
+        run: uv run dev-ready init demo-app --yes
+
+      - name: Build containers
+        working-directory: demo-app
+        run: docker compose build
+
+      - name: Start containers
+        working-directory: demo-app
+        run: docker compose up -d
+
+      - name: Wait for backend health check
+        working-directory: demo-app
+        run: |
+          # GET /api/v1/utils/health-check/ on port 8000, confirmed against
+          # the manifest-pinned snapshot's compose.yml healthcheck and
+          # backend/app/api/routes/utils.py. Bounded retries, ~120s budget
+          # total — never an unbounded loop.
+          attempts=24
+          for i in $(seq 1 "$attempts"); do
+            if curl -fsS http://localhost:8000/api/v1/utils/health-check/; then
+              echo "backend is healthy"
+              exit 0
+            fi
+            echo "waiting for backend (attempt $i/$attempts)..."
+            sleep 5
+          done
+          echo "backend did not become healthy within the time budget"
+          exit 1
+
+      - name: Show container logs on failure
+        if: failure()
+        working-directory: demo-app
+        run: docker compose logs
+
+      - name: Tear down containers
+        if: always()
+        working-directory: demo-app
+        run: docker compose down -v

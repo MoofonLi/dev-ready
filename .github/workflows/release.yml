@@ -7,14 +7,31 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Phase 5 TODO: configure PyPI trusted publishing for this repo first
     permissions:
-      id-token: write
+      id-token: write # trusted publishing to PyPI — no token/password needed
       contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+
+      - name: Verify tag matches pyproject.toml version
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version="$(grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')"
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "::error::pushed tag $GITHUB_REF_NAME (version $tag_version) does not match pyproject.toml version $pkg_version"
+            exit 1
+          fi
+          echo "tag $GITHUB_REF_NAME matches pyproject.toml version $pkg_version"
+
       - name: Build
         run: uv build
-      - name: Placeholder publish
-        run: echo "Enable pypa/gh-action-pypi-publish once trusted publishing is configured"
+
+      - name: Smoke test the built wheel
+        run: |
+          python3 -m venv /tmp/dev-ready-smoke-venv
+          /tmp/dev-ready-smoke-venv/bin/pip install --quiet dist/*.whl
+          /tmp/dev-ready-smoke-venv/bin/dev-ready --version
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.14.0
