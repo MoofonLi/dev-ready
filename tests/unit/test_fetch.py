@@ -20,6 +20,7 @@ PIN = UpstreamPin(
     ref="master",
     commit="4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2",
     license="MIT",
+    exclude=(".agents/skills/fastapi", ".claude/skills/fastapi"),
 )
 
 
@@ -78,6 +79,23 @@ def test_happy_path_populates_dest_and_pins_copier_call(
     assert recorded["kwargs"]["vcs_ref"] == PIN.commit
     assert recorded["kwargs"]["defaults"] is True
     assert recorded["kwargs"]["unsafe"] is True
+    # The pin's exclude list must reach Copier: the pinned template ships
+    # dangling .venv symlinks that crash Copier if not skipped.
+    assert recorded["kwargs"]["exclude"] == PIN.exclude
+
+
+def test_pin_without_exclude_passes_empty_exclude(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recorded: dict[str, Any] = {}
+    _install_fake_run_copy(monkeypatch, recorded)
+    bare_pin = UpstreamPin(
+        repo=PIN.repo, ref=PIN.ref, commit=PIN.commit, license=PIN.license
+    )
+
+    fetch_snapshot(bare_pin, tmp_path / "snapshot")
+
+    assert recorded["kwargs"]["exclude"] == ()
 
 
 def test_template_data_defaults_to_empty_dict(

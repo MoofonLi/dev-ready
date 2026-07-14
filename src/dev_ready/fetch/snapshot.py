@@ -62,6 +62,12 @@ def _run_copier(pin: UpstreamPin, staging_dir: Path, data: dict[str, Any]) -> No
             staging_dir,
             data=data,
             vcs_ref=pin.commit,
+            # Per-pin source paths Copier must skip, merged with the
+            # template's own _exclude. The pinned template ships symlinks
+            # into .venv/ that dangle until the user creates the venv;
+            # Copier follows symlinks and crashes on them (see manifest.json
+            # and UpstreamPin.exclude).
+            exclude=pin.exclude,
             # Unanswered template questions take the template's defaults;
             # dev-ready's own prompting happens in `prompts`, never here.
             defaults=True,

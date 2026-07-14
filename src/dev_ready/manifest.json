@@ -6,7 +6,13 @@
       "ref": "master",
       "commit": "4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2",
       "verified_at": "2026-07-04",
-      "license": "MIT"
+      "license": "MIT",
+      "exclude": [
+        ".agents/skills/fastapi",
+        ".agents/skills/sqlmodel",
+        ".claude/skills/fastapi",
+        ".claude/skills/sqlmodel"
+      ]
     }
   },
   "overlay_version": "0.1.0"

@@ -105,10 +105,35 @@ def _parse_pin(name: str, entry: object, source: str) -> UpstreamPin:
             f"{source}: upstream '{name}' field 'verified_at' must be a string or null"
         )
 
+    exclude = _parse_exclude(name, entry, source)
+
     return UpstreamPin(
         repo=values["repo"],
         ref=values["ref"],
         commit=values["commit"],
         license=values["license"],
         verified_at=verified_at,
+        exclude=exclude,
     )
+
+
+def _parse_exclude(name: str, entry: dict, source: str) -> tuple[str, ...]:
+    """Validate the optional per-pin 'exclude' list (Copier source-path patterns)."""
+    raw = entry.get("exclude")
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ManifestError(f"{source}: upstream '{name}' field 'exclude' must be a list")
+    patterns: list[str] = []
+    for item in raw:
+        if not isinstance(item, str) or not item:
+            raise ManifestError(
+                f"{source}: upstream '{name}' 'exclude' entries must be non-empty strings"
+            )
+        if item.startswith(("/", "\\")) or ".." in item.split("/"):
+            raise ManifestError(
+                f"{source}: upstream '{name}' 'exclude' entries must be relative"
+                f" paths without '..', got {item!r}"
+            )
+        patterns.append(item)
+    return tuple(patterns)
