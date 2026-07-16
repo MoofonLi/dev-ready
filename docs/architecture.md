@@ -67,7 +67,27 @@ uvx dev-ready init my-app
   - New runtime dependency (copier, which brings jinja2/pydantic/plumbum) and a new host requirement: git must be installed (Copier clones; checked up front, mapped to FetchError/exit 3).
   - `unsafe=True` executes the template's `_tasks` (`.copier/update_dotenv.py`) at generation time. Accepted because the executed code is pinned to a CI-verified commit (ADR-002), never floating "latest".
   - Template question names are coupled to the pinned commit; an upstream rename is caught by the bump PR's generate-and-verify job, not by end users.
-  - Unwanted template-repo metadata files (upstream `.github/` workflows, SECURITY.md, release-notes.md) are NOT excluded by the template's `_exclude`; a manifest-driven prune list remains future work.
+  - Unwanted template-repo metadata files (upstream `.github/` workflows, SECURITY.md, release-notes.md) are NOT excluded by the template's `_exclude`; a manifest-driven prune list remains future work (now ADR-006, v0.2).
+
+### ADR-006: Manifest-driven prune list, separate from exclude (v0.2)
+
+- Status: Accepted (2026-07-16)
+- Context: A real generation (my-app, v0.1.3) contains upstream repo-maintenance files that are useless or misleading in a user project: upstream deploy/issue-triage workflows, CONTRIBUTING.md, release-notes.md, README screenshots (`img/`), release tooling, and a dead cookiecutter-era hook. Additionally, the template defines its own `_exclude`, which REPLACES Copier's DEFAULT_EXCLUDE — this is how `.git` and `copier.yml` leaked into v0.1.3 output. The full audited list is in requirements.md FR-7.
+- Decision: `manifest.json` gains a `prune` key next to `exclude`, with identical validation (relative paths, no `..`). Both are merged into Copier's `exclude=` parameter at fetch time. The split is semantic, for bump-review clarity: `exclude` = broken-by-design, generation fails or output is corrupted without it (dangling symlinks, `.git`, `copier.yml`); `prune` = generates fine but does not belong in a user project (curated, revisited at bump time). JSON has no comments, so the two keys ARE the documentation.
+- Consequences: One trivial loader/model change; no new fetch logic. The weekly bump PR reviews both lists against the new upstream commit. `verify_project` gains a forbidden-paths check (FR-9) as the enforcement backstop: if upstream restructures and a pruned/excluded path reappears, CI fails at bump time, never at the user's machine... with one caveat — verify runs at generation time too, so users are equally protected.
+
+### ADR-007: Multi-agent development team and handoff protocol (v0.2)
+
+- Status: Accepted (2026-07-16)
+- Context: dev-ready is developed by one human with several AI agents. v0.1 used a loose Architect -> Engineer -> reviewers flow. Adding Antigravity (Gemini) as a code-writing agent requires explicit roles and explicit handoff artifacts, or agents duplicate work and burn tokens re-deriving context.
+- Decision: fixed roles, communicating only through committed markdown handoffs under `docs/handoffs/`:
+  - CEO (Moofon): sets goals, approves plans, merges.
+  - Tech Lead (Claude Fable 5, Cowork): talks with the CEO; writes decisions, plans, and handoff documents ONLY — never writes or edits code.
+  - Senior Engineer (Claude Opus 4.8): reads the tech lead's phase plan, breaks it into implementation tasks with acceptance criteria (a handoff for the junior), reviews the junior's code for logic and architecture, and personally fixes hard bugs the junior escalates.
+  - Junior Engineer (Gemini 3.1 Pro, Antigravity): implements the senior's tasks — writes most of the code. On completion writes an execution report (md). On a hard bug or an unimplementable task: STOP generating code (do not thrash tokens), move to the next task, and write an escalation handoff for the senior describing where, what happened, and the suspected cause.
+  - IBM Bob (QA / Security / SRE): unchanged; reviewer expectations stay in `.bob/qa.md`, `.bob/security.md`, `.bob/sre.md`.
+- Handoff artifacts per phase, under `docs/handoffs/phase-N/`: `01-opus-plan.md` (senior's task breakdown for the junior), `02-gemini-implementation.md` (junior's brief: role, tasks, stop rules), `03-opus-review.md` (senior's review brief: read the junior's report, fix hard bugs, close the phase), `04-bob-qa.md`, `05-bob-security.md`, `06-bob-sre.md`. The junior's outputs go to `docs/handoffs/phase-N/reports/` (`execution-report.md`, `escalation-*.md`).
+- Consequences: Every agent starts from a committed document, not from chat history; token spend concentrates in the cheapest capable agent (junior writes most code, senior only reviews and unblocks); the tech lead's no-code rule keeps decisions and implementation auditable separately. FR-10 ships the same scaffold to generated projects as an optional overlay component, so dev-ready users get this workflow for free.
 
 ## Module Boundary
 

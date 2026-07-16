@@ -1,12 +1,12 @@
 # CLAUDE.md — dev-ready
 
-Guidance for AI agents (Claude Code, GPT, IBM Bob) working in this repo.
+Guidance for AI agents (Claude, Gemini/Antigravity, IBM Bob) working in this repo.
 
 ## What this project is
 
 dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus an overlay of CLAUDE.md, Claude Code skills, MCP config, and design docs.
 
-Current phase: v0.1 complete. The full pipeline (prompt -> fetch -> overlay -> verify -> report) is implemented, along with CI generate-and-verify, the weekly upstream-bump automation, and the PyPI release pipeline.
+Current phase: v0.1 complete (v0.1.4 fixes pending release); v0.2 in progress — see `docs/v0.2-plan.md` and ADR-006/ADR-007 in `docs/architecture.md`.
 
 ## Read before writing code
 
@@ -29,6 +29,16 @@ Current phase: v0.1 complete. The full pipeline (prompt -> fetch -> overlay -> v
 - Unit tests: no network, no filesystem outside tmp_path.
 - Conventional Commits.
 
-## Multi-agent workflow
+## Multi-agent workflow (ADR-007)
 
-Architect (design docs) -> Engineer (implement) -> QA (`.bob/qa.md`) -> Security (`.bob/security.md`) -> SRE/Release (`.bob/sre.md`). Reviewer expectations are defined in `.bob/`.
+Roles are fixed. Agents communicate ONLY through committed handoff documents in `docs/handoffs/phase-N/` — never assume chat context from another agent.
+
+| Role | Agent | Does | Never does |
+|---|---|---|---|
+| CEO | Moofon | Sets goals, approves plans, merges | — |
+| Tech Lead | Claude Fable 5 (Cowork) | Decisions, plans, handoff docs | Write or edit code |
+| Senior Engineer | Claude Opus 4.8 | Task breakdown for the junior, code review (logic + architecture), fixes escalated hard bugs | Write code the junior can handle |
+| Junior Engineer | Gemini 3.1 Pro (Antigravity) | Implements tasks — writes most of the code; execution report per phase | Keep grinding on a hard bug (STOP, escalate to senior via `reports/escalation-*.md`, move to next task) |
+| QA / Security / SRE | IBM Bob | Reviews per `.bob/qa.md`, `.bob/security.md`, `.bob/sre.md` | — |
+
+Handoff files per phase: `01-opus-plan.md`, `02-gemini-implementation.md`, `03-opus-review.md`, `04-bob-qa.md`, `05-bob-security.md`, `06-bob-sre.md`; junior outputs in `reports/`.
