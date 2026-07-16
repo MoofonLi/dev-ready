@@ -8,6 +8,9 @@
       "verified_at": "2026-07-04",
       "license": "MIT",
       "exclude": [
+        ".git",
+        "copier.yml",
+        "copier.yaml",
         ".agents/skills/fastapi",
         ".agents/skills/sqlmodel",
         ".claude/skills/fastapi",

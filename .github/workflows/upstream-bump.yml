@@ -10,6 +10,16 @@ on:
 # ci.yml, whose generate-and-verify job regenerates a project against the
 # new pin and runs the full docker-compose health check — that is the
 # actual gate for the bump (ADR-002).
+#
+# IMPORTANT: for that gate to fire automatically, the PR must be opened
+# with a token OTHER than the default GITHUB_TOKEN. GitHub deliberately
+# does not run `on: pull_request` workflows for PRs created with the
+# default GITHUB_TOKEN (recursion protection), so a PR opened with it
+# would sit with NO checks at all. Set up a fine-grained PAT with
+# contents:write + pull-requests:write on this repo and save it as the
+# `BUMP_PR_TOKEN` repository secret. If the secret is missing, this falls
+# back to GITHUB_TOKEN and the PR must be closed and reopened manually
+# (or pushed to) to trigger CI.
 permissions:
   contents: write
   pull-requests: write
@@ -32,7 +42,7 @@ jobs:
         if: steps.bump.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.BUMP_PR_TOKEN || secrets.GITHUB_TOKEN }}
           commit-message: "chore: bump upstream pin to ${{ steps.bump.outputs.new_commit_short }}"
           title: "chore: bump upstream pin to ${{ steps.bump.outputs.new_commit_short }}"
           branch: chore/upstream-bump

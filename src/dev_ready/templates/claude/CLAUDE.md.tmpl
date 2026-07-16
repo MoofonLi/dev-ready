@@ -1,12 +1,12 @@
 # {{project_name}}
 
-{{project_name}} is a FastAPI full-stack project, scaffolded by [dev-ready](https://github.com/) on top of [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template): a FastAPI + SQLModel + PostgreSQL backend and a React + TypeScript + Vite frontend, wired together with Docker Compose.
+{{project_name}} is a FastAPI full-stack project, scaffolded by [dev-ready](https://github.com/MoofonLi/dev-ready) on top of [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template): a FastAPI + SQLModel + PostgreSQL backend and a React + TypeScript + Vite frontend, wired together with Docker Compose.
 
 ## Stack
 
 - **Backend**: FastAPI, SQLModel, PostgreSQL, Pydantic — `backend/`
 - **Frontend**: React, TypeScript, Vite — `frontend/`
-- **Infra**: Docker Compose, Traefik reverse proxy — `docker-compose.yml`
+- **Infra**: Docker Compose, Traefik reverse proxy — `compose.yml`
 
 ## Commands
 
@@ -21,7 +21,7 @@
 
 - `backend/` — FastAPI application, SQLModel models, Alembic migrations
 - `frontend/` — React application
-- `docker-compose.yml` — local development orchestration
+- `compose.yml` — local development orchestration (`compose.override.yml` adds the local-dev overrides)
 - `docs/` — design docs for this project, if generated with the docs overlay
 
 ## Working with this repo

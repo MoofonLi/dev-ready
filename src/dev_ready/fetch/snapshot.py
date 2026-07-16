@@ -63,10 +63,16 @@ def _run_copier(pin: UpstreamPin, staging_dir: Path, data: dict[str, Any]) -> No
             data=data,
             vcs_ref=pin.commit,
             # Per-pin source paths Copier must skip, merged with the
-            # template's own _exclude. The pinned template ships symlinks
-            # into .venv/ that dangle until the user creates the venv;
-            # Copier follows symlinks and crashes on them (see manifest.json
-            # and UpstreamPin.exclude).
+            # template's own _exclude. Two reasons entries live here:
+            # (1) the pinned template ships symlinks into .venv/ that dangle
+            #     until the user creates the venv; Copier follows symlinks
+            #     and crashes on them;
+            # (2) the template defines its own _exclude, which REPLACES
+            #     Copier's DEFAULT_EXCLUDE entirely — so .git and
+            #     copier.yml/.yaml would otherwise be copied into the
+            #     generated project (the .git worktree file makes the output
+            #     look like a checkout of the upstream template).
+            # See manifest.json and UpstreamPin.exclude.
             exclude=pin.exclude,
             # Unanswered template questions take the template's defaults;
             # dev-ready's own prompting happens in `prompts`, never here.
