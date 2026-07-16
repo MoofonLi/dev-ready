@@ -15,6 +15,24 @@
         ".agents/skills/sqlmodel",
         ".claude/skills/fastapi",
         ".claude/skills/sqlmodel"
+      ],
+      "prune": [
+        ".github/workflows/deploy-production.yml",
+        ".github/workflows/deploy-staging.yml",
+        ".github/workflows/issue-manager.yml",
+        ".github/workflows/labeler.yml",
+        ".github/workflows/add-to-project.yml",
+        ".github/workflows/latest-changes.yml",
+        ".github/workflows/smokeshow.yml",
+        ".github/workflows/detect-conflicts.yml",
+        ".github/workflows/zizmor.yml",
+        ".github/workflows/guard-dependencies.yml",
+        ".github/labeler.yml",
+        "CONTRIBUTING.md",
+        "release-notes.md",
+        "img",
+        "scripts/add_latest_release_date.py",
+        "hooks"
       ]
     }
   },

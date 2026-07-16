@@ -14,6 +14,9 @@ class UpstreamPin:
     Copier follows symlinks by default. The list lives next to the pin so a
     weekly bump PR that hits new dangling entries fails CI loudly and gets
     fixed here, in one reviewed place (ADR-002/ADR-005).
+
+    `prune` = paths that generate fine but do not belong in a user project
+    (curated, reviewed at bump time), vs `exclude` = broken-by-design paths (ADR-006).
     """
 
     repo: str
@@ -22,6 +25,7 @@ class UpstreamPin:
     license: str
     verified_at: str | None = None
     exclude: tuple[str, ...] = ()
+    prune: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

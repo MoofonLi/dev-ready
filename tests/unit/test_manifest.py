@@ -174,9 +174,46 @@ def test_exclude_entries_must_be_relative_without_traversal(bad_entry: str) -> N
         parse_manifest(json.dumps(data))
 
 
+def test_prune_defaults_to_empty_tuple() -> None:
+    manifest = parse_manifest(json.dumps(VALID))
+    assert manifest.upstream["base_template"].prune == ()
+
+
+def test_prune_parsed_as_tuple_of_patterns() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["upstream"]["base_template"]["prune"] = ["docs/junk.md"]
+    pin = parse_manifest(json.dumps(data)).upstream["base_template"]
+    assert pin.prune == ("docs/junk.md",)
+
+
+def test_prune_must_be_a_list() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["upstream"]["base_template"]["prune"] = ".agents"
+    with pytest.raises(ManifestError, match="must be a list"):
+        parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize("bad_entry", ["", 42, None])
+def test_prune_entries_must_be_non_empty_strings(bad_entry: object) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["upstream"]["base_template"]["prune"] = [bad_entry]
+    with pytest.raises(ManifestError, match="non-empty strings"):
+        parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize("bad_entry", ["/etc/passwd", "\\windows", "../outside", "a/../b"])
+def test_prune_entries_must_be_relative_without_traversal(bad_entry: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["upstream"]["base_template"]["prune"] = [bad_entry]
+    with pytest.raises(ManifestError, match="relative"):
+        parse_manifest(json.dumps(data))
+
+
 def test_bundled_manifest_is_valid() -> None:
     manifest = load_default_manifest()
     assert "base_template" in manifest.upstream
     # The pinned FastAPI template ships dangling .venv symlinks that Copier
     # would otherwise follow and crash on (see UpstreamPin.exclude docstring).
     assert manifest.upstream["base_template"].exclude != ()
+    assert manifest.upstream["base_template"].prune != ()
+    assert ".github/workflows/test-backend.yml" not in manifest.upstream["base_template"].prune
