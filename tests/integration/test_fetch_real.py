@@ -18,4 +18,7 @@ def test_fetch_real_pinned_snapshot(tmp_path: Path) -> None:
     result = fetch_snapshot(pin, dest)
 
     assert result == dest
-    assert (dest / "README.md").exists()
+    # Root README.md is in the manifest prune list since phase 2 (FR-8):
+    # the snapshot must NOT contain it, while subdir READMEs survive.
+    assert not (dest / "README.md").exists()
+    assert (dest / "backend" / "README.md").exists()

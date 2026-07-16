@@ -120,7 +120,21 @@ def _parse_pin(name: str, entry: object, source: str) -> UpstreamPin:
 
 
 def _parse_path_list(name: str, entry: dict, source: str, field: str) -> tuple[str, ...]:
-    """Validate optional per-pin path lists (exclude or prune)."""
+    """Validate optional per-pin path lists (exclude or prune).
+
+    Entries are gitwildmatch patterns handed to Copier's path matcher, never to
+    filesystem APIs. Two accepted shapes:
+
+    - relative pattern (``img/**``, ``CONTRIBUTING.md``): gitwildmatch treats a
+      slash-free pattern as matching at ANY depth.
+    - root-anchored pattern with a single leading ``/`` (``/README.md``): the
+      leading slash anchors the match to the template root, so it hits only the
+      top-level entry and not same-named entries in subdirectories. The ``/`` is
+      a match anchor, not an absolute filesystem path.
+
+    Rejected in every case: backslash-prefixed entries, a double leading slash,
+    ``..`` path segments, and empty strings.
+    """
     raw = entry.get(field)
     if raw is None:
         return ()
@@ -132,10 +146,20 @@ def _parse_path_list(name: str, entry: dict, source: str, field: str) -> tuple[s
             raise ManifestError(
                 f"{source}: upstream '{name}' '{field}' entries must be non-empty strings"
             )
-        if item.startswith(("/", "\\")) or ".." in item.split("/"):
+        # A single leading '/' is a gitwildmatch root anchor, not an absolute
+        # path; strip it before the traversal checks. Backslash prefixes and
+        # double leading slashes stay rejected.
+        unanchored = item[1:] if item.startswith("/") else item
+        if (
+            item.startswith("\\")
+            or unanchored.startswith(("/", "\\"))
+            or not unanchored
+            or ".." in unanchored.split("/")
+        ):
             raise ManifestError(
-                f"{source}: upstream '{name}' '{field}' entries must be relative"
-                f" paths without '..', got {item!r}"
+                f"{source}: upstream '{name}' '{field}' entries must be relative paths"
+                f" (an optional single leading '/' root anchor is allowed),"
+                f" without '..', got {item!r}"
             )
         patterns.append(item)
     return tuple(patterns)

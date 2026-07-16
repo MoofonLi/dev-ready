@@ -166,7 +166,7 @@ def test_exclude_entries_must_be_non_empty_strings(bad_entry: object) -> None:
         parse_manifest(json.dumps(data))
 
 
-@pytest.mark.parametrize("bad_entry", ["/etc/passwd", "\\windows", "../outside", "a/../b"])
+@pytest.mark.parametrize("bad_entry", ["//etc/passwd", "\\windows", "../outside", "a/../b"])
 def test_exclude_entries_must_be_relative_without_traversal(bad_entry: str) -> None:
     data = json.loads(json.dumps(VALID))
     data["upstream"]["base_template"]["exclude"] = [bad_entry]
@@ -201,12 +201,20 @@ def test_prune_entries_must_be_non_empty_strings(bad_entry: object) -> None:
         parse_manifest(json.dumps(data))
 
 
-@pytest.mark.parametrize("bad_entry", ["/etc/passwd", "\\windows", "../outside", "a/../b"])
+@pytest.mark.parametrize("bad_entry", ["//etc/passwd", "\\windows", "../outside", "a/../b"])
 def test_prune_entries_must_be_relative_without_traversal(bad_entry: str) -> None:
     data = json.loads(json.dumps(VALID))
     data["upstream"]["base_template"]["prune"] = [bad_entry]
     with pytest.raises(ManifestError, match="relative"):
         parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize("field", ["exclude", "prune"])
+def test_path_list_accepts_single_leading_slash_root_anchor(field: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["upstream"]["base_template"][field] = ["/README.md"]
+    pin = parse_manifest(json.dumps(data)).upstream["base_template"]
+    assert getattr(pin, field) == ("/README.md",)  # stored verbatim, anchor kept
 
 
 def test_bundled_manifest_is_valid() -> None:

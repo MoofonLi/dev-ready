@@ -30,6 +30,7 @@
         ".github/labeler.yml",
         "CONTRIBUTING.md",
         "release-notes.md",
+        "/README.md",
         "img/**",
         "scripts/add_latest_release_date.py",
         "hooks/**"

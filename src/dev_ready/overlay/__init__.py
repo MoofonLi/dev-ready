@@ -22,7 +22,7 @@ _TEMPLATE_TOKEN = "{{project_name}}"
 def apply_overlay(answers: Answers, project_dir: Path) -> list[Path]:
     """Apply the selected overlay components onto `project_dir`.
 
-    CLAUDE.md is always applied; `.claude/skills/`, `.mcp.json`, and `docs/`
+    CLAUDE.md and README.md are always applied; `.claude/skills/`, `.mcp.json`, and `docs/`
     follow `answers.include_skills` / `include_mcp` / `include_docs`.
 
     Returns the paths written, relative to `project_dir`. Raises
@@ -38,7 +38,13 @@ def apply_overlay(answers: Answers, project_dir: Path) -> list[Path]:
             project_dir,
             Path("CLAUDE.md"),
             answers.project_name,
-        )
+        ),
+        _apply_file(
+            templates_root.joinpath("readme", "README.md.tmpl"),
+            project_dir,
+            Path("README.md"),
+            answers.project_name,
+        ),
     ]
 
     if answers.include_skills:

@@ -25,6 +25,7 @@ def test_happy_path_writes_every_component_with_substitution(tmp_path: Path) -> 
     written = apply_overlay(_answers(tmp_path), project_dir)
 
     assert (project_dir / "CLAUDE.md").exists()
+    assert (project_dir / "README.md").exists()
     assert (project_dir / ".claude" / "skills" / "project-orientation" / "SKILL.md").exists()
     assert (project_dir / ".mcp.json").exists()
     assert (project_dir / "docs" / "architecture.md").exists()
@@ -90,11 +91,36 @@ def test_claude_md_always_present_even_with_all_components_disabled(tmp_path: Pa
         project_dir,
     )
 
-    assert written == [Path("CLAUDE.md")]
+    assert written == [Path("CLAUDE.md"), Path("README.md")]
     assert (project_dir / "CLAUDE.md").exists()
+    assert (project_dir / "README.md").exists()
     assert not (project_dir / ".claude").exists()
     assert not (project_dir / ".mcp.json").exists()
     assert not (project_dir / "docs").exists()
+
+
+def test_readme_is_about_the_project_not_the_template(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    apply_overlay(_answers(tmp_path), project_dir)
+
+    readme = (project_dir / "README.md").read_text(encoding="utf-8")
+    assert "my-app" in readme
+    assert "{{" not in readme
+    assert "MoofonLi/dev-ready" in readme
+    assert "img/" not in readme
+
+
+def test_collision_on_existing_readme_raises_overlay_error(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    (project_dir / "README.md").write_text("pre-existing", encoding="utf-8")
+
+    with pytest.raises(OverlayError, match="README.md"):
+        apply_overlay(_answers(tmp_path), project_dir)
+
+    assert (project_dir / "README.md").read_text(encoding="utf-8") == "pre-existing"
 
 
 def test_collision_on_existing_claude_md_raises_overlay_error(tmp_path: Path) -> None:

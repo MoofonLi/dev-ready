@@ -35,7 +35,6 @@ def _fake_fetch_ok(
     pin: UpstreamPin, dest: Path, template_data: dict[str, str] | None = None
 ) -> Path:
     dest.mkdir(parents=True)
-    (dest / "README.md").write_text("hello", encoding="utf-8")
     (dest / "backend").mkdir()
     (dest / "backend" / "main.py").write_text("print('hi')", encoding="utf-8")
     # Every path verify_project checks for must be present, or the happy-path
@@ -60,7 +59,10 @@ def test_generate_happy_path_merges_upstream_and_overlay(
 
     written = generate(answers, PIN)
 
-    assert (target_dir / "README.md").read_text(encoding="utf-8") == "hello"
+    assert (target_dir / "README.md").exists()
+    readme = (target_dir / "README.md").read_text(encoding="utf-8")
+    assert "my-app" in readme
+    assert "MoofonLi/dev-ready" in readme
     assert (target_dir / "backend" / "main.py").exists()
     assert (target_dir / "CLAUDE.md").exists()
     assert (target_dir / ".mcp.json").exists()
