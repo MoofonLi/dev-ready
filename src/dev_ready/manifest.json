@@ -30,9 +30,9 @@
         ".github/labeler.yml",
         "CONTRIBUTING.md",
         "release-notes.md",
-        "img",
+        "img/**",
         "scripts/add_latest_release_date.py",
-        "/hooks"
+        "hooks/**"
       ]
     }
   },
