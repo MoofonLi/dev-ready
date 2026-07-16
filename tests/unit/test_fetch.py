@@ -98,6 +98,21 @@ def test_pin_without_exclude_passes_empty_exclude(
     assert recorded["kwargs"]["exclude"] == ()
 
 
+def test_pin_with_exclude_and_prune_merges_them(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recorded: dict[str, Any] = {}
+    _install_fake_run_copy(monkeypatch, recorded)
+    pin = UpstreamPin(
+        repo=PIN.repo, ref=PIN.ref, commit=PIN.commit, license=PIN.license,
+        exclude=(".agents/skills/fastapi",), prune=("CONTRIBUTING.md", "img")
+    )
+
+    fetch_snapshot(pin, tmp_path / "snapshot")
+
+    assert recorded["kwargs"]["exclude"] == pin.exclude + pin.prune
+
+
 def test_template_data_defaults_to_empty_dict(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

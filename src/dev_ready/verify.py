@@ -12,7 +12,7 @@ from pathlib import Path
 
 from dev_ready.errors import VerificationError
 
-__all__ = ["verify_project", "REQUIRED_UPSTREAM_PATHS"]
+__all__ = ["verify_project", "REQUIRED_UPSTREAM_PATHS", "FORBIDDEN_PATHS"]
 
 # Derived from a real fetch of the manifest-pinned commit
 # (fastapi/full-stack-fastapi-template @ 4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2).
@@ -28,6 +28,8 @@ REQUIRED_UPSTREAM_PATHS: tuple[str, ...] = (
     "LICENSE",
 )
 
+FORBIDDEN_PATHS: tuple[str, ...] = (".git", "copier.yml", "copier.yaml")
+
 
 def verify_project(project_dir: Path) -> None:
     """Check that `project_dir` has the upstream paths dev-ready depends on.
@@ -42,4 +44,12 @@ def verify_project(project_dir: Path) -> None:
                 "Likely cause: the upstream layout changed at the manifest-pinned "
                 "commit. Action: file an issue against dev-ready, or do not use "
                 "this pin."
+            )
+
+    for path in FORBIDDEN_PATHS:
+        if (project_dir / path).exists():
+            raise VerificationError(
+                f"generated project contains forbidden path {path!r} — an upstream/Copier change "
+                "reintroduced a template-repo leak (.git worktree or copier.yml). Action: "
+                "file an issue against dev-ready; do not use this pin."
             )

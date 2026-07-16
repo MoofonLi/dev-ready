@@ -72,8 +72,9 @@ def _run_copier(pin: UpstreamPin, staging_dir: Path, data: dict[str, Any]) -> No
             #     copier.yml/.yaml would otherwise be copied into the
             #     generated project (the .git worktree file makes the output
             #     look like a checkout of the upstream template).
-            # See manifest.json and UpstreamPin.exclude.
-            exclude=pin.exclude,
+            # See manifest.json and UpstreamPin.exclude. `pin.prune`
+            # (curated repo-maintenance files, ADR-006) is merged in alongside `pin.exclude`.
+            exclude=pin.exclude + pin.prune,
             # Unanswered template questions take the template's defaults;
             # dev-ready's own prompting happens in `prompts`, never here.
             defaults=True,
