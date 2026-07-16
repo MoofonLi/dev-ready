@@ -219,3 +219,5 @@ __marimo__/
 
 handoff/
 .bob/reviews/
+
+.vscode/

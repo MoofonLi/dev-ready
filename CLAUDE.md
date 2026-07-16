@@ -31,14 +31,14 @@ Current phase: v0.1 complete (v0.1.4 fixes pending release); v0.2 in progress �
 
 ## Multi-agent workflow (ADR-007)
 
-Roles are fixed. Agents communicate ONLY through committed handoff documents in `docs/handoffs/phase-N/` — never assume chat context from another agent.
+Roles are fixed. Agents communicate ONLY through on-disk handoff documents in `handoff/<version>/phaseN/` (gitignored — handoffs are working files, never committed; code is committed normally) — never assume chat context from another agent.
 
 | Role | Agent | Does | Never does |
 |---|---|---|---|
 | CEO | Moofon | Sets goals, approves plans, merges | — |
 | Tech Lead | Claude Fable 5 (Cowork) | Decisions, plans, handoff docs | Write or edit code |
 | Senior Engineer | Claude Opus 4.8 | Task breakdown for the junior, code review (logic + architecture), fixes escalated hard bugs | Write code the junior can handle |
-| Junior Engineer | Gemini 3.1 Pro (Antigravity) | Implements tasks — writes most of the code; execution report per phase | Keep grinding on a hard bug (STOP, escalate to senior via `reports/escalation-*.md`, move to next task) |
+| Junior Engineer | Gemini 3.1 Pro (Antigravity) | Implements tasks in the working tree — writes most of the code; execution report per phase | Run state-changing git (commit/branch/push — only the CEO commits, after reviews); keep grinding on a hard bug (STOP, log it in `reports/problems.md`, move to next task) |
 | QA / Security / SRE | IBM Bob | Reviews per `.bob/qa.md`, `.bob/security.md`, `.bob/sre.md` | — |
 
 Handoff files per phase: `01-opus-plan.md`, `02-gemini-implementation.md`, `03-opus-review.md`, `04-bob-qa.md`, `05-bob-security.md`, `06-bob-sre.md`; junior outputs in `reports/`.
