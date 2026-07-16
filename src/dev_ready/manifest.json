@@ -32,7 +32,7 @@
         "release-notes.md",
         "img",
         "scripts/add_latest_release_date.py",
-        "hooks"
+        "/hooks"
       ]
     }
   },
