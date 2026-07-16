@@ -40,6 +40,7 @@ def generate(answers: Answers, pin: UpstreamPin) -> list[Path]:
         fetch_snapshot(pin, project_staging, _template_data(answers))
         written = apply_overlay(answers, project_staging)
         verify_project(project_staging)
+        _prune_empty_dirs(project_staging)
         _finalize(project_staging, answers.target_dir)
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)
@@ -102,3 +103,18 @@ def _finalize(staging_dir: Path, target_dir: Path) -> None:
         raise TargetDirectoryError(
             f"failed to write generated project into {target_dir}: {error}"
         ) from error
+
+
+def _prune_empty_dirs(root: Path) -> None:
+    """Recursively remove empty directories from bottom to top."""
+    import os
+    for dirpath, _, _ in os.walk(root, topdown=False):
+        path = Path(dirpath)
+        if path == root:
+            continue
+        if not any(path.iterdir()):
+            try:
+                path.rmdir()
+            except OSError:
+                pass
+
