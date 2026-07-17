@@ -38,6 +38,15 @@ def generate(answers: Answers, pin: UpstreamPin) -> list[Path]:
     try:
         project_staging = staging_root / "project"
         fetch_snapshot(pin, project_staging, _template_data(answers))
+
+        # Post-fetch cleanup: delete Copier metadata so it doesn't leak into the final output
+        copier_dir = project_staging / ".copier"
+        if copier_dir.exists():
+            shutil.rmtree(copier_dir)
+        copier_answers = project_staging / ".copier-answers.yml"
+        if copier_answers.exists():
+            copier_answers.unlink()
+
         written = apply_overlay(answers, project_staging)
         verify_project(project_staging)
         _prune_empty_dirs(project_staging)
