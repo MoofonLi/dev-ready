@@ -24,21 +24,38 @@ without codebase-memory) — see FR-14 / ADR-010. Everything the generator itsel
 materializes is pinned to CI-verified commits (ADR-002); nothing is fetched
 "latest" at generation time.
 
-## Integration modes (see ADR-008)
+## Integration modes (see ADR-008, amended 2026-07-18)
 
-Every third-party integration is classified into exactly one of two modes. This
-classification drives license work, maintenance cost, and where the content lives:
+CEO decision: the product's core promise is "one command, Day-1 ready" — nothing
+dev-ready sets up may require a manual install step, and everything is pinned.
+Two mechanisms deliver this, chosen by content type — not by preference:
 
-| Mode | What ships | Redistribution? | License work | Examples |
-|---|---|---|---|---|
-| **Reference** | Config entries or original wrapper-skill text that point at the tool's official distribution channel (npm, binary release). The user installs/executes it themselves. | No | None | codebase-memory-mcp (`.mcp.json` entry), react-doctor (wrapper skill running `npx`) |
-| **Vendor** | A snapshot of upstream content committed into `src/dev_ready/templates/`, pinned in the manifest `vendored` section with provenance. | Yes | Per-repo license review, THIRD_PARTY_NOTICES, NOTICE propagation for Apache 2.0 | caveman, mattpocock/skills subset, cloudflare/security-audit-skill, awesome-design-md, anthropics/skills examples |
+| Mode | Used for | What ships | How Day-1 works |
+|---|---|---|---|
+| **Vendor** | All text content: skills, CLAUDE.md guidance, design-doc templates, handoff templates | Snapshot committed into `src/dev_ready/templates/`, pinned in the manifest `vendored` section (ADR-009), THIRD_PARTY_NOTICES + NOTICE propagation | The files are simply there after `init` |
+| **Pinned dependency** | Executable tools (MCP server binaries, npm CLI tools) | Pinned launcher/dependency entries in generated config: `.mcp.json` launches `uvx codebase-memory-mcp==<pin>`; `react-doctor@<pin>` is a devDependency in the frontend `package.json` | The package manager the user already runs (uv for the agent, `npm install` for the frontend) materializes the exact pinned version on first use — zero manual steps |
+
+Direct binary vendoring into the dev-ready wheel was evaluated and rejected as
+*infeasible*, not merely undesirable: 5 platform binaries × tens of MB exceeds
+PyPI's default 100 MB project limits, forces a dev-ready re-release for every
+upstream binary patch, and makes us the redistributor of executables we did not
+build. The pinned-dependency mechanism achieves the identical user experience
+(zero setup, exact pinned version, updated only via dev-ready releases) through
+official channels.
 
 Pinning philosophy: the *generation-time* rule (never fetch latest, ADR-002) is
-unchanged and applies to everything dev-ready materializes. Reference-mode tools are
-executed later, by the user's own choice, from the official channel — that version
-risk is the user's, and wrapper skills mitigate it by recommending a pinned major
-(e.g. `npx react-doctor@1`).
+unchanged — dev-ready materializes only pinned content. Pinned-dependency tools
+are fetched by the user's package manager at first use, at the exact version
+dev-ready pinned in the generated config; version changes arrive only through
+dev-ready pin bumps, same as everything else.
+
+Legal boundary (independent of any UX decision): content whose license prohibits
+redistribution is never vendored, open-source project or not — redistribution
+rules apply regardless of commercial intent. anthropics document-processing
+skills (source-available) are permanently excluded; karpathy-skills stays out
+until upstream adds a LICENSE file; react-doctor's *source* is never copied (a
+devDependency declaration is not redistribution, so its Commons Clause-style
+terms are not triggered).
 
 ## Curation principles
 
@@ -49,17 +66,18 @@ risk is the user's, and wrapper skills mitigate it by recommending a pinned majo
   not about forcing content on users.
 - Subsets, not whole repos: vendor only the files that earn their context-window cost
   in a generated project.
-- Never vendor anything that is not clearly licensed for redistribution. Currently
-  permanently excluded: anthropics/skills document-processing skills
-  (source-available, prohibits productization); react-doctor source (Modified
-  MIT/Commons Clause — wrapper skill instead); multica-ai/andrej-karpathy-skills
-  until upstream adds a LICENSE file.
+- Vendor everything that can legally be vendored; never vendor anything that is
+  not clearly licensed for redistribution. Currently permanently excluded:
+  anthropics/skills document-processing skills (source-available, prohibits
+  productization); react-doctor source (Modified MIT/Commons Clause — pinned
+  devDependency + wrapper skill instead, see FR-13); multica-ai/
+  andrej-karpathy-skills until upstream adds a LICENSE file.
 - Solo-maintainer budget: base-template bump stays weekly; vendored pins bump
   **monthly** (skill text churns slowly; review load must stay bounded).
 
 ---
 
-## v0.3 — Reference integrations + stamp + item-level selection
+## v0.3 — Pinned tool integrations + stamp + item-level selection
 
 Low-risk, no redistribution, no new license work. Ships value fast and lays two
 foundations the rest of the roadmap depends on: the generation stamp (v0.6 needs
@@ -74,17 +92,21 @@ pins. Without this, projects generated before v0.6 can never be `check`ed or
 a required path.
 
 FR-12. **Codebase-memory MCP item.** The `mcp` component gains a `code-memory` item:
-a `codebase-memory` server entry in the generated `.mcp.json`
-(DeusData/codebase-memory-mcp, MIT). Reference mode: we ship configuration only;
-the generated README/CLAUDE.md documents the one-line install from the official
-release channel, and states plainly that the entry is inert until the user installs
-the binary.
+a server entry in the generated `.mcp.json` launching the tool via a pinned
+package-manager command (DeusData/codebase-memory-mcp, MIT — published on npm and
+PyPI; `uvx codebase-memory-mcp==<pin>` preferred since every dev-ready user has uv;
+exact package name and channel verified by the senior engineer at implementation).
+Zero manual install: the agent's first MCP connection materializes the exact pinned
+version. The pin lives in `manifest.json` and is recorded in the stamp; updates
+arrive only through dev-ready pin bumps.
 
-FR-13. **react-doctor wrapper skill.** An *original* skill (our own text, no vendored
-code) — item id `react-doctor` in the `skills` component — that teaches the agent
-when and how to run `npx react-doctor@<pinned-major>` on the frontend and how to
-act on its findings. This sidesteps the Commons Clause question entirely: no
-redistribution occurs.
+FR-13. **react-doctor integration.** Two pieces, no source redistribution:
+(1) `react-doctor@<exact-pin>` is added as a devDependency (plus a package script)
+to the generated frontend `package.json` — it arrives with the `npm install` the
+user runs anyway, Day-1 seamless; (2) an *original* wrapper skill — item id
+`react-doctor` in the `skills` component — teaches the agent when to run it on the
+frontend and how to act on its findings. The Commons Clause question never
+triggers: a dependency declaration is not redistribution.
 
 FR-14. **Item-level component selection (ADR-010).** Users select individual items
 inside the `skills` and `mcp` components — e.g. react-doctor without code-memory:
@@ -206,8 +228,9 @@ enforced by exclude + prune + the verify leak guard.
   mitigated by catalog-driven generation (one code path, items as data) and CI
   testing all-on, all-off, and one representative mixed selection.
 - **Solo-maintainer review load** — mitigated by monthly (not weekly) vendored
-  bumps and reference mode being the default choice where viable.
+  bumps and by pinned-dependency integration for executables (no snapshot to
+  maintain, just a version pin).
 - **Upstream license changes** (react-doctor terms, anthropics/skills terms) —
-  reference mode limits exposure; vendored pins mean a license change upstream
+  pinned-dependency mode limits exposure; vendored pins mean a license change upstream
   never retroactively affects an already-released dev-ready version, but bump PRs
   must re-check the license file on every bump (added to the bump-PR checklist).
