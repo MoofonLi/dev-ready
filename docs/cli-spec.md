@@ -15,6 +15,7 @@ Generate a new project.
 | `--no-skills` | bool | false | Skip Claude Code skills overlay |
 | `--no-mcp` | bool | false | Skip MCP server configuration overlay |
 | `--no-docs` | bool | false | Skip design-doc templates overlay |
+| `--no-agents` | bool | false | Skip the agent-team handoff scaffold overlay (`docs/handoffs/`) |
 
 Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification.
 
@@ -25,14 +26,14 @@ Standard version and help output.
 ## Interactive Prompt Flow (default path)
 
 1. Project name (if not given as argument)
-2. Overlay component selection (skills / MCP / docs — multi-select, all on by default; skipped entirely if any `--no-skills`/`--no-mcp`/`--no-docs` flag was passed)
+2. Overlay component selection (skills / MCP / docs / agents — multi-select, all on by default; skipped entirely if any `--no-skills`/`--no-mcp`/`--no-docs`/`--no-agents` flag was passed)
 3. Confirmation summary before writing anything
 
 All answers collect into a single `Answers` model shared with the flag-based path.
 
 Declining the confirmation, or cancelling any prompt (Ctrl-C), prints `aborted: nothing was written` to stderr and exits 1 — nothing has been written at that point by construction. `--yes` bypasses every prompt in this flow, including confirmation. A non-TTY stdin with missing inputs and no `--yes` fails fast with an invalid-arguments error (exit 2) instead of hanging.
 
-**Windows compatibility:** interactive prompts are tested against Windows Terminal. Legacy `cmd.exe` may render the checkbox prompt incorrectly (missing VT/ANSI support). In environments where terminal support is uncertain, use `--yes` with explicit `--no-skills`/`--no-mcp`/`--no-docs` flags instead of relying on prompts.
+**Windows compatibility:** interactive prompts are tested against Windows Terminal. Legacy `cmd.exe` may render the checkbox prompt incorrectly (missing VT/ANSI support). In environments where terminal support is uncertain, use `--yes` with explicit `--no-skills`/`--no-mcp`/`--no-docs`/`--no-agents` flags instead of relying on prompts.
 
 ## Planned (not in v0.1)
 

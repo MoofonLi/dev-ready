@@ -16,6 +16,9 @@ A generated project based on [fastapi/full-stack-fastapi-template](https://githu
 - Claude Code skills (e.g. project orientation)
 - MCP server configuration (`mcp.json`)
 - Design-doc templates (`architecture.md`, `requirements.md`)
+- Agent-team handoff scaffold (`docs/handoffs/` — a document-driven multi-agent workflow: Tech Lead → Senior → Junior → QA/Security/SRE)
+
+Every generated project also gets its own `README.md` (the upstream template's repo README and other repo-maintenance files — `CONTRIBUTING.md`, release notes, deploy workflows, screenshots — are pruned, so nothing template-repo-specific leaks into your project).
 
 ## Requirements
 
@@ -53,7 +56,8 @@ uvx dev-ready init my-app \
   --dir path/to/target \  # default: ./my-app
   --no-skills \           # skip the Claude Code skills overlay
   --no-mcp \              # skip the MCP configuration overlay
-  --no-docs               # skip the design-doc templates
+  --no-docs \             # skip the design-doc templates
+  --no-agents             # skip the agent-team handoff scaffold
 ```
 
 Then follow the printed next steps (typically `docker compose watch` inside the generated project).
