@@ -28,6 +28,7 @@ def _init_args(**overrides) -> argparse.Namespace:
         "no_skills": False,
         "no_mcp": False,
         "no_docs": False,
+        "no_agents": False,
     }
     defaults.update(overrides)
     return argparse.Namespace(**defaults)
@@ -102,6 +103,7 @@ def test_init_success_omits_disabled_components_from_summary(
                 "--no-skills",
                 "--no-mcp",
                 "--no-docs",
+                "--no-agents",
             ]
         )
         == 0
@@ -110,6 +112,7 @@ def test_init_success_omits_disabled_components_from_summary(
     assert "skills" not in out
     assert "mcp" not in out
     assert "docs" not in out
+    assert "agents" not in out
 
 
 @pytest.mark.parametrize(
@@ -163,6 +166,7 @@ def test_init_flags_reach_generate_via_answers(
     assert answers.include_skills is False
     assert answers.include_mcp is False
     assert answers.include_docs is True
+    assert answers.include_agents is True
     assert answers.assume_yes is True
 
 
@@ -173,27 +177,30 @@ def test_build_answers_defaults() -> None:
     assert answers.include_skills is True
     assert answers.include_mcp is True
     assert answers.include_docs is True
+    assert answers.include_agents is True
     assert answers.assume_yes is False
 
 
 def test_build_answers_respects_flags(tmp_path) -> None:
     answers = build_answers(
-        _init_args(yes=True, target_dir=tmp_path / "out", no_skills=True, no_mcp=True)
+        _init_args(yes=True, target_dir=tmp_path / "out", no_skills=True, no_mcp=True, no_agents=True)
     )
     assert answers.target_dir == tmp_path / "out"
     assert answers.include_skills is False
     assert answers.include_mcp is False
     assert answers.include_docs is True
+    assert answers.include_agents is False
     assert answers.assume_yes is True
 
 
 def test_parser_accepts_all_documented_flags() -> None:
     args = build_parser().parse_args(
-        ["init", "my-app", "-y", "--dir", "x", "--no-skills", "--no-mcp", "--no-docs"]
+        ["init", "my-app", "-y", "--dir", "x", "--no-skills", "--no-mcp", "--no-docs", "--no-agents"]
     )
     assert args.command == "init"
     assert args.yes is True
     assert args.target_dir == Path("x")
+    assert args.no_agents is True
 
 
 # --- interactive flow (no --yes): confirm / abort / questionary isolation ---

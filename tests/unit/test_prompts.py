@@ -68,6 +68,7 @@ def _partial(**overrides: object) -> PartialAnswers:
         "include_skills": True,
         "include_mcp": True,
         "include_docs": True,
+        "include_agents": True,
         "components_explicit": True,
         "assume_yes": False,
     }
@@ -82,6 +83,11 @@ def _answers(**overrides: object) -> Answers:
     }
     defaults.update(overrides)
     return Answers(**defaults)  # type: ignore[arg-type]
+
+
+def test_answers_default_has_include_agents() -> None:
+    answers = Answers(project_name="my-app", target_dir=Path("/tmp/my-app"))
+    assert answers.include_agents is True
 
 
 # --- name prompt ---
@@ -111,9 +117,10 @@ def test_name_prompt_result_lands_in_answers() -> None:
 
 
 def test_component_prompt_fires_only_when_no_explicit_flag() -> None:
-    asker = FakeAsker(checkboxes=[["skills", "mcp", "docs"]])
+    asker = FakeAsker(checkboxes=[["skills", "mcp", "docs", "agents"]])
     answers = collect_answers(_partial(components_explicit=False), asker=asker)
-    assert (answers.include_skills, answers.include_mcp, answers.include_docs) == (
+    assert (answers.include_skills, answers.include_mcp, answers.include_docs, answers.include_agents) == (
+        True,
         True,
         True,
         True,
@@ -122,9 +129,9 @@ def test_component_prompt_fires_only_when_no_explicit_flag() -> None:
 
 
 def test_component_prompt_skipped_when_flag_explicit() -> None:
-    asker = FakeAsker(checkboxes=[["skills", "mcp", "docs"]])
+    asker = FakeAsker(checkboxes=[["skills", "mcp", "docs", "agents"]])
     answers = collect_answers(
-        _partial(components_explicit=True, include_skills=False, include_mcp=True, include_docs=True),
+        _partial(components_explicit=True, include_skills=False, include_mcp=True, include_docs=True, include_agents=True),
         asker=asker,
     )
     assert answers.include_skills is False
@@ -134,11 +141,30 @@ def test_component_prompt_skipped_when_flag_explicit() -> None:
 def test_component_prompt_selection_can_disable_some() -> None:
     asker = FakeAsker(checkboxes=[["mcp"]])
     answers = collect_answers(_partial(components_explicit=False), asker=asker)
-    assert (answers.include_skills, answers.include_mcp, answers.include_docs) == (
+    assert (answers.include_skills, answers.include_mcp, answers.include_docs, answers.include_agents) == (
         False,
         True,
         False,
+        False,
     )
+
+
+@pytest.mark.parametrize(
+    ("selected", "expected_skills", "expected_mcp", "expected_docs", "expected_agents"),
+    [
+        (["skills", "mcp", "docs", "agents"], True, True, True, True),
+        (["skills", "mcp", "docs"], True, True, True, False),
+        (["docs", "agents"], False, False, True, True),
+        ([], False, False, False, False),
+    ]
+)
+def test_component_matrix(selected, expected_skills, expected_mcp, expected_docs, expected_agents) -> None:
+    asker = FakeAsker(checkboxes=[selected])
+    answers = collect_answers(_partial(components_explicit=False), asker=asker)
+    assert answers.include_skills is expected_skills
+    assert answers.include_mcp is expected_mcp
+    assert answers.include_docs is expected_docs
+    assert answers.include_agents is expected_agents
 
 
 # --- cancellation during collect_answers ---
@@ -178,6 +204,7 @@ def test_non_tty_missing_components_raises_invalid_arguments(
     with pytest.raises(InvalidArgumentsError) as excinfo:
         collect_answers(_partial(components_explicit=False))
     assert "component selection requires an interactive terminal" in str(excinfo.value)
+    assert "--no-agents" in str(excinfo.value)
 
 
 # --- interactive/flag path convergence (ADR-004) ---
@@ -195,10 +222,11 @@ def test_interactive_and_flag_paths_produce_identical_answers(tmp_path: Path) ->
         include_skills=False,
         include_mcp=True,
         include_docs=True,
+        include_agents=True,
         assume_yes=False,
     )
 
-    asker = FakeAsker(texts=["my-app"], checkboxes=[["mcp", "docs"]])
+    asker = FakeAsker(texts=["my-app"], checkboxes=[["mcp", "docs", "agents"]])
     prompt_answers = collect_answers(
         _partial(
             project_name=None,
@@ -285,3 +313,13 @@ def test_confirm_non_tty_without_injected_asker_raises_invalid_arguments(
     monkeypatch.setattr(collect_module, "_is_interactive", lambda: False)
     with pytest.raises(InvalidArgumentsError):
         confirm_generation(_answers(), PIN)
+
+
+def test_render_confirmation_summary_includes_agents() -> None:
+    from dev_ready.prompts.collect import _render_confirmation_summary
+    # when agents is True
+    summary_on = _render_confirmation_summary(_answers(include_agents=True), PIN)
+    assert "agents" in summary_on
+    # when agents is False
+    summary_off = _render_confirmation_summary(_answers(include_agents=False), PIN)
+    assert "agents" not in summary_off

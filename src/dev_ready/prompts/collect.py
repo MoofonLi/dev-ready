@@ -18,7 +18,7 @@ from dev_ready.prompts.asker import Asker
 __all__ = ["collect_answers", "confirm_generation"]
 
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
-_COMPONENT_CHOICES = ("skills", "mcp", "docs")
+_COMPONENT_CHOICES = ("skills", "mcp", "docs", "agents")
 
 
 def _is_interactive() -> bool:
@@ -50,7 +50,7 @@ def collect_answers(partial: PartialAnswers, *, asker: Asker | None = None) -> A
     if needs_components and asker is None and not _is_interactive():
         raise InvalidArgumentsError(
             "component selection requires an interactive terminal — pass "
-            "--no-skills/--no-mcp/--no-docs explicitly, or use --yes"
+            "--no-skills/--no-mcp/--no-docs/--no-agents explicitly, or use --yes"
         )
 
     resolved_asker = asker
@@ -64,11 +64,12 @@ def collect_answers(partial: PartialAnswers, *, asker: Asker | None = None) -> A
 
     if needs_components:
         assert resolved_asker is not None
-        include_skills, include_mcp, include_docs = _prompt_components(resolved_asker)
+        include_skills, include_mcp, include_docs, include_agents = _prompt_components(resolved_asker)
     else:
         include_skills = partial.include_skills
         include_mcp = partial.include_mcp
         include_docs = partial.include_docs
+        include_agents = partial.include_agents
 
     target_dir = (
         partial.target_dir if partial.target_dir is not None else Path.cwd() / project_name
@@ -80,6 +81,7 @@ def collect_answers(partial: PartialAnswers, *, asker: Asker | None = None) -> A
         include_skills=include_skills,
         include_mcp=include_mcp,
         include_docs=include_docs,
+        include_agents=include_agents,
         assume_yes=partial.assume_yes,
     )
 
@@ -114,6 +116,7 @@ def _render_confirmation_summary(answers: Answers, pin: UpstreamPin) -> str:
             ("skills", answers.include_skills),
             ("mcp", answers.include_mcp),
             ("docs", answers.include_docs),
+            ("agents", answers.include_agents),
         )
         if included
     ]
@@ -145,7 +148,7 @@ def _prompt_project_name(asker: Asker) -> str:
         )
 
 
-def _prompt_components(asker: Asker) -> tuple[bool, bool, bool]:
+def _prompt_components(asker: Asker) -> tuple[bool, bool, bool, bool]:
     try:
         selected = asker.checkbox("Select components to include:", _COMPONENT_CHOICES)
     except KeyboardInterrupt:
@@ -157,4 +160,5 @@ def _prompt_components(asker: Asker) -> tuple[bool, bool, bool]:
         "skills" in selected_set,
         "mcp" in selected_set,
         "docs" in selected_set,
+        "agents" in selected_set,
     )

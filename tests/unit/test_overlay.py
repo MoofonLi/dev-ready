@@ -30,6 +30,8 @@ def test_happy_path_writes_every_component_with_substitution(tmp_path: Path) -> 
     assert (project_dir / ".mcp.json").exists()
     assert (project_dir / "docs" / "architecture.md").exists()
     assert (project_dir / "docs" / "requirements.md").exists()
+    assert (project_dir / "docs" / "handoffs" / "README.md").exists()
+    assert (project_dir / "docs" / "handoffs" / "phase-N" / "01-opus-plan.md").exists()
 
     for path in written:
         assert not path.is_absolute()
@@ -39,10 +41,14 @@ def test_happy_path_writes_every_component_with_substitution(tmp_path: Path) -> 
     claude_md = (project_dir / "CLAUDE.md").read_text(encoding="utf-8")
     assert "my-app" in claude_md
     assert "{{" not in claude_md
+    assert "docs/handoffs/README.md" in claude_md
 
     architecture = (project_dir / "docs" / "architecture.md").read_text(encoding="utf-8")
     assert "my-app" in architecture
     assert "{{" not in architecture
+
+    handoffs_readme = (project_dir / "docs" / "handoffs" / "README.md").read_text(encoding="utf-8")
+    assert "{{" not in handoffs_readme
 
 
 @pytest.mark.parametrize(
@@ -66,6 +72,15 @@ def test_happy_path_writes_every_component_with_substitution(tmp_path: Path) -> 
             Path("docs") / "architecture.md",
             [Path(".mcp.json"), Path(".claude") / "skills" / "project-orientation" / "SKILL.md"],
         ),
+        (
+            "include_agents",
+            Path("docs") / "handoffs" / "README.md",
+            [
+                Path(".mcp.json"),
+                Path(".claude") / "skills" / "project-orientation" / "SKILL.md",
+                Path("docs") / "architecture.md",
+            ],
+        ),
     ],
 )
 def test_component_flag_skips_exactly_its_component(
@@ -87,7 +102,7 @@ def test_claude_md_always_present_even_with_all_components_disabled(tmp_path: Pa
     project_dir.mkdir()
 
     written = apply_overlay(
-        _answers(tmp_path, include_skills=False, include_mcp=False, include_docs=False),
+        _answers(tmp_path, include_skills=False, include_mcp=False, include_docs=False, include_agents=False),
         project_dir,
     )
 
@@ -97,6 +112,24 @@ def test_claude_md_always_present_even_with_all_components_disabled(tmp_path: Pa
     assert not (project_dir / ".claude").exists()
     assert not (project_dir / ".mcp.json").exists()
     assert not (project_dir / "docs").exists()
+
+
+def test_coexistence_docs_and_agents(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    apply_overlay(_answers(tmp_path, include_docs=True, include_agents=True), project_dir)
+    assert (project_dir / "docs" / "architecture.md").exists()
+    assert (project_dir / "docs" / "handoffs" / "README.md").exists()
+
+
+def test_docs_without_agents(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    apply_overlay(_answers(tmp_path, include_docs=True, include_agents=False), project_dir)
+    assert (project_dir / "docs" / "architecture.md").exists()
+    assert not (project_dir / "docs" / "handoffs").exists()
 
 
 def test_readme_is_about_the_project_not_the_template(tmp_path: Path) -> None:

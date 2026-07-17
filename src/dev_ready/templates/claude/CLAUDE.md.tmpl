@@ -24,6 +24,13 @@
 - `compose.yml` — local development orchestration (`compose.override.yml` adds the local-dev overrides)
 - `docs/` — design docs for this project, if generated with the docs overlay
 
+## Multi-agent handoff protocol
+
+If this project was generated with the agents component, `docs/handoffs/README.md`
+defines a fixed-role, document-driven workflow (Tech Lead, Senior, Junior, QA/Security/SRE)
+with per-phase handoff files under `docs/handoffs/phase-N/`. See that README before
+coordinating multiple agents.
+
 ## Working with this repo
 
 Read `docs/architecture.md` and `docs/requirements.md` (if present) before making structural changes. This file and any `.claude/skills/` were added by dev-ready; everything else in the tree comes from the upstream template linked above.

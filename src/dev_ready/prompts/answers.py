@@ -13,6 +13,7 @@ class Answers:
     include_skills: bool = True
     include_mcp: bool = True
     include_docs: bool = True
+    include_agents: bool = True
     assume_yes: bool = False
 
 
@@ -30,5 +31,6 @@ class PartialAnswers:
     include_skills: bool
     include_mcp: bool
     include_docs: bool
+    include_agents: bool
     components_explicit: bool
     assume_yes: bool = False

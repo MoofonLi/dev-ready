@@ -53,6 +53,9 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument(
         "--no-docs", action="store_true", help="Skip design-doc templates overlay"
     )
+    init_parser.add_argument(
+        "--no-agents", action="store_true", help="Exclude the agent-team handoff scaffold (docs/handoffs/)."
+    )
     return parser
 
 
@@ -80,6 +83,7 @@ def build_answers(args: argparse.Namespace) -> Answers:
         include_skills=not args.no_skills,
         include_mcp=not args.no_mcp,
         include_docs=not args.no_docs,
+        include_agents=not args.no_agents,
         assume_yes=args.yes,
     )
 
@@ -100,7 +104,8 @@ def _build_partial_answers(args: argparse.Namespace) -> PartialAnswers:
         include_skills=not args.no_skills,
         include_mcp=not args.no_mcp,
         include_docs=not args.no_docs,
-        components_explicit=args.no_skills or args.no_mcp or args.no_docs,
+        include_agents=not args.no_agents,
+        components_explicit=args.no_skills or args.no_mcp or args.no_docs or args.no_agents,
         assume_yes=args.yes,
     )
 

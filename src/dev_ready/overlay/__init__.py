@@ -22,8 +22,8 @@ _TEMPLATE_TOKEN = "{{project_name}}"
 def apply_overlay(answers: Answers, project_dir: Path) -> list[Path]:
     """Apply the selected overlay components onto `project_dir`.
 
-    CLAUDE.md and README.md are always applied; `.claude/skills/`, `.mcp.json`, and `docs/`
-    follow `answers.include_skills` / `include_mcp` / `include_docs`.
+    CLAUDE.md and README.md are always applied; `.claude/skills/`, `.mcp.json`, `docs/`, and `docs/handoffs/`
+    follow `answers.include_skills` / `include_mcp` / `include_docs` / `include_agents`.
 
     Returns the paths written, relative to `project_dir`. Raises
     `OverlayError` on any destination collision, missing asset, or leftover
@@ -73,6 +73,16 @@ def apply_overlay(answers: Answers, project_dir: Path) -> list[Path]:
                 templates_root.joinpath("docs"),
                 project_dir,
                 Path("docs"),
+                answers.project_name,
+            )
+        )
+
+    if answers.include_agents:
+        written.extend(
+            _apply_tree(
+                templates_root.joinpath("agents"),
+                project_dir,
+                Path("docs") / "handoffs",
                 answers.project_name,
             )
         )
