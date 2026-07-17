@@ -52,10 +52,10 @@ dev-ready pin bumps, same as everything else.
 Legal boundary (independent of any UX decision): content whose license prohibits
 redistribution is never vendored, open-source project or not — redistribution
 rules apply regardless of commercial intent. anthropics document-processing
-skills (source-available) are permanently excluded; karpathy-skills stays out
-until upstream adds a LICENSE file; react-doctor's *source* is never copied (a
-devDependency declaration is not redistribution, so its Commons Clause-style
-terms are not triggered).
+skills (source-available) are permanently excluded; react-doctor's *source* is
+never copied (a devDependency declaration is not redistribution, so its Commons
+Clause-style terms are not triggered); karpathy-skills is vendorable on the basis
+of the MIT declaration in its README (see Curation principles).
 
 ## Curation principles
 
@@ -67,11 +67,16 @@ terms are not triggered).
 - Subsets, not whole repos: vendor only the files that earn their context-window cost
   in a generated project.
 - Vendor everything that can legally be vendored; never vendor anything that is
-  not clearly licensed for redistribution. Currently permanently excluded:
+  not clearly licensed for redistribution. Permanently excluded:
   anthropics/skills document-processing skills (source-available, prohibits
   productization); react-doctor source (Modified MIT/Commons Clause — pinned
-  devDependency + wrapper skill instead, see FR-13); multica-ai/
-  andrej-karpathy-skills until upstream adds a LICENSE file.
+  devDependency + wrapper skill instead, see FR-13).
+- multica-ai/andrej-karpathy-skills: no standalone LICENSE file, but the README
+  declares "License MIT" — a valid grant from the copyright holder (verified
+  2026-07-18). Vendorable; the NOTICES entry cites "MIT, per README at
+  <pinned commit>", and the pinned commit permanently preserves the grant as
+  evidence. Asking upstream for a formal LICENSE file is a nice-to-have, no
+  longer a blocker.
 - Solo-maintainer budget: base-template bump stays weekly; vendored pins bump
   **monthly** (skill text churns slowly; review load must stay bounded).
 
@@ -128,8 +133,15 @@ Carry-overs / pre-work in v0.3:
   v0.2-overview KEEP-set correction; FR-7 KEEP list) — done alongside this plan.
 - Add `.copier` and `.copier-answers.yml` to `FORBIDDEN_PATHS` in verify (the leak
   guard should enforce what generate now prunes).
-- Open the LICENSE issue on multica-ai/andrej-karpathy-skills now (zero cost; the
-  clock on v0.5 eligibility starts today).
+- (Optional, nice-to-have) Ask multica-ai/andrej-karpathy-skills upstream for a
+  formal LICENSE file; the README's MIT declaration already suffices (verified
+  2026-07-18, no longer blocking FR-20).
+- CI hygiene: `ci.yml` gains `paths-ignore` for `docs/**`, root-level `*.md`, and
+  `.bob/**` so documentation-only pushes/PRs skip the heavy jobs. Must NOT use
+  `**.md` — markdown under `src/dev_ready/templates/` is functional wheel content
+  and must keep triggering CI. `release.yml` and `upstream-bump.yml` unchanged.
+  Revisit with `dorny/paths-filter` if branch protection with required checks is
+  ever enabled (skipped workflows leave required checks pending).
 
 ## v0.4 — Vendoring infrastructure + MIT wave
 
@@ -168,10 +180,11 @@ ships in the generated project alongside the skills, and the NOTICES machinery
 (FR-18) is extended for Apache attribution. Document-processing skills
 (docx/pdf/pptx/xlsx) remain permanently excluded (source-available terms).
 
-FR-20. **Karpathy guardrails content** — *conditional on upstream license
-resolution* (issue opened in v0.3). If resolved: fold the CLAUDE.md guardrail
-guidance into our generated CLAUDE.md template with attribution. If unresolved by
-v0.5 planning: drop from scope without renumbering.
+FR-20. **Karpathy guardrails content.** Fold the multica-ai/andrej-karpathy-skills
+CLAUDE.md guardrail guidance into our generated CLAUDE.md template with
+attribution. License basis: MIT as declared in the upstream README (no standalone
+LICENSE file; the pinned commit preserves the README grant as evidence — see
+Curation principles). NOTICES entry cites the README declaration.
 
 (The formerly planned "skill-selection UX review" is retired: FR-14 resolved it in
 v0.3 by decision, not deferral.)

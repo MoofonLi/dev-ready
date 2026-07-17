@@ -56,7 +56,7 @@ Agreed 2026-07-17. Full detail, rationale, and per-version grouping live in
 - FR-17 (v0.4). MIT-wave vendoring (curated subsets, each a catalog item): caveman, mattpocock/skills, cloudflare/security-audit-skill, awesome-design-md.
 - FR-18 (v0.4). THIRD_PARTY_NOTICES ↔ manifest `vendored` sync check in CI.
 - FR-19 (v0.5). anthropics/skills Apache 2.0 example subset with NOTICE propagation (document-processing skills permanently excluded).
-- FR-20 (v0.5). Karpathy guardrails content in generated CLAUDE.md — conditional on upstream LICENSE resolution (issue opened in v0.3).
+- FR-20 (v0.5). Karpathy guardrails content in generated CLAUDE.md — MIT per the upstream README declaration (no standalone LICENSE file; pinned commit preserves the grant), with attribution in NOTICES.
 - FR-21 (v0.6). `dev-ready check`: read-only validation of an existing project against its stamp and the CLI's manifest.
 - FR-22 (v0.6). `dev-ready upgrade`: re-apply overlay-managed files only (per the stamp's item selection); never touches upstream application code; never silently overwrites user edits.
 
