@@ -59,11 +59,11 @@ uvx dev-ready init my-app
 
 ### ADR-005: Consume upstream via Copier, superseding the tarball fetch (v0.1.3)
 
-- Status: Accepted (2026-07-14), amends ADR-003
+- Status: Accepted (2026-07-14), amends ADR-003; amended (2026-07-17): `.copier/` and `.copier-answers.yml` are now removed from generated output by `generate` after the template's `_tasks` complete (`e096aaf`). The "enables `copier update`" consequence below is thereby retired — Copier metadata is generator machinery, not user-project content, and the supported upgrade path is `dev-ready upgrade` (FR-22, v0.6). This prune is code-level (not the manifest `prune` list) by necessity: `.copier-answers.yml` is produced by Copier itself after generation, so exclude/prune-at-fetch cannot remove it.
 - Context: v0.1 downloaded the upstream as a raw tarball. Real-world use showed two gaps: (1) the template's own copier.yml questions (project_name, stack_name, secret_key, postgres_password, first_superuser_password) were never answered, so every generated project shipped the upstream "changethis" placeholder secrets and default project name in `.env`; (2) the template's `_exclude` list was ignored. Copier is the upstream template's officially supported consumption path.
 - Decision: `fetch` runs `copier.run_copy(https://github.com/<repo>.git, staging, data=..., vcs_ref=<pinned commit>, defaults=True, unsafe=True, quiet=True)`. `generate` builds the template data from Answers, generating per-project secrets (`secrets.token_urlsafe`) that the template's `_tasks` write into the project's `.env`. Everything else — manifest pin, staging directory, all-or-nothing finalize, weekly bump CI — is unchanged. The tarball download/extract modules and their tests are removed.
 - Consequences:
-  - Generated projects get correct names and unique secrets, and carry `.copier/.copier-answers.yml`, enabling `copier update` for users later.
+  - Generated projects get correct names and unique secrets. (Originally they also carried `.copier/.copier-answers.yml` to enable `copier update`; retired by the 2026-07-17 amendment above.)
   - New runtime dependency (copier, which brings jinja2/pydantic/plumbum) and a new host requirement: git must be installed (Copier clones; checked up front, mapped to FetchError/exit 3).
   - `unsafe=True` executes the template's `_tasks` (`.copier/update_dotenv.py`) at generation time. Accepted because the executed code is pinned to a CI-verified commit (ADR-002), never floating "latest".
   - Template question names are coupled to the pinned commit; an upstream rename is caught by the bump PR's generate-and-verify job, not by end users.
@@ -88,6 +88,33 @@ uvx dev-ready init my-app
   - IBM Bob (QA / Security / SRE): unchanged; reviewer expectations stay in `.bob/qa.md`, `.bob/security.md`, `.bob/sre.md`.
 - Handoff artifacts per phase, under `handoff/<version>/phaseN/`: `01-opus-plan.md` (tech lead's brief to the senior; the senior writes his task breakdown + implementation details into 02's designated section), `02-gemini-implementation.md` (the single file the junior receives: working rules from the tech lead + the senior's task breakdown), `03-opus-review.md` (senior's review brief: entry check on `reports/problems.md` — if present, fix mode from problems.md + 02; if absent, review the branch, and write problems.md for any non-trivial finding), `04-bob-qa.md`, `05-bob-security.md`, `06-bob-sre.md`. The junior's outputs go to `handoff/<version>/phaseN/reports/` (`execution-report.md` always; `problems.md` when hard bugs exist).
 - Consequences: Every agent starts from a written on-disk document, not from chat history; token spend concentrates in the cheapest capable agent (junior writes most code, senior only reviews and unblocks); the tech lead's no-code rule keeps decisions and implementation auditable separately. FR-10 ships the same scaffold to generated projects as an optional overlay component, so dev-ready users get this workflow for free.
+
+### ADR-008: Two third-party integration modes — reference vs vendor (v0.3+)
+
+- Status: Accepted (2026-07-17)
+- Context: The roadmap (docs/version-plan.md) integrates external tools and skill content: codebase-memory-mcp, react-doctor, caveman, mattpocock/skills, cloudflare/security-audit-skill, awesome-design-md, anthropics/skills, andrej-karpathy-skills. Some of these have restrictive or unclear licenses (react-doctor: Modified MIT with Commons Clause-style terms; anthropics document-processing skills: source-available, no productization; karpathy-skills: no LICENSE file). Shipping third-party content inside the wheel is redistribution and carries license obligations; shipping only configuration or original instructions does not.
+- Decision: every integration is classified into exactly one mode.
+  - **Reference mode**: dev-ready ships configuration (`.mcp.json` entries) or original wrapper-skill text pointing at the tool's official distribution channel. No third-party bytes in the wheel; no license obligations; the user installs and executes the tool by their own choice. Default choice whenever viable. Wrapper skills recommend a pinned major version (e.g. `npx react-doctor@1`).
+  - **Vendor mode**: a curated subset of upstream content is snapshotted into `src/dev_ready/templates/`, pinned in the manifest `vendored` section (ADR-009) with license and provenance, listed in THIRD_PARTY_NOTICES, and — for Apache 2.0 content — accompanied by NOTICE propagation into generated projects. Only for clearly redistributable licenses.
+- Consequences: react-doctor and codebase-memory-mcp integrate in v0.3 with zero license work (reference). The Commons Clause question on react-doctor becomes moot — nothing is redistributed. Vendor mode is deferred to v0.4 where its infrastructure (sync tooling, drift guard, NOTICES automation) is built once, properly. Scope note on ADR-002: "never fetch latest" governs what dev-ready materializes at generation time; a reference-mode tool executed later by the user from its official channel is outside that boundary, and that boundary line is part of this decision.
+
+### ADR-009: Manifest `vendored` section with enforced provenance (v0.4)
+
+- Status: Proposed (2026-07-17), implemented in v0.4 (FR-15/FR-16/FR-18)
+- Context: Vendored snapshots rot silently: once files are copied in, nothing ties them to their origin, and "this is repo X at commit Y" becomes an unverifiable claim. The upstream base template solved this with a manifest pin plus CI verification (ADR-002); vendored content needs the same discipline.
+- Decision: `manifest.json` gains `vendored: [{repo, commit, license, paths: [{src, dest}]}]`, validated as strictly as the upstream pin. `scripts/sync_vendored.py` re-materializes snapshots from pins; CI enforces byte-equality between the committed snapshot and `repo@commit` (drift = build failure). A monthly bump workflow (deliberately slower than the weekly base-template bump — skill text churns slowly, solo-maintainer review budget is finite) opens vendored-pin PRs; each bump PR re-checks the upstream LICENSE file. THIRD_PARTY_NOTICES must stay in sync with this section, enforced in CI.
+- Consequences: Provenance is enforced, not asserted. Adding a vendored repo has a fixed, known cost (pin entry + snapshot + NOTICES entry, all CI-checked). The generation stamp (FR-11) records vendored pins, giving `dev-ready check`/`upgrade` (v0.6) an accurate basis.
+
+### ADR-010: Item-level component selection with a data-driven catalog (v0.3)
+
+- Status: Accepted (2026-07-17)
+- Context: The `skills` and `mcp` components stop being monolithic in v0.3: they contain independent items (react-doctor, code-memory; later caveman, security-audit, mattpocock subset, anthropics examples). Users must be able to compose freely — e.g. react-doctor without code-memory. One boolean flag per item (`--no-react-doctor`, `--no-code-memory`, ...) explodes the CLI surface with every catalog addition and was rejected.
+- Decision: two-level selection.
+  - Level 1 (unchanged): the four components skills / mcp / docs / agents, existing flags and checkbox.
+  - Level 2 (new, `skills` and `mcp` only): interactive flow shows a second multi-select listing the chosen component's items, all on by default — pressing Enter reproduces today's behavior exactly. Non-interactive: list flags `--skills <ids|all|none>` and `--mcp <ids|all|none>` (comma-separated ids); `--no-skills`/`--no-mcp` remain as aliases for `none`; `--yes` alone still selects everything. Unknown ids exit 2 listing valid ids.
+  - The item catalog is data in `manifest.json` (id, description, integration mode per ADR-008, license, source paths). Prompts, overlay, and verify all render from the catalog: adding a skill is a data entry plus assets, never CLI code. `docs` and `agents` remain boolean — each is a single item.
+  - The Answers model (ADR-004) carries item sets; the generation stamp (FR-11) records the exact selection, which `dev-ready upgrade` (FR-22) later relies on.
+- Consequences: The CLI contract changes once (v0.3) and then absorbs catalog growth as data. Test surface for selection combinations is bounded by catalog-driven generation (one code path) with CI covering all-on, all-off, and a mixed selection. verify checks that exactly the selected items are present.
 
 ## Module Boundary
 

@@ -35,7 +35,11 @@ Declining the confirmation, or cancelling any prompt (Ctrl-C), prints `aborted: 
 
 **Windows compatibility:** interactive prompts are tested against Windows Terminal. Legacy `cmd.exe` may render the checkbox prompt incorrectly (missing VT/ANSI support). In environments where terminal support is uncertain, use `--yes` with explicit `--no-skills`/`--no-mcp`/`--no-docs`/`--no-agents` flags instead of relying on prompts.
 
-## Planned (not in v0.1)
+## Planned (see docs/version-plan.md)
 
-- `dev-ready check` — validate an existing generated project against the manifest
-- `dev-ready upgrade` — re-apply a newer overlay to an existing project
+- v0.3 (FR-14, ADR-010) — item-level selection inside `skills` and `mcp`:
+  - `--skills <ids|all|none>` and `--mcp <ids|all|none>` (comma-separated item ids, e.g. `--skills react-doctor,caveman`). Unknown ids exit 2 listing valid ids.
+  - `--no-skills` / `--no-mcp` become aliases for `--skills none` / `--mcp none` (backward compatible).
+  - Interactive flow gains a second-level multi-select per chosen component, all items on by default (plain Enter reproduces current behavior). `--yes` alone still selects everything.
+  - `docs` and `agents` remain boolean flags (single-item components).
+- v0.6 — `dev-ready check` (validate an existing generated project against its `.dev-ready.json` stamp and the manifest) and `dev-ready upgrade` (re-apply overlay-managed files only).
