@@ -9,11 +9,12 @@ import secrets
 import shutil
 import sys
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 
 from dev_ready.errors import TargetDirectoryError
 from dev_ready.fetch import fetch_snapshot
-from dev_ready.manifest import UpstreamPin
+from dev_ready.manifest import CatalogItem, UpstreamPin
 from dev_ready.overlay import apply_overlay
 from dev_ready.prompts import Answers
 from dev_ready.verify import verify_project
@@ -21,7 +22,9 @@ from dev_ready.verify import verify_project
 __all__ = ["generate"]
 
 
-def generate(answers: Answers, pin: UpstreamPin) -> list[Path]:
+def generate(
+    answers: Answers, pin: UpstreamPin, catalog: Mapping[str, tuple[CatalogItem, ...]]
+) -> list[Path]:
     """Fetch the pinned upstream snapshot, apply the overlay, verify the
     result, then move the fully assembled project into `answers.target_dir`
     as the last step.
@@ -47,10 +50,11 @@ def generate(answers: Answers, pin: UpstreamPin) -> list[Path]:
         if copier_answers.exists():
             copier_answers.unlink()
 
-        written = apply_overlay(answers, project_staging)
-        verify_project(project_staging)
+        written = apply_overlay(answers, project_staging, catalog, pin)
+        verify_project(project_staging, answers, catalog)
         _prune_empty_dirs(project_staging)
         _finalize(project_staging, answers.target_dir)
+
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)
         if staging_root.exists():

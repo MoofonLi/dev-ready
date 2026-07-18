@@ -29,9 +29,26 @@ class UpstreamPin:
 
 
 @dataclass(frozen=True)
+class ItemPath:
+    src: str
+    dest: str
+
+
+@dataclass(frozen=True)
+class CatalogItem:
+    id: str
+    description: str
+    mode: str
+    license: str
+    paths: tuple[ItemPath, ...]
+
+
+@dataclass(frozen=True)
 class Manifest:
     """Validated content of manifest.json."""
 
     manifest_version: int
     upstream: dict[str, UpstreamPin]
     overlay_version: str
+    components: dict[str, tuple[CatalogItem, ...]]
+

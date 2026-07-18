@@ -8,7 +8,7 @@ import pytest
 import dev_ready.generate as generate_module
 from dev_ready.errors import FetchError, OverlayError, TargetDirectoryError, VerificationError
 from dev_ready.generate import generate
-from dev_ready.manifest import UpstreamPin
+from dev_ready.manifest import UpstreamPin, load_default_manifest
 from dev_ready.prompts import Answers
 from dev_ready.verify import REQUIRED_UPSTREAM_PATHS
 
@@ -18,8 +18,24 @@ PIN = UpstreamPin(
     commit="4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2",
     license="MIT",
 )
+CATALOG = load_default_manifest().components
 
 _VERIFY_DIRECTORY_ENTRIES = {"backend", "frontend"}
+
+
+def _answers(target_dir: Path, **overrides: object) -> Answers:
+    defaults: dict[str, object] = {
+        "project_name": "my-app",
+        "target_dir": target_dir,
+        "include_skills": True,
+        "include_mcp": True,
+        "include_docs": True,
+        "include_agents": True,
+        "skills_items": frozenset({"project-orientation"}),
+        "mcp_items": frozenset({"mcp-config"}),
+    }
+    defaults.update(overrides)
+    return Answers(**defaults)  # type: ignore[arg-type]
 
 
 @pytest.fixture(autouse=True)
@@ -55,9 +71,9 @@ def test_generate_happy_path_merges_upstream_and_overlay(
     monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
 
     target_dir = tmp_path / "my-app"
-    answers = Answers(project_name="my-app", target_dir=target_dir)
+    answers = _answers(target_dir)
 
-    written = generate(answers, PIN)
+    written = generate(answers, PIN, CATALOG)
 
     assert (target_dir / "README.md").exists()
     readme = (target_dir / "README.md").read_text(encoding="utf-8")
@@ -87,7 +103,7 @@ def test_preflight_rejects_non_empty_target_dir_before_fetch(
     (target_dir / "existing.txt").write_text("keep me", encoding="utf-8")
 
     with pytest.raises(TargetDirectoryError):
-        generate(Answers(project_name="my-app", target_dir=target_dir), PIN)
+        generate(_answers(target_dir), PIN, CATALOG)
 
     assert calls == []
     assert (target_dir / "existing.txt").read_text(encoding="utf-8") == "keep me"
@@ -98,7 +114,7 @@ def test_preflight_rejects_target_dir_that_is_a_file(tmp_path: Path) -> None:
     target_dir.write_text("i am a file", encoding="utf-8")
 
     with pytest.raises(TargetDirectoryError):
-        generate(Answers(project_name="my-app", target_dir=target_dir), PIN)
+        generate(_answers(target_dir), PIN, CATALOG)
 
 
 def test_fetch_failure_leaves_target_untouched_and_no_leaked_temp_dirs(
@@ -113,7 +129,7 @@ def test_fetch_failure_leaves_target_untouched_and_no_leaked_temp_dirs(
 
     target_dir = tmp_path / "my-app"
     with pytest.raises(FetchError):
-        generate(Answers(project_name="my-app", target_dir=target_dir), PIN)
+        generate(_answers(target_dir), PIN, CATALOG)
 
     assert not target_dir.exists()
     assert list(_isolated_tempdir.iterdir()) == []
@@ -134,7 +150,7 @@ def test_overlay_failure_leaves_target_untouched_and_no_leaked_temp_dirs(
 
     target_dir = tmp_path / "my-app"
     with pytest.raises(OverlayError):
-        generate(Answers(project_name="my-app", target_dir=target_dir), PIN)
+        generate(_answers(target_dir), PIN, CATALOG)
 
     assert not target_dir.exists()
     assert list(_isolated_tempdir.iterdir()) == []
@@ -145,7 +161,7 @@ def test_success_leaves_no_leaked_temp_dirs(
 ) -> None:
     monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
 
-    generate(Answers(project_name="my-app", target_dir=tmp_path / "my-app"), PIN)
+    generate(_answers(tmp_path / "my-app"), PIN, CATALOG)
 
     assert list(_isolated_tempdir.iterdir()) == []
 
@@ -166,7 +182,7 @@ def test_verification_failure_leaves_target_untouched_and_no_leaked_temp_dirs(
 
     target_dir = tmp_path / "my-app"
     with pytest.raises(VerificationError):
-        generate(Answers(project_name="my-app", target_dir=target_dir), PIN)
+        generate(_answers(target_dir), PIN, CATALOG)
 
     assert not target_dir.exists()
     assert list(_isolated_tempdir.iterdir()) == []
@@ -177,7 +193,7 @@ def test_verify_runs_after_overlay_and_before_move(
 ) -> None:
     call_order: list[str] = []
     target_dir = tmp_path / "my-app"
-    answers = Answers(project_name="my-app", target_dir=target_dir)
+    answers = _answers(target_dir)
 
     def _spy_fetch(
         pin: UpstreamPin, dest: Path, template_data: dict[str, str] | None = None
@@ -185,11 +201,11 @@ def test_verify_runs_after_overlay_and_before_move(
         call_order.append("fetch")
         return _fake_fetch_ok(pin, dest)
 
-    def _spy_overlay(passed_answers: Answers, project_dir: Path) -> list[Path]:
+    def _spy_overlay(passed_answers: Answers, project_dir: Path, cat, pin) -> list[Path]:
         call_order.append("overlay")
         return []
 
-    def _spy_verify(project_dir: Path) -> None:
+    def _spy_verify(project_dir: Path, passed_answers: Answers, cat) -> None:
         call_order.append("verify")
         # verify must run before the staging dir is moved into target_dir
         assert not target_dir.exists()
@@ -198,7 +214,7 @@ def test_verify_runs_after_overlay_and_before_move(
     monkeypatch.setattr(generate_module, "apply_overlay", _spy_overlay)
     monkeypatch.setattr(generate_module, "verify_project", _spy_verify)
 
-    generate(answers, PIN)
+    generate(answers, PIN, CATALOG)
 
     assert call_order == ["fetch", "overlay", "verify"]
     assert target_dir.exists()
@@ -217,7 +233,7 @@ def test_fetch_receives_template_data_with_generated_secrets(
 
     monkeypatch.setattr(generate_module, "fetch_snapshot", _spy_fetch)
 
-    generate(Answers(project_name="My_Cool-App", target_dir=tmp_path / "my-app"), PIN)
+    generate(_answers(tmp_path / "my-app", project_name="My_Cool-App"), PIN, CATALOG)
 
     assert received["project_name"] == "My_Cool-App"
     assert received["stack_name"] == "my-cool-app"
@@ -225,3 +241,4 @@ def test_fetch_receives_template_data_with_generated_secrets(
     for key in ("secret_key", "postgres_password", "first_superuser_password"):
         assert received[key] != "changethis"
         assert len(received[key]) >= 16
+

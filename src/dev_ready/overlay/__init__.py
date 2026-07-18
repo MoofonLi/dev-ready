@@ -4,26 +4,52 @@ Pure local file operations — must never fetch from the network.
 See docs/architecture.md.
 """
 
+import json
 import re
+from collections.abc import Mapping
 from importlib import resources
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
+from dev_ready import __version__
 from dev_ready.errors import OverlayError
+from dev_ready.manifest import CatalogItem, UpstreamPin
 from dev_ready.prompts import Answers
 
-__all__ = ["apply_overlay"]
+__all__ = ["apply_overlay", "render_stamp"]
 
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 _TEMPLATE_SUFFIX = ".tmpl"
 _TEMPLATE_TOKEN = "{{project_name}}"
 
 
-def apply_overlay(answers: Answers, project_dir: Path) -> list[Path]:
+def render_stamp(
+    answers: Answers, pin: UpstreamPin, catalog: Mapping[str, tuple[CatalogItem, ...]]
+) -> str:
+    data = {
+        "stamp_version": 1,
+        "dev_ready_version": __version__,
+        "components": {
+            "skills": {"included": answers.include_skills, "items": sorted(answers.skills_items)},
+            "mcp": {"included": answers.include_mcp, "items": sorted(answers.mcp_items)},
+            "docs": {"included": answers.include_docs},
+            "agents": {"included": answers.include_agents},
+        },
+        "upstream": {"repo": pin.repo, "commit": pin.commit},
+    }
+    return json.dumps(data, indent=2) + "\n"
+
+
+def apply_overlay(
+    answers: Answers,
+    project_dir: Path,
+    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    pin: UpstreamPin,
+) -> list[Path]:
     """Apply the selected overlay components onto `project_dir`.
 
     CLAUDE.md and README.md are always applied; `.claude/skills/`, `.mcp.json`, `docs/`, and `docs/handoffs/`
-    follow `answers.include_skills` / `include_mcp` / `include_docs` / `include_agents`.
+    follow `answers.skills_items` / `mcp_items` / `include_docs` / `include_agents`.
 
     Returns the paths written, relative to `project_dir`. Raises
     `OverlayError` on any destination collision, missing asset, or leftover
@@ -47,25 +73,17 @@ def apply_overlay(answers: Answers, project_dir: Path) -> list[Path]:
         ),
     ]
 
-    if answers.include_skills:
-        written.extend(
-            _apply_tree(
-                templates_root.joinpath("claude", "skills"),
-                project_dir,
-                Path(".claude") / "skills",
-                answers.project_name,
-            )
-        )
-
-    if answers.include_mcp:
-        written.append(
-            _apply_file(
-                templates_root.joinpath("mcp", "mcp.json"),
-                project_dir,
-                Path(".mcp.json"),
-                answers.project_name,
-            )
-        )
+    for component, selected in (("skills", answers.skills_items), ("mcp", answers.mcp_items)):
+        for item in catalog.get(component, ()):
+            if item.id not in selected:
+                continue
+            for item_path in item.paths:
+                source = templates_root.joinpath(*item_path.src.split("/"))
+                dest_rel = Path(item_path.dest)
+                if source.is_dir():
+                    written.extend(_apply_tree(source, project_dir, dest_rel, answers.project_name))
+                else:
+                    written.append(_apply_file(source, project_dir, dest_rel, answers.project_name))
 
     if answers.include_docs:
         written.extend(
@@ -86,6 +104,15 @@ def apply_overlay(answers: Answers, project_dir: Path) -> list[Path]:
                 answers.project_name,
             )
         )
+
+    stamp_path = project_dir / ".dev-ready.json"
+    if stamp_path.exists() or stamp_path.is_symlink():
+        raise OverlayError("overlay destination already exists: .dev-ready.json")
+    try:
+        stamp_path.write_text(render_stamp(answers, pin, catalog), encoding="utf-8")
+    except OSError as error:
+        raise OverlayError(f"failed to write .dev-ready.json: {error}") from error
+    written.append(Path(".dev-ready.json"))
 
     return written
 

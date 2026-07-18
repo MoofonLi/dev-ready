@@ -8,10 +8,11 @@ which never calls into this module at all) never triggers the import.
 
 import re
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from dev_ready.errors import AbortedError, InvalidArgumentsError
-from dev_ready.manifest import UpstreamPin
+from dev_ready.manifest import CatalogItem, UpstreamPin
 from dev_ready.prompts.answers import Answers, PartialAnswers
 from dev_ready.prompts.asker import Asker
 
@@ -31,7 +32,12 @@ def _default_asker() -> Asker:
     return QuestionaryAsker()
 
 
-def collect_answers(partial: PartialAnswers, *, asker: Asker | None = None) -> Answers:
+def collect_answers(
+    partial: PartialAnswers,
+    *,
+    catalog: Mapping[str, tuple[CatalogItem, ...]] | None = None,
+    asker: Asker | None = None,
+) -> Answers:
     """Fill in whatever `partial` left unanswered, via `asker` (or a real
     terminal prompt by default), and return a complete `Answers`.
 
@@ -64,10 +70,44 @@ def collect_answers(partial: PartialAnswers, *, asker: Asker | None = None) -> A
 
     if needs_components:
         assert resolved_asker is not None
-        include_skills, include_mcp, include_docs, include_agents = _prompt_components(resolved_asker)
+        skills_on, mcp_on, include_docs, include_agents = _prompt_components(resolved_asker)
+        if catalog is not None:
+            if skills_on and "skills" in catalog and catalog["skills"]:
+                skills_items = _prompt_items(
+                    resolved_asker, "skills", [item.id for item in catalog["skills"]]
+                )
+            else:
+                skills_items = frozenset()
+
+            if mcp_on and "mcp" in catalog and catalog["mcp"]:
+                mcp_items = _prompt_items(
+                    resolved_asker, "mcp", [item.id for item in catalog["mcp"]]
+                )
+            else:
+                mcp_items = frozenset()
+
+            include_skills = bool(skills_items)
+            include_mcp = bool(mcp_items)
+        else:
+            skills_items = frozenset()
+            mcp_items = frozenset()
+            include_skills = skills_on
+            include_mcp = mcp_on
     else:
-        include_skills = partial.include_skills
-        include_mcp = partial.include_mcp
+        skills_items = (
+            partial.skills_selection if partial.skills_selection is not None else frozenset()
+        )
+        mcp_items = (
+            partial.mcp_selection if partial.mcp_selection is not None else frozenset()
+        )
+        include_skills = (
+            bool(skills_items)
+            if partial.skills_selection is not None
+            else partial.include_skills
+        )
+        include_mcp = (
+            bool(mcp_items) if partial.mcp_selection is not None else partial.include_mcp
+        )
         include_docs = partial.include_docs
         include_agents = partial.include_agents
 
@@ -82,6 +122,8 @@ def collect_answers(partial: PartialAnswers, *, asker: Asker | None = None) -> A
         include_mcp=include_mcp,
         include_docs=include_docs,
         include_agents=include_agents,
+        skills_items=skills_items,
+        mcp_items=mcp_items,
         assume_yes=partial.assume_yes,
     )
 
@@ -110,23 +152,26 @@ def confirm_generation(
 
 
 def _render_confirmation_summary(answers: Answers, pin: UpstreamPin) -> str:
-    components = [
-        name
-        for name, included in (
-            ("skills", answers.include_skills),
-            ("mcp", answers.include_mcp),
-            ("docs", answers.include_docs),
-            ("agents", answers.include_agents),
-        )
-        if included
-    ]
+    comp_parts = []
+    if answers.include_skills:
+        skills_str = ", ".join(sorted(answers.skills_items)) if answers.skills_items else "(none)"
+        comp_parts.append(f"skills ({skills_str})")
+    if answers.include_mcp:
+        mcp_str = ", ".join(sorted(answers.mcp_items)) if answers.mcp_items else "(none)"
+        comp_parts.append(f"mcp ({mcp_str})")
+    if answers.include_docs:
+        comp_parts.append("docs")
+    if answers.include_agents:
+        comp_parts.append("agents")
+
+    components_line = ", ".join(comp_parts) if comp_parts else "(none)"
     return "\n".join(
         [
             "Ready to generate:",
             f"  project name: {answers.project_name}",
             f"  target dir:   {answers.target_dir}",
             f"  upstream:     {pin.repo}@{pin.commit[:12]}",
-            f"  components:   {', '.join(components) if components else '(none)'}",
+            f"  components:   {components_line}",
         ]
     )
 
@@ -162,3 +207,14 @@ def _prompt_components(asker: Asker) -> tuple[bool, bool, bool, bool]:
         "docs" in selected_set,
         "agents" in selected_set,
     )
+
+
+def _prompt_items(asker: Asker, component: str, item_ids: Sequence[str]) -> frozenset[str]:
+    try:
+        selected = asker.checkbox(f"Select {component} items to include:", item_ids)
+    except KeyboardInterrupt:
+        selected = None
+    if selected is None:
+        raise AbortedError(f"{component} item selection cancelled")
+    return frozenset(selected)
+

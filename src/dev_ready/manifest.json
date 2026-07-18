@@ -37,5 +37,33 @@
       ]
     }
   },
+  "components": {
+    "skills": {
+      "items": [
+        {
+          "id": "project-orientation",
+          "description": "Skill that orients an AI agent to the generated project's layout, stack, and dev workflow.",
+          "mode": "builtin",
+          "license": "MIT",
+          "paths": [
+            { "src": "claude/skills/project-orientation", "dest": ".claude/skills/project-orientation" }
+          ]
+        }
+      ]
+    },
+    "mcp": {
+      "items": [
+        {
+          "id": "mcp-config",
+          "description": "Base .mcp.json MCP server configuration for the generated project.",
+          "mode": "builtin",
+          "license": "MIT",
+          "paths": [
+            { "src": "mcp/mcp.json", "dest": ".mcp.json" }
+          ]
+        }
+      ]
+    }
+  },
   "overlay_version": "0.1.0"
 }

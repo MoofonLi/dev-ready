@@ -11,9 +11,12 @@ from importlib import resources
 from pathlib import Path
 
 from dev_ready.errors import ManifestError
-from dev_ready.manifest.models import Manifest, UpstreamPin
+from dev_ready.manifest.models import CatalogItem, ItemPath, Manifest, UpstreamPin
 
 SUPPORTED_MANIFEST_VERSION = 1
+ALLOWED_MODES = ("builtin", "vendor", "pinned-dependency")
+CATALOG_COMPONENTS = ("skills", "mcp")
+_ITEM_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 # owner/name, GitHub-shaped: each side must start with an alphanumeric so no
@@ -64,6 +67,8 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
         raise ManifestError(f"{source}: 'upstream' must be a non-empty object")
     upstream = {name: _parse_pin(name, entry, source) for name, entry in upstream_raw.items()}
 
+    components = _parse_components(data, source)
+
     overlay_version = data.get("overlay_version")
     if not isinstance(overlay_version, str) or not overlay_version:
         raise ManifestError(f"{source}: 'overlay_version' must be a non-empty string")
@@ -72,6 +77,7 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
         manifest_version=version,
         upstream=upstream,
         overlay_version=overlay_version,
+        components=components,
     )
 
 
@@ -163,3 +169,110 @@ def _parse_path_list(name: str, entry: dict, source: str, field: str) -> tuple[s
             )
         patterns.append(item)
     return tuple(patterns)
+
+
+def _parse_components(data: dict, source: str) -> dict[str, tuple[CatalogItem, ...]]:
+    raw = data.get("components")
+    if not isinstance(raw, dict):
+        raise ManifestError(f"{source}: 'components' must be an object")
+
+    for key in raw:
+        if key not in CATALOG_COMPONENTS:
+            raise ManifestError(f"{source}: unknown component key in 'components': {key!r}")
+
+    for req in CATALOG_COMPONENTS:
+        if req not in raw:
+            raise ManifestError(f"{source}: missing required component in 'components': {req!r}")
+
+    result: dict[str, tuple[CatalogItem, ...]] = {}
+    for comp_name, comp_dict in raw.items():
+        if not isinstance(comp_dict, dict):
+            raise ManifestError(f"{source}: component '{comp_name}' must be an object")
+        items_raw = comp_dict.get("items")
+        if not isinstance(items_raw, list):
+            raise ManifestError(f"{source}: component '{comp_name}' field 'items' must be a list")
+
+        seen_ids: set[str] = set()
+        parsed_items: list[CatalogItem] = []
+        for item_entry in items_raw:
+            if not isinstance(item_entry, dict):
+                raise ManifestError(f"{source}: item in '{comp_name}' must be an object")
+
+            item_id = item_entry.get("id")
+            if not isinstance(item_id, str) or not item_id or not _ITEM_ID_PATTERN.fullmatch(item_id):
+                raise ManifestError(
+                    f"{source}: component '{comp_name}' item 'id' must match pattern, got {item_id!r}"
+                )
+
+            if item_id in seen_ids:
+                raise ManifestError(
+                    f"{source}: duplicate item id {item_id!r} in component '{comp_name}'"
+                )
+            seen_ids.add(item_id)
+
+            desc = item_entry.get("description")
+            if not isinstance(desc, str) or not desc:
+                raise ManifestError(
+                    f"{source}: component '{comp_name}' item '{item_id}' field 'description' must be a non-empty string"
+                )
+
+            mode = item_entry.get("mode")
+            if not isinstance(mode, str) or mode not in ALLOWED_MODES:
+                raise ManifestError(
+                    f"{source}: component '{comp_name}' item '{item_id}' field 'mode' must be one of {ALLOWED_MODES!r}, got {mode!r}"
+                )
+
+            lic = item_entry.get("license")
+            if not isinstance(lic, str) or not lic:
+                raise ManifestError(
+                    f"{source}: component '{comp_name}' item '{item_id}' field 'license' must be a non-empty string"
+                )
+
+            paths_raw = item_entry.get("paths")
+            if not isinstance(paths_raw, list) or not paths_raw:
+                raise ManifestError(
+                    f"{source}: component '{comp_name}' item '{item_id}' field 'paths' must be a non-empty list"
+                )
+
+            parsed_paths: list[ItemPath] = []
+            for path_entry in paths_raw:
+                if not isinstance(path_entry, dict):
+                    raise ManifestError(
+                        f"{source}: component '{comp_name}' item '{item_id}' path entry must be an object"
+                    )
+                src = _parse_catalog_path(comp_name, item_id, "src", path_entry.get("src"), source)
+                dest = _parse_catalog_path(comp_name, item_id, "dest", path_entry.get("dest"), source)
+                parsed_paths.append(ItemPath(src=src, dest=dest))
+
+            parsed_items.append(
+                CatalogItem(
+                    id=item_id,
+                    description=desc,
+                    mode=mode,
+                    license=lic,
+                    paths=tuple(parsed_paths),
+                )
+            )
+
+        result[comp_name] = tuple(parsed_items)
+    return result
+
+
+def _parse_catalog_path(
+    component: str, item_id: str, field: str, value: object, source: str
+) -> str:
+    if not isinstance(value, str) or not value:
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' path field '{field}' must be a non-empty string"
+        )
+    if (
+        value.startswith("/")
+        or value.startswith("\\")
+        or "\\" in value
+        or any(seg == ".." for seg in value.split("/"))
+    ):
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' path field '{field}' must be a relative path without '..', got {value!r}"
+        )
+    return value
+

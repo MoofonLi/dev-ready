@@ -8,12 +8,13 @@ Responsibilities (see docs/architecture.md, Module Boundary):
 import argparse
 import re
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 from dev_ready import __version__
 from dev_ready.errors import AbortedError, DevReadyError, InvalidArgumentsError
 from dev_ready.generate import generate
-from dev_ready.manifest import load_default_manifest
+from dev_ready.manifest import CatalogItem, load_default_manifest
 from dev_ready.prompts import Answers, PartialAnswers, collect_answers, confirm_generation
 from dev_ready.report import render_report
 
@@ -45,6 +46,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Target directory (default: ./PROJECT_NAME)",
     )
     init_parser.add_argument(
+        "--skills",
+        dest="skills",
+        default=None,
+        help="Item selection for the skills component: comma-separated ids, or 'all' / 'none'.",
+    )
+    init_parser.add_argument(
+        "--mcp",
+        dest="mcp",
+        default=None,
+        help="Item selection for the mcp component: comma-separated ids, or 'all' / 'none'.",
+    )
+    init_parser.add_argument(
         "--no-skills", action="store_true", help="Skip Claude Code skills overlay"
     )
     init_parser.add_argument(
@@ -59,7 +72,45 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def build_answers(args: argparse.Namespace) -> Answers:
+def _resolve_item_selection(
+    component: str, raw_value: str | None, no_flag: bool, catalog_ids: frozenset[str]
+) -> frozenset[str] | None:
+    """None => unspecified (prompt or default-all later). Else a concrete id set."""
+    if no_flag and raw_value is not None and raw_value.strip().lower() != "none":
+        raise InvalidArgumentsError(
+            f"--no-{component} conflicts with --{component} {raw_value!r}; use one."
+        )
+    if no_flag:
+        return frozenset()
+    if raw_value is None:
+        return None
+
+    val = raw_value.strip().lower()
+    if val == "all":
+        return catalog_ids
+    if val == "none":
+        return frozenset()
+
+    requested = set()
+    for item in raw_value.split(","):
+        stripped = item.strip()
+        if stripped:
+            requested.add(stripped)
+
+    if not requested:
+        raise InvalidArgumentsError(f"empty item selection for --{component}")
+
+    unknown = sorted(requested - catalog_ids)
+    if unknown:
+        raise InvalidArgumentsError(
+            f"unknown {component} item ids: {unknown!r}; valid ids: {sorted(catalog_ids)!r}"
+        )
+    return frozenset(requested)
+
+
+def build_answers(
+    args: argparse.Namespace, catalog: Mapping[str, tuple[CatalogItem, ...]]
+) -> Answers:
     """Turn parsed flags into the shared Answers model.
 
     Used only on the --yes path, where all values must come from the command
@@ -76,19 +127,33 @@ def build_answers(args: argparse.Namespace) -> Answers:
             f"invalid project name {name!r}: use letters, digits, '.', '_', '-',"
             " starting with a letter or digit"
         )
+
+    all_skill_ids = frozenset(i.id for i in catalog.get("skills", ()))
+    all_mcp_ids = frozenset(i.id for i in catalog.get("mcp", ()))
+
+    skills_resolved = _resolve_item_selection("skills", args.skills, args.no_skills, all_skill_ids)
+    mcp_resolved = _resolve_item_selection("mcp", args.mcp, args.no_mcp, all_mcp_ids)
+
+    skills_items = skills_resolved if skills_resolved is not None else all_skill_ids
+    mcp_items = mcp_resolved if mcp_resolved is not None else all_mcp_ids
+
     target_dir = args.target_dir if args.target_dir is not None else Path.cwd() / name
     return Answers(
         project_name=name,
         target_dir=target_dir,
-        include_skills=not args.no_skills,
-        include_mcp=not args.no_mcp,
+        include_skills=bool(skills_items),
+        include_mcp=bool(mcp_items),
         include_docs=not args.no_docs,
         include_agents=not args.no_agents,
+        skills_items=skills_items,
+        mcp_items=mcp_items,
         assume_yes=args.yes,
     )
 
 
-def _build_partial_answers(args: argparse.Namespace) -> PartialAnswers:
+def _build_partial_answers(
+    args: argparse.Namespace, catalog: Mapping[str, tuple[CatalogItem, ...]]
+) -> PartialAnswers:
     """Same flag mapping as `build_answers`, but tolerates a missing name —
     `collect_answers` prompts for whatever this leaves unanswered.
     """
@@ -98,14 +163,44 @@ def _build_partial_answers(args: argparse.Namespace) -> PartialAnswers:
             f"invalid project name {name!r}: use letters, digits, '.', '_', '-',"
             " starting with a letter or digit"
         )
+
+    all_skill_ids = frozenset(i.id for i in catalog.get("skills", ()))
+    all_mcp_ids = frozenset(i.id for i in catalog.get("mcp", ()))
+
+    skills_resolved = _resolve_item_selection("skills", args.skills, args.no_skills, all_skill_ids)
+    mcp_resolved = _resolve_item_selection("mcp", args.mcp, args.no_mcp, all_mcp_ids)
+
+    components_explicit = (
+        args.no_skills
+        or args.no_mcp
+        or args.no_docs
+        or args.no_agents
+        or args.skills is not None
+        or args.mcp is not None
+    )
+
+    if components_explicit:
+        skills_selection = skills_resolved if skills_resolved is not None else all_skill_ids
+        mcp_selection = mcp_resolved if mcp_resolved is not None else all_mcp_ids
+    else:
+        skills_selection = None
+        mcp_selection = None
+
+    include_skills = (
+        bool(skills_selection) if skills_selection is not None else (not args.no_skills)
+    )
+    include_mcp = bool(mcp_selection) if mcp_selection is not None else (not args.no_mcp)
+
     return PartialAnswers(
         project_name=name,
         target_dir=args.target_dir,
-        include_skills=not args.no_skills,
-        include_mcp=not args.no_mcp,
+        include_skills=include_skills,
+        include_mcp=include_mcp,
         include_docs=not args.no_docs,
         include_agents=not args.no_agents,
-        components_explicit=args.no_skills or args.no_mcp or args.no_docs or args.no_agents,
+        components_explicit=components_explicit,
+        skills_selection=skills_selection,
+        mcp_selection=mcp_selection,
         assume_yes=args.yes,
     )
 
@@ -115,15 +210,15 @@ def _run_init(args: argparse.Namespace) -> int:
     pin = manifest.upstream["base_template"]
 
     if args.yes:
-        answers = build_answers(args)
+        answers = build_answers(args, manifest.components)
     else:
-        partial = _build_partial_answers(args)
-        answers = collect_answers(partial)
+        partial = _build_partial_answers(args, manifest.components)
+        answers = collect_answers(partial, catalog=manifest.components)
         if not confirm_generation(answers, pin):
             print("aborted: nothing was written", file=sys.stderr)
             return 1
 
-    written = generate(answers, pin)
+    written = generate(answers, pin, manifest.components)
     print(render_report(answers, pin, written))
     return 0
 

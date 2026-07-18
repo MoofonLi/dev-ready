@@ -14,6 +14,8 @@ class Answers:
     include_mcp: bool = True
     include_docs: bool = True
     include_agents: bool = True
+    skills_items: frozenset[str] = frozenset()
+    mcp_items: frozenset[str] = frozenset()
     assume_yes: bool = False
 
 
@@ -33,4 +35,7 @@ class PartialAnswers:
     include_docs: bool
     include_agents: bool
     components_explicit: bool
+    skills_selection: frozenset[str] | None = None
+    mcp_selection: frozenset[str] | None = None
     assume_yes: bool = False
+

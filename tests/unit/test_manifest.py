@@ -22,6 +22,35 @@ VALID = {
             "license": "MIT",
         }
     },
+    "components": {
+        "skills": {
+            "items": [
+                {
+                    "id": "project-orientation",
+                    "description": "Skill that orients an AI agent to the generated project's layout, stack, and dev workflow.",
+                    "mode": "builtin",
+                    "license": "MIT",
+                    "paths": [
+                        {
+                            "src": "claude/skills/project-orientation",
+                            "dest": ".claude/skills/project-orientation",
+                        }
+                    ],
+                }
+            ]
+        },
+        "mcp": {
+            "items": [
+                {
+                    "id": "mcp-config",
+                    "description": "Base .mcp.json MCP server configuration for the generated project.",
+                    "mode": "builtin",
+                    "license": "MIT",
+                    "paths": [{"src": "mcp/mcp.json", "dest": ".mcp.json"}],
+                }
+            ]
+        },
+    },
     "overlay_version": "0.1.0",
 }
 
@@ -35,6 +64,21 @@ def test_parse_valid_manifest() -> None:
     assert pin.commit == "4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2"
     assert pin.verified_at == "2026-07-04"
     assert pin.license == "MIT"
+    assert len(manifest.components["skills"]) == 1
+    skill = manifest.components["skills"][0]
+    assert skill.id == "project-orientation"
+    assert skill.mode == "builtin"
+    assert skill.license == "MIT"
+    assert skill.paths[0].src == "claude/skills/project-orientation"
+    assert skill.paths[0].dest == ".claude/skills/project-orientation"
+    assert len(manifest.components["mcp"]) == 1
+    mcp = manifest.components["mcp"][0]
+    assert mcp.id == "mcp-config"
+    assert mcp.mode == "builtin"
+    assert mcp.license == "MIT"
+    assert mcp.paths[0].src == "mcp/mcp.json"
+    assert mcp.paths[0].dest == ".mcp.json"
+
 
 
 def test_verified_at_may_be_null() -> None:
@@ -225,3 +269,78 @@ def test_bundled_manifest_is_valid() -> None:
     assert manifest.upstream["base_template"].exclude != ()
     assert manifest.upstream["base_template"].prune != ()
     assert ".github/workflows/test-backend.yml" not in manifest.upstream["base_template"].prune
+
+
+def test_missing_components_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    del data["components"]
+    with pytest.raises(ManifestError, match="'components' must be an object"):
+        parse_manifest(json.dumps(data))
+
+
+def test_unknown_component_key_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["docs"] = {"items": []}
+    with pytest.raises(ManifestError, match="unknown component key"):
+        parse_manifest(json.dumps(data))
+
+
+def test_missing_required_component_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    del data["components"]["mcp"]
+    with pytest.raises(ManifestError, match="missing required component"):
+        parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize("bad_id", ["UPPERCASE", "-leading", "has,comma", "has space", ""])
+def test_bad_item_id_rejected(bad_id: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["id"] = bad_id
+    with pytest.raises(ManifestError, match="must match pattern"):
+        parse_manifest(json.dumps(data))
+
+
+def test_duplicate_item_id_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    item = data["components"]["skills"]["items"][0]
+    data["components"]["skills"]["items"].append(item)
+    with pytest.raises(ManifestError, match="duplicate item id"):
+        parse_manifest(json.dumps(data))
+
+
+def test_empty_description_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["description"] = ""
+    with pytest.raises(ManifestError, match="description"):
+        parse_manifest(json.dumps(data))
+
+
+def test_invalid_mode_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["mode"] = "unknown-mode"
+    with pytest.raises(ManifestError, match="mode"):
+        parse_manifest(json.dumps(data))
+
+
+def test_empty_license_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["license"] = ""
+    with pytest.raises(ManifestError, match="license"):
+        parse_manifest(json.dumps(data))
+
+
+def test_empty_paths_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["paths"] = []
+    with pytest.raises(ManifestError, match="paths"):
+        parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize("bad_path", ["/abs/path", "\\win\\path", "with\\backslash", "../outside", "a/../b", ""])
+def test_invalid_item_path_rejected(bad_path: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["paths"][0]["src"] = bad_path
+    with pytest.raises(ManifestError, match=r"relative path|non-empty string"):
+        parse_manifest(json.dumps(data))
+
+
