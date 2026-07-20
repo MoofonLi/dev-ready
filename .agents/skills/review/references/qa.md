@@ -1,4 +1,4 @@
-# IBM Bob — QA Agent
+# QA Reviewer
 
 Role: review every change for test quality before merge.
 

@@ -1,4 +1,4 @@
-# IBM Bob — SRE / Reliability Reviewer
+# SRE / Reliability Reviewer
 
 Role: reliability review. dev-ready has no servers, so "SRE" here means CLI operational quality plus the reliability of generated projects and CI automation.
 

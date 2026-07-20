@@ -217,7 +217,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-handoff/
+docs/handoff/
 .bob/reviews/
 
 .vscode/

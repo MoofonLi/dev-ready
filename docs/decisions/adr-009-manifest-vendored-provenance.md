@@ -1,0 +1,6 @@
+# ADR-009: Manifest `vendored` section with enforced provenance (v0.4)
+
+- Status: Proposed (2026-07-17), implemented in v0.4 (FR-15/FR-16/FR-18)
+- Context: Vendored snapshots rot silently: once files are copied in, nothing ties them to their origin, and "this is repo X at commit Y" becomes an unverifiable claim. The upstream base template solved this with a manifest pin plus CI verification (ADR-002); vendored content needs the same discipline.
+- Decision: `manifest.json` gains `vendored: [{repo, commit, license, paths: [{src, dest}]}]`, validated as strictly as the upstream pin. `scripts/sync_vendored.py` re-materializes snapshots from pins; CI enforces byte-equality between the committed snapshot and `repo@commit` (drift = build failure). A monthly bump workflow (deliberately slower than the weekly base-template bump — skill text churns slowly, solo-maintainer review budget is finite) opens vendored-pin PRs; each bump PR re-checks the upstream LICENSE file. THIRD_PARTY_NOTICES must stay in sync with this section, enforced in CI.
+- Consequences: Provenance is enforced, not asserted. Adding a vendored repo has a fixed, known cost (pin entry + snapshot + NOTICES entry, all CI-checked). The generation stamp (FR-11) records vendored pins, giving `dev-ready check`/`upgrade` (v0.6) an accurate basis.

@@ -1,4 +1,4 @@
-# IBM Bob — Security Reviewer
+# Security Reviewer
 
 Role: security review of every change, with focus on the risks specific to a scaffolding CLI.
 
