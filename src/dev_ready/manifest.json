@@ -4,8 +4,8 @@
     "base_template": {
       "repo": "fastapi/full-stack-fastapi-template",
       "ref": "master",
-      "commit": "4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2",
-      "verified_at": "2026-07-04",
+      "commit": "4d3d5e92c1ea6b3fa0fab02c41124844ec45bca8",
+      "verified_at": "2026-07-20",
       "license": "MIT",
       "exclude": [
         ".git",
@@ -46,7 +46,10 @@
           "mode": "builtin",
           "license": "MIT",
           "paths": [
-            { "src": "claude/skills/project-orientation", "dest": ".claude/skills/project-orientation" }
+            {
+              "src": "claude/skills/project-orientation",
+              "dest": ".claude/skills/project-orientation"
+            }
           ]
         }
       ]
@@ -59,7 +62,10 @@
           "mode": "builtin",
           "license": "MIT",
           "paths": [
-            { "src": "mcp/mcp.json", "dest": ".mcp.json" }
+            {
+              "src": "mcp/mcp.json",
+              "dest": ".mcp.json"
+            }
           ]
         }
       ]
