@@ -205,7 +205,7 @@ report and skip. Requires FR-21's stamp reading plus a recorded file inventory
 (added to the stamp in this version).
 
 Explicitly still out of scope after v0.6: additional base templates, Web UI
-companion (decisions deferred, unchanged from requirements.md).
+companion — now planned in detail; see "Post-v0.6 roadmap" below.
 
 ---
 
@@ -247,3 +247,121 @@ enforced by exclude + prune + the verify leak guard.
   pinned-dependency mode limits exposure; vendored pins mean a license change upstream
   never retroactively affects an already-released dev-ready version, but bump PRs
   must re-check the license file on every bump (added to the bump-PR checklist).
+
+---
+
+## Post-v0.6 roadmap — Decisions of 2026-07-19
+
+Status: Directions **Accepted** (CEO + Tech Lead, final architecture session,
+2026-07-19). The v0.3–v0.6 scope above is **unchanged** — nothing in this
+section may pull work forward into those versions. The decisions and mechanisms
+below are settled; the version assignments (v0.7 / v0.8 / v1.0) are a proposed
+sequencing to be re-confirmed at v0.6 close. FR numbering FR-23..FR-27 is
+reserved here; requirements.md gains the full entries when each version's
+development starts (same flow as v0.3–v0.6).
+
+### D-1. Mechanism/policy separation for the agent-team workflow (FR-23)
+
+The tech-lead → senior → junior → QA/Security/SRE handoff loop shipped in FR-10
+encodes one specific team (Fable/Opus/Gemini/Bob). That lineup is a *policy* —
+one team's choice — and model names churn fast; hardcoding either into the
+overlay guarantees staleness. dev-ready's durable product is the *mechanism*:
+role definitions, handoff document templates, folder structure, and loop rules
+(hard-bug escalation, report obligations, who commits).
+
+Concretely: generated projects carry a workflow config
+(`docs/handoffs/workflow.yaml`) declaring roles as data —
+`{id, title, model, responsibilities, never_does}` — plus the handoff sequence
+and loop rules. Handoff templates and the CLAUDE.md agent-roles section render
+role names and models from this config, never from literals. Two design rules:
+
+- **Roles decoupled from models**: roles are `planner` / `implementer` /
+  `reviewer`-style ids; the model is an editable field on the role. Swapping
+  next year's model is a one-line config edit, not a template rewrite.
+- **Preset, not framework**: the current loop ships as the single default
+  preset. A preset ecosystem (multiple built-in loops, community sharing,
+  plugin mechanics) is explicitly deferred until real users ask for it —
+  abstractions built before a second user exists usually abstract the wrong
+  thing.
+
+### D-2. AI-invokable generation — the "generate" skill (FR-24)
+
+The non-interactive surface built in FR-3/FR-14 (`--yes`, `--skills`, `--mcp`,
+item ids, exit codes) is already a machine interface. FR-24 ships an *original*
+skill that teaches a coding agent when and how to drive
+`uvx dev-ready init` with the right flags — so a user can tell their agent
+"start a new project with X and Y" and the agent composes the command itself.
+
+Distribution: in this repo, laid out to be installable via the Agent Skills
+ecosystem (skills.sh) and/or as a Claude Code plugin — **not** inside generated
+projects (a generated project has no reason to regenerate itself).
+Precondition: the FR-14 flag contract is stable (v0.3 shipped). Cost: one
+SKILL.md plus docs — smallest FR on this list.
+
+### D-3. CLI internationalization — English + Traditional Chinese (FR-25)
+
+Scope decided precisely: i18n covers the **CLI surface only** — interactive
+prompts, progress/result messages, errors, `--help` text. Generated project
+content (CLAUDE.md, skills, design docs, handoff templates) stays English
+permanently: its consumer is the agent, and English is what models parse most
+reliably. This scope line is the decision; revisiting it requires a new ADR.
+
+Mechanics: default language English; `zh-TW` selected via `--lang`, then
+`DEV_READY_LANG`, then locale detection (precedence in that order). Messages
+live in a catalog (single lookup layer, no scattered literals), so adding a
+locale later is a data change. Accepted cost: every user-facing string is
+maintained twice; a new FR's messages must land in both locales in the same PR
+(CI check compares catalog keys across locales).
+
+### D-4. Multi-coding-agent output targets (FR-26)
+
+Today the overlay renders for Claude Code only (`.claude/skills/`, `CLAUDE.md`,
+`.mcp.json`). The Agent Skills / AGENTS.md standards make skill *content*
+portable; what varies per agent (Codex, Cursor, other standard-compliant
+harnesses) is output paths and config format. FR-26 adds a **render target**
+dimension to the overlay: the user picks target agent(s) — Claude Code remains
+the default — and the same catalog items render into each target's layout;
+verify checks per-target required paths. This mirrors the skills.sh installer
+UX ("pick skills, pick agents") without changing what the catalog is.
+
+Risk accepted: these standards are still moving. The exact target list and
+per-target layouts are pinned at implementation time, not now.
+
+### D-5. Multi-template — second stack (FR-27, v1.x)
+
+Confirmed: still the last thing. Mechanism decided now so v0.x work does not
+paint us into a corner: templates become **registry entries** in the manifest —
+`{id, source, fetch_strategy, pinned_ref, overlay_set, smoke_test}` — and the
+fetch layer grows a strategy interface (`copier-native` | `degit-style` |
+`wrapped-generator`, for ecosystems like Next.js/Vue whose starters are not
+Copier templates). ADR-002 (pins only, never latest) and the `fetch/` network
+boundary apply to every strategy. Overlay content becomes stack-aware:
+CLAUDE.md guidance and quality-gate skills are per-stack, not shared.
+
+Hard gates before starting FR-27: v0.6 shipped; real users on the FastAPI
+template; explicit acceptance that each template roughly doubles CI, license,
+and overlay maintenance (solo-maintainer budget). One template done well beats
+two half-done.
+
+### D-6. Web UI — deferred, mechanism noted
+
+No new FR. Recorded insight: FR-14's catalog-as-data means a future Web UI is
+just another renderer of the same catalog, with the non-interactive CLI as its
+execution backend — the architecture already supports it. Revisit after FR-24
+and FR-26 have proven the catalog contract against real consumers.
+
+### D-7. Selection UX with per-item descriptions — already covered
+
+No new work. The skills.sh-style experience ("pick items, each with a
+description, then pick agents") is exactly FR-14 (+ FR-26 for the agent axis);
+the catalog's `description` field is the contract. Quality bar recorded: every
+catalog item's description must answer "what does the user lose by omitting
+it?" — the same test as the curation principle.
+
+### Proposed sequencing (re-confirm at v0.6 close)
+
+| Version | Contents | Rationale |
+|---|---|---|
+| v0.7 | FR-23 workflow config, FR-24 generate skill | Cheap, self-contained; deepens the existing agents/skills story with no new external surface |
+| v0.8 | FR-25 CLI i18n, FR-26 multi-agent render targets | Widens the audience once content and catalog are stable |
+| v1.0 | FR-27 second template; Web UI decision revisited | Platform step; gated on real-user feedback and the D-5 hard gates |

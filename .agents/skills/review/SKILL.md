@@ -43,7 +43,7 @@ checklist on top of the standing definition.
 
 ## Precondition
 
-`03-opus-review.md` (the Senior's review) ends with a Verdict marking the phase
+`03-review.md` (the Senior's review) ends with a Verdict marking the phase
 ready for review, and `reports/problems.md` does not exist. If the phase is not
 ready, stop and flag it.
 

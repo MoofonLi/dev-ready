@@ -37,7 +37,7 @@ committed repo doc. The committed roadmap it draws from is `docs/version-plan.md
   never the reverse.
 - Exactly one phase per version ships the release, and it is the LAST phase. Its
   section must say so and name the version bump (e.g. "bump 0.2.2 → 0.3.0"); this
-  is what tells the `handoff` skill to emit `07-opus-release.md` for that phase
+  is what tells the `handoff` skill to emit `07-release.md` for that phase
   and nothing else (07 grants scoped git authority — never on a non-release
   phase).
 - State cross-phase couplings explicitly as "do NOT do X here — phase N owns it",

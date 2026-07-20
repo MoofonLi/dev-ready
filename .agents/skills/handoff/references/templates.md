@@ -10,7 +10,7 @@ intact; fill slots.
 
 ---
 
-## 01-opus-plan.md
+## 01-plan.md
 
 ```markdown
 # Phase {{N}} Handoff — 01: Senior Engineer Plan
@@ -19,11 +19,11 @@ intact; fill slots.
 - To: Senior Engineer
 - Phase: {{VERSION}} Phase {{N}} — {{TITLE}} ({{FRS}})
 - Date: {{DATE}}
-- Status: AWAITING TASK BREAKDOWN (write it into 02-gemini-implementation.md, then update this line)
+- Status: AWAITING TASK BREAKDOWN (write it into 02-implementation.md, then update this line)
 
 ## Your role
 
-You are the Senior Engineer. In this handoff you do NOT write code. You read the phase scope below and write an ordered task breakdown WITH implementation details directly into `02-gemini-implementation.md`, in the section "Task Breakdown & Implementation Details (Senior writes here)" — and only in that section; everything above its divider is the Tech Lead's protocol and read-only. `02` is the single file the Junior (running in Antigravity) receives, so it must be self-contained: assume the Junior has no chat context.
+You are the Senior Engineer. In this handoff you do NOT write code. You read the phase scope below and write an ordered task breakdown WITH implementation details directly into `02-implementation.md`, in the section "Task Breakdown & Implementation Details (Senior writes here)" — and only in that section; everything above its divider is the Tech Lead's protocol and read-only. `02` is the single file the Junior (running in Antigravity) receives, so it must be self-contained: assume the Junior has no chat context.
 
 ## Precondition
 
@@ -67,7 +67,7 @@ You are the Senior Engineer. In this handoff you do NOT write code. You read the
 
 ---
 
-## 02-gemini-implementation.md
+## 02-implementation.md
 
 ```markdown
 # Phase {{N}} Handoff — 02: Junior Engineer Implementation Brief
@@ -160,7 +160,7 @@ If you hit any hard bugs, ALSO write `{{DIR}}/reports/problems.md` using exactly
     - Suspected cause: <your hypothesis>
     - What was tried: <attempts so far>
 
-Save both files. The presence of `reports/problems.md` means the phase is blocked on the Senior; its absence plus your execution report means the phase moves to review (`03-opus-review.md`). Nothing is committed at this stage — code stays in the working tree until the CEO commits after all reviews pass.
+Save both files. The presence of `reports/problems.md` means the phase is blocked on the Senior; its absence plus your execution report means the phase moves to review (`03-review.md`). Nothing is committed at this stage — code stays in the working tree until the CEO commits after all reviews pass.
 
 ---
 
@@ -168,12 +168,12 @@ Save both files. The presence of `reports/problems.md` means the phase is blocke
 
 This section is written and maintained by the Senior Engineer only. Everything above the divider is the Tech Lead's protocol and is read-only for all agents. Junior: if anything here conflicts with the protocol above, the protocol wins — record it in `reports/problems.md` instead of guessing.
 
-_Empty — the Senior Engineer fills this section per `01-opus-plan.md`._
+_Empty — the Senior Engineer fills this section per `01-plan.md`._
 ```
 
 ---
 
-## 03-opus-review.md
+## 03-review.md
 
 ```markdown
 # Phase {{N}} Handoff — 03: Senior Engineer Review & Close
@@ -186,7 +186,7 @@ _Empty — the Senior Engineer fills this section per `01-opus-plan.md`._
 ## Entry check (do this first)
 
 1. `{{DIR}}/reports/execution-report.md` must exist. If not, stop — the Junior has not finished; nothing to review.
-2. `{{DIR}}/reports/problems.md` must NOT exist. If it exists, the phase is in FIX mode, not review mode: work from `problems.md` (its header tells you the fix protocol) together with the breakdown in `02-gemini-implementation.md`. Come back to this file only after `problems.md` is resolved and deleted.
+2. `{{DIR}}/reports/problems.md` must NOT exist. If it exists, the phase is in FIX mode, not review mode: work from `problems.md` (its header tells you the fix protocol) together with the breakdown in `02-implementation.md`. Come back to this file only after `problems.md` is resolved and deleted.
 
 ## Your role
 
@@ -195,7 +195,7 @@ Review the Junior's Phase {{N}} work and close the phase. All Phase {{N}} work l
 ## Read first
 
 1. `{{DIR}}/reports/execution-report.md`
-2. The breakdown you wrote in `02-gemini-implementation.md`
+2. The breakdown you wrote in `02-implementation.md`
 3. The actual diff: `git status` and `git diff` (read-only git is allowed; state-changing git is not)
 
 ## Step 1 — code review (logic and architecture)
@@ -251,7 +251,7 @@ Append "## Review Verdict" to this file and save (docs/handoff/ is gitignored �
 - Statement that the phase is ready for review (04–06) — or what blocks it.
 - Suggested Conventional Commit message(s) for the CEO (one per task, or a sensible squash), taken from the task headings in `02`.
 
-You do not commit, merge, or release under THIS document. For a non-release phase, the CEO commits and pushes after the reviewer passes; CI generate-and-verify on that push is the final backstop. For a release phase, git authority arrives only with `07-opus-release.md`, which the CEO hands over after the reviewer's three APPROVE reports are on disk.
+You do not commit, merge, or release under THIS document. For a non-release phase, the CEO commits and pushes after the reviewer passes; CI generate-and-verify on that push is the final backstop. For a release phase, git authority arrives only with `07-release.md`, which the CEO hands over after the reviewer's three APPROVE reports are on disk.
 ```
 
 ---
@@ -266,7 +266,7 @@ Common shape — instantiate three times with role = QA / Security / SRE:
 - From: Tech Lead (ADR-007)
 - To: Reviewer ({{ROLE}})
 - Phase: {{VERSION}} Phase {{N}} — {{TITLE}} ({{FRS}})
-- Precondition: `03-opus-review.md` contains a Review Verdict marked ready for review
+- Precondition: `03-review.md` contains a Review Verdict marked ready for review
 
 Your role definition is `.agents/skills/review/references/{{qa|security|sre}}.md` — read and follow it. The change under review is UNCOMMITTED working-tree changes on top of main: inspect with `git status` / `git diff` (read-only git only). Context docs: `docs/handoff/{{VERSION}}/{{VERSION}}-plan.md` (Phase {{N}}), `docs/requirements.md` {{FRS}}, {{ROLE_CONTEXT_DOCS}}.
 
@@ -287,7 +287,7 @@ Role-specific list guidance:
 
 ---
 
-## 07-opus-release.md — RELEASE PHASES ONLY
+## 07-release.md — RELEASE PHASES ONLY
 
 Generate this file only when the phase ships a release (SKILL.md Step 2).
 It is the single document that grants git authority; every other handoff
@@ -303,7 +303,7 @@ doc's NO GIT rule stays binding.
 
 ## Entry check (do this first — touch NOTHING until all four hold)
 
-1. `{{DIR}}/03-opus-review.md` ends with a Review Verdict stating the phase is ready for review.
+1. `{{DIR}}/03-review.md` ends with a Review Verdict stating the phase is ready for review.
 2. `{{DIR}}/reports/qa-review.md`, `security-review.md`, and `sre-review.md` all exist with Verdict `APPROVE`.
 3. `{{DIR}}/reports/problems.md` does NOT exist.
 4. `git log --oneline -5` shows no commits you cannot account for — the phase's work must still be uncommitted working-tree changes on top of main.
@@ -320,7 +320,7 @@ Why the discipline matters: the steps up to and including CI are reversible; the
 
 - The version lives in BOTH `src/dev_ready/__init__.py` (`__version__`) and `pyproject.toml` (`version`). `release.yml` refuses to publish if the pushed tag does not match `pyproject.toml`; the CLI prints `__version__`. A mismatch ships a CLI that reports the wrong version.
 - `docs/handoff/` is gitignored — never stage or commit anything under it.
-- Conventional Commits are mandatory; the commit messages come from the task headings in `02-gemini-implementation.md`.
+- Conventional Commits are mandatory; the commit messages come from the task headings in `02-implementation.md`.
 - Run every command from the dev-ready repo root.
 
 ## Step 1 — bump the version in two files

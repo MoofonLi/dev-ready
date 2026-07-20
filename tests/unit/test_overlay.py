@@ -60,7 +60,7 @@ def test_happy_path_writes_every_component_with_substitution(tmp_path: Path) -> 
     assert (project_dir / "docs" / "architecture.md").exists()
     assert (project_dir / "docs" / "requirements.md").exists()
     assert (project_dir / "docs" / "handoffs" / "README.md").exists()
-    assert (project_dir / "docs" / "handoffs" / "phase-N" / "01-opus-plan.md").exists()
+    assert (project_dir / "docs" / "handoffs" / "phase-N" / "01-plan.md").exists()
 
     for path in written:
         assert not path.is_absolute()

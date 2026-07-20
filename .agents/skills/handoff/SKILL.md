@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Generate the multi-agent handoff documents for a dev-ready development phase (Tech Lead -> Senior -> Junior -> Reviewer workflow, ADR-007/ADR-011) - six docs per phase, plus a seventh release handoff (07-opus-release) when the phase ships a version. Use when asked to create, generate, or regenerate handoff docs for a version/phase - e.g. "generate v0.3 phase 2 handoffs", "open a new phase", "this phase releases, add the release handoff".
+description: Generate the multi-agent handoff documents for a dev-ready development phase (Tech Lead -> Senior -> Junior -> Reviewer workflow, ADR-007/ADR-011) - six docs per phase, plus a seventh release handoff (07-release) when the phase ships a version. Use when asked to create, generate, or regenerate handoff docs for a version/phase - e.g. "generate v0.3 phase 2 handoffs", "open a new phase", "this phase releases, add the release handoff".
 ---
 
 # dev-ready Handoff Generator
@@ -10,13 +10,13 @@ Generate the complete handoff document set for one dev-ready phase, under
 
 ```
 docs/handoff/<version>/phase-<N>/
-├── 01-opus-plan.md              # brief to the Senior Engineer
-├── 02-gemini-implementation.md  # the ONLY file the Junior receives
-├── 03-opus-review.md            # Senior's review brief (state machine entry)
+├── 01-plan.md              # brief to the Senior Engineer
+├── 02-implementation.md  # the ONLY file the Junior receives
+├── 03-review.md            # Senior's review brief (state machine entry)
 ├── 04-qa-review.md              # QA reviewer brief
 ├── 05-security-review.md        # Security reviewer brief
 ├── 06-sre-review.md             # SRE reviewer brief
-├── 07-opus-release.md           # Release Engineer brief — RELEASE PHASES ONLY
+├── 07-release.md           # Release Engineer brief — RELEASE PHASES ONLY
 └── reports/README.md            # explains execution-report.md / problems.md
 ```
 
@@ -47,7 +47,7 @@ context from anyone else. Every design rule below exists to keep that true:
   fine. Task headings carry Conventional Commit messages used at commit
   time. (History: an agent once committed straight to main; this rule is
   the countermeasure.)
-- The ONE exemption — `07-opus-release.md`: a phase that ships a version
+- The ONE exemption — `07-release.md`: a phase that ships a version
   ends with `07`, which delegates the ENTIRE release to the Senior acting
   as Release Engineer — version bump, verification, phase overview report,
   staged commits, push, CI wait, tag, PyPI (see `.agents/skills/release/`).
@@ -97,7 +97,7 @@ context from anyone else. Every design rule below exists to keep that true:
 
 3. Read `references/templates.md` (next to this file) and instantiate the
    seven base files, replacing every `{{...}}` placeholder. For a release
-   phase, additionally instantiate `07-opus-release.md`. Do not weaken
+   phase, additionally instantiate `07-release.md`. Do not weaken
    protocol wording (STOP rules, NO GIT, the `07` git-exemption scoping,
    problems.md template) — phase-specific content goes in the marked slots
    only.

@@ -7,7 +7,7 @@ description: Release a new version of the dev-ready repo (MoofonLi/dev-ready) en
 
 Ship a dev-ready version from finished code to a published PyPI release. Follow the steps in order; each step gates the next. The CEO (Moofon) runs the terminal commands unless he has explicitly asked otherwise - the default job is to prepare everything, verify state, and hand him the exact commands.
 
-This skill is the single source of truth for the release process. It is invoked either directly by the CEO, or by the Release Engineer (the Senior Engineer role) acting on `07-opus-release.md` at the close of a release phase (the one document that carries a scoped git-authority exemption, ADR-007/ADR-011).
+This skill is the single source of truth for the release process. It is invoked either directly by the CEO, or by the Release Engineer (the Senior Engineer role) acting on `07-release.md` at the close of a release phase (the one document that carries a scoped git-authority exemption, ADR-007/ADR-011).
 
 Repo layout facts this workflow depends on: version lives in BOTH `src/dev_ready/__init__.py` (`__version__`) and `pyproject.toml` (`version`); `release.yml` refuses to publish if the pushed tag does not match `pyproject.toml`; handoff working files live in `docs/handoff/<version>/phase-N/` (gitignored - never commit them, ADR-011); Conventional Commits are mandatory.
 

@@ -45,7 +45,7 @@ Roles are fixed; the model or tool filling each role is not. Agents communicate 
 
 The CEO is Moofon (human). The other roles are filled by AI agents, assigned per task and swappable — no model name is binding anywhere in this repo. The Reviewer role was previously run by IBM Bob but is not tied to it.
 
-Handoff files per phase: `01-opus-plan.md`, `02-gemini-implementation.md`, `03-opus-review.md`, `04-qa-review.md`, `05-security-review.md`, `06-sre-review.md` (+ `07-opus-release.md` for release phases only); Junior outputs in `reports/`. The `-opus-`/`-gemini-` tokens in the plan/implementation/review/release filenames are legacy structural identifiers of the state machine, not a model requirement — the role is what binds.
+Handoff files per phase: `01-plan.md`, `02-implementation.md`, `03-review.md`, `04-qa-review.md`, `05-security-review.md`, `06-sre-review.md` (+ `07-release.md` for release phases only); Junior outputs in `reports/`. Filenames name the role/step, never the model — the number and role are what bind; any capable model may fill each role.
 
 ## Process skills
 

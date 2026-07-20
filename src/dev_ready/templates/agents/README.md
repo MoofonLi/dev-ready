@@ -23,12 +23,12 @@ Work is organized into phases. Each phase lives in `phase-N/` and uses these fil
 
 | File | Author | Purpose |
 |---|---|---|
-| `01-opus-plan.md` | Senior Engineer | Ordered task breakdown with implementation details |
-| `02-gemini-implementation.md` | Junior Engineer | Implementation brief the junior executes |
-| `03-opus-review.md` | Senior Engineer | Logic + architecture review of the implementation |
-| `04-bob-qa.md` | QA | Quality review |
-| `05-bob-security.md` | Security | Security review |
-| `06-bob-sre.md` | SRE | Operability / release review |
+| `01-plan.md` | Senior Engineer | Ordered task breakdown with implementation details |
+| `02-implementation.md` | Junior Engineer | Implementation brief the junior executes |
+| `03-review.md` | Senior Engineer | Logic + architecture review of the implementation |
+| `04-qa-review.md` | QA | Quality review |
+| `05-security-review.md` | Security | Security review |
+| `06-sre-review.md` | SRE | Operability / release review |
 
 ## `reports/` convention
 
