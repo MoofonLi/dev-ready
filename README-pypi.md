@@ -17,6 +17,9 @@ A generated project based on [fastapi/full-stack-fastapi-template](https://githu
 - MCP server configuration (`mcp.json`)
 - Design-doc templates (`architecture.md`, `requirements.md`)
 - Agent-team handoff scaffold (`docs/handoffs/` — a document-driven multi-agent workflow: Tech Lead → Senior → Junior → QA/Security/SRE)
+- Generation stamp — every generated project gets a `.dev-ready.json` recording the dev-ready version, selected components/items, and pinned upstream commit
+- Pinned tool integrations — optional, selectable MCP and skill items: a codebase-memory MCP server (`uvx codebase-memory-mcp`) and a `react-doctor` frontend wrapper skill + devDependency
+- item-level selection — pick individual items inside the skills and MCP components, not just the whole component
 
 Every generated project also gets its own `README.md` (the upstream template's repo README and other repo-maintenance files — `CONTRIBUTING.md`, release notes, deploy workflows, screenshots — are pruned, so nothing template-repo-specific leaks into your project).
 
@@ -53,11 +56,13 @@ uvx dev-ready init my-app --yes
 
 # Options
 uvx dev-ready init my-app \
-  --dir path/to/target \  # default: ./my-app
-  --no-skills \           # skip the Claude Code skills overlay
-  --no-mcp \              # skip the MCP configuration overlay
-  --no-docs \             # skip the design-doc templates
-  --no-agents             # skip the agent-team handoff scaffold
+  --dir path/to/target \    # default: ./my-app
+  --skills <ids|all|none> \ # choose individual skills (default: all)
+  --mcp <ids|all|none> \    # choose individual MCP servers (default: all)
+  --no-skills \             # skip the Claude Code skills overlay
+  --no-mcp \                # skip the MCP configuration overlay
+  --no-docs \               # skip the design-doc templates
+  --no-agents               # skip the agent-team handoff scaffold
 ```
 
 Then follow the printed next steps (typically `docker compose watch` inside the generated project).

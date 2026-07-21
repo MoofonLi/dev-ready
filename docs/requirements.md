@@ -47,10 +47,10 @@ FR-10. Agent-team overlay (optional component, alongside skills/mcp/docs). Gener
 Agreed 2026-07-17. Full detail, rationale, and per-version grouping live in
 [version-plan.md](version-plan.md); summary index here for numbering continuity:
 
-- FR-11 (v0.3). Generation stamp: `.dev-ready.json` written into every generated project (version, components + selected items, pins) — the prerequisite for FR-21/FR-22.
-- FR-12 (v0.3). Codebase-memory MCP item in the `mcp` component: `.mcp.json` entry launching `uvx codebase-memory-mcp==<pin>` — zero manual install, pin in manifest (pinned-dependency mode, ADR-008).
-- FR-13 (v0.3). react-doctor item in the `skills` component: pinned devDependency + package script in the generated frontend `package.json`, plus an original wrapper skill; no source redistribution (ADR-008).
-- FR-14 (v0.3). Item-level component selection (ADR-010): users pick individual items inside `skills` and `mcp` (e.g. react-doctor without code-memory) — second-level interactive multi-select (all on by default) plus `--skills <ids|all|none>` / `--mcp <ids|all|none>` list flags; item catalog lives in `manifest.json` as data.
+- FR-11 (v0.3, shipped). Generation stamp: `.dev-ready.json` written into every generated project (version, components + selected items, pins) — the prerequisite for FR-21/FR-22.
+- FR-12 (v0.3, shipped). Codebase-memory MCP item in the `mcp` component: `.mcp.json` entry launching `uvx codebase-memory-mcp==<pin>` — zero manual install, pin in manifest (pinned-dependency mode, ADR-008).
+- FR-13 (v0.3, shipped). react-doctor item in the `skills` component: pinned devDependency + package script in the generated frontend `package.json`, plus an original wrapper skill; no source redistribution (ADR-008).
+- FR-14 (v0.3, shipped). Item-level component selection (ADR-010): users pick individual items inside `skills` and `mcp` (e.g. react-doctor without code-memory) — second-level interactive multi-select (all on by default) plus `--skills <ids|all|none>` / `--mcp <ids|all|none>` list flags; item catalog lives in `manifest.json` as data.
 - FR-15 (v0.4). Manifest `vendored` section: provenance pins (repo, commit, license, paths) for all vendored content.
 - FR-16 (v0.4). Vendored snapshot sync tooling + CI byte-equality drift guard + monthly vendored-bump workflow.
 - FR-17 (v0.4). MIT-wave vendoring (curated subsets, each a catalog item): caveman, mattpocock/skills, cloudflare/security-audit-skill, awesome-design-md.
@@ -82,7 +82,7 @@ NFR-5. Cross-platform: macOS, Linux, Windows.
 
 1. v0.1: single template, interactive init, pinned manifest, three CI workflows (upstream bump, PR validation, release). DONE (v0.1.4).
 2. v0.2: prune list (FR-7), project README (FR-8), verify leak guard (FR-9), agent-team overlay (FR-10). DONE (v0.2.2).
-3. v0.3: pinned tool integrations + selection — generation stamp (FR-11), codebase-memory MCP (FR-12), react-doctor (FR-13), item-level selection (FR-14). See [version-plan.md](version-plan.md).
+3. v0.3: pinned tool integrations + selection — generation stamp (FR-11), codebase-memory MCP (FR-12), react-doctor (FR-13), item-level selection (FR-14). See [version-plan.md](version-plan.md). DONE (v0.3.0).
 4. v0.4: vendoring infrastructure + MIT wave (FR-15..FR-18).
 5. v0.5: Apache wave + pending items (FR-19, FR-20).
 6. v0.6: lifecycle commands — `check` / `upgrade` (FR-21, FR-22).
