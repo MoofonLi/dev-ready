@@ -6,7 +6,7 @@ See docs/architecture.md.
 
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from importlib import resources
 from importlib.resources.abc import Traversable
 from pathlib import Path
@@ -26,12 +26,20 @@ _TEMPLATE_TOKEN = "{{project_name}}"
 def render_stamp(
     answers: Answers, pin: UpstreamPin, catalog: Mapping[str, tuple[CatalogItem, ...]]
 ) -> str:
+    def _stamp_items(component: str, selected: Collection[str]) -> list[dict[str, str | None]]:
+        out = [
+            {"id": item.id, "pin": item.pin}
+            for item in catalog.get(component, ())
+            if item.id in selected
+        ]
+        return sorted(out, key=lambda d: str(d["id"]))
+
     data = {
-        "stamp_version": 1,
+        "stamp_version": 2,
         "dev_ready_version": __version__,
         "components": {
-            "skills": {"included": answers.include_skills, "items": sorted(answers.skills_items)},
-            "mcp": {"included": answers.include_mcp, "items": sorted(answers.mcp_items)},
+            "skills": {"included": answers.include_skills, "items": _stamp_items("skills", answers.skills_items)},
+            "mcp": {"included": answers.include_mcp, "items": _stamp_items("mcp", answers.mcp_items)},
             "docs": {"included": answers.include_docs},
             "agents": {"included": answers.include_agents},
         },
@@ -84,6 +92,12 @@ def apply_overlay(
                     written.extend(_apply_tree(source, project_dir, dest_rel, answers.project_name))
                 else:
                     written.append(_apply_file(source, project_dir, dest_rel, answers.project_name))
+
+    for component, selected in (("skills", answers.skills_items), ("mcp", answers.mcp_items)):
+        for item in catalog.get(component, ()):
+            if item.id not in selected or item.inject is None:
+                continue
+            _apply_injection(item, project_dir)
 
     if answers.include_docs:
         written.extend(
@@ -166,3 +180,97 @@ def _apply_file(
         raise OverlayError(f"failed to write {dest_rel}: {error}") from error
 
     return dest_rel
+
+
+def _apply_injection(item: CatalogItem, project_dir: Path) -> None:
+    if item.inject is None:
+        return
+    if item.inject.kind == "mcp-server":
+        _inject_mcp_server(item, project_dir)
+    elif item.inject.kind == "npm-dev-dependency":
+        _inject_npm_dev_dependency(item, project_dir)
+    else:
+        raise OverlayError(f"unrecognized injection kind {item.inject.kind!r}")
+
+
+def _inject_mcp_server(item: CatalogItem, project_dir: Path) -> None:
+    assert item.inject is not None
+    target_path = project_dir / item.inject.target
+    if not target_path.exists():
+        raise OverlayError(
+            f"item '{item.id}' requires base target '{item.inject.target}' from 'mcp-config' — include 'mcp-config' as well"
+        )
+
+    try:
+        raw_text = target_path.read_text(encoding="utf-8")
+        data = json.loads(raw_text)
+    except (OSError, json.JSONDecodeError) as error:
+        raise OverlayError(f"failed to parse {item.inject.target}: {error}") from error
+
+    if not isinstance(data, dict):
+        raise OverlayError(f"{item.inject.target} root must be a JSON object")
+
+    mcp_servers = data.setdefault("mcpServers", {})
+    if not isinstance(mcp_servers, dict):
+        raise OverlayError(f"'mcpServers' field in {item.inject.target} must be a JSON object")
+
+    server_name = item.inject.server_name
+    assert server_name is not None
+    if server_name in mcp_servers:
+        raise OverlayError(f"server '{server_name}' already exists in {item.inject.target}")
+
+    mcp_servers[server_name] = {
+        "command": item.inject.command,
+        "args": [f"{item.inject.package}=={item.pin}"],
+    }
+
+    try:
+        target_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    except OSError as error:
+        raise OverlayError(f"failed to write {item.inject.target}: {error}") from error
+
+
+def _inject_npm_dev_dependency(item: CatalogItem, project_dir: Path) -> None:
+    assert item.inject is not None
+    target_path = project_dir / item.inject.target
+    if not target_path.exists():
+        raise OverlayError(
+            f"item '{item.id}' target '{item.inject.target}' is missing — upstream layout changed or fetch incomplete"
+        )
+
+    try:
+        raw_text = target_path.read_text(encoding="utf-8")
+        data = json.loads(raw_text)
+    except (OSError, json.JSONDecodeError) as error:
+        raise OverlayError(f"failed to parse {item.inject.target}: {error}") from error
+
+    if not isinstance(data, dict):
+        raise OverlayError(f"{item.inject.target} root must be a JSON object")
+
+    dev_deps = data.setdefault("devDependencies", {})
+    if not isinstance(dev_deps, dict):
+        raise OverlayError(f"'devDependencies' in {item.inject.target} must be a JSON object")
+
+    pkg_name = item.inject.package
+    if pkg_name in dev_deps:
+        raise OverlayError(
+            f"package '{pkg_name}' already declared in {item.inject.target} devDependencies"
+        )
+    assert item.pin is not None
+    dev_deps[pkg_name] = item.pin
+
+    scripts = data.setdefault("scripts", {})
+    if not isinstance(scripts, dict):
+        raise OverlayError(f"'scripts' in {item.inject.target} must be a JSON object")
+
+    for s_name, s_cmd in item.inject.scripts:
+        if s_name in scripts:
+            raise OverlayError(
+                f"script '{s_name}' already declared in {item.inject.target} scripts"
+            )
+        scripts[s_name] = s_cmd
+
+    try:
+        target_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    except OSError as error:
+        raise OverlayError(f"failed to write {item.inject.target}: {error}") from error

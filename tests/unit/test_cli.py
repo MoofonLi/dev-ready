@@ -183,8 +183,8 @@ def test_build_answers_defaults() -> None:
     assert answers.target_dir == Path.cwd() / "my-app"
     assert answers.include_skills is True
     assert answers.include_mcp is True
-    assert answers.skills_items == frozenset({"project-orientation"})
-    assert answers.mcp_items == frozenset({"mcp-config"})
+    assert answers.skills_items == frozenset({"project-orientation", "react-doctor"})
+    assert answers.mcp_items == frozenset({"mcp-config", "code-memory"})
     assert answers.include_docs is True
     assert answers.include_agents is True
     assert answers.assume_yes is False
@@ -233,7 +233,7 @@ def test_parser_accepts_all_documented_flags() -> None:
 def test_skills_and_mcp_item_flag_variations() -> None:
     # --skills all / --mcp none
     ans = build_answers(_init_args(skills="all", mcp="none"), CATALOG)
-    assert ans.skills_items == frozenset({"project-orientation"})
+    assert ans.skills_items == frozenset({"project-orientation", "react-doctor"})
     assert ans.mcp_items == frozenset()
     assert ans.include_skills is True
     assert ans.include_mcp is False
@@ -248,7 +248,7 @@ def test_unknown_item_id_exits_2(capsys) -> None:
     assert main(["init", "my-app", "--yes", "--skills", "bogus"]) == 2
     err = capsys.readouterr().err
     assert "unknown skills item ids: ['bogus']" in err
-    assert "valid ids: ['project-orientation']" in err
+    assert "valid ids: ['project-orientation', 'react-doctor']" in err
 
 
 def test_conflicting_flags_exits_2(capsys) -> None:

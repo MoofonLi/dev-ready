@@ -344,3 +344,221 @@ def test_invalid_item_path_rejected(bad_path: str) -> None:
         parse_manifest(json.dumps(data))
 
 
+def test_valid_pinned_dependency_mcp_server() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["mcp"]["items"].append({
+        "id": "code-memory",
+        "description": "Codebase memory server",
+        "mode": "pinned-dependency",
+        "license": "MIT",
+        "pin": "0.9.0",
+        "inject": {
+            "kind": "mcp-server",
+            "target": ".mcp.json",
+            "server_name": "codebase-memory",
+            "command": "uvx",
+            "package": "codebase-memory-mcp",
+        },
+    })
+    manifest = parse_manifest(json.dumps(data))
+    item = manifest.components["mcp"][1]
+    assert item.id == "code-memory"
+    assert item.mode == "pinned-dependency"
+    assert item.pin == "0.9.0"
+    assert item.paths == ()
+    assert item.inject is not None
+    assert item.inject.kind == "mcp-server"
+    assert item.inject.target == ".mcp.json"
+    assert item.inject.package == "codebase-memory-mcp"
+    assert item.inject.server_name == "codebase-memory"
+    assert item.inject.command == "uvx"
+
+
+def test_valid_pinned_dependency_npm_dev_dependency() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"].append({
+        "id": "react-doctor",
+        "description": "React doctor skill",
+        "mode": "pinned-dependency",
+        "license": "MIT",
+        "pin": "0.8.1",
+        "paths": [{"src": "claude/skills/react-doctor", "dest": ".claude/skills/react-doctor"}],
+        "inject": {
+            "kind": "npm-dev-dependency",
+            "target": "frontend/package.json",
+            "package": "react-doctor",
+            "scripts": {"doctor": "react-doctor"},
+        },
+    })
+    manifest = parse_manifest(json.dumps(data))
+    item = manifest.components["skills"][1]
+    assert item.id == "react-doctor"
+    assert item.pin == "0.8.1"
+    assert item.inject is not None
+    assert item.inject.kind == "npm-dev-dependency"
+    assert item.inject.scripts == (("doctor", "react-doctor"),)
+
+
+@pytest.mark.parametrize("bad_pin", ["", "latest", "^1.2.3", "1.2", "1.2.3 "])
+def test_malformed_pin_rejected(bad_pin: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["mcp"]["items"].append({
+        "id": "code-memory",
+        "description": "Codebase memory server",
+        "mode": "pinned-dependency",
+        "license": "MIT",
+        "pin": bad_pin,
+        "inject": {
+            "kind": "mcp-server",
+            "target": ".mcp.json",
+            "server_name": "codebase-memory",
+            "command": "uvx",
+            "package": "codebase-memory-mcp",
+        },
+    })
+    with pytest.raises(ManifestError, match="pin"):
+        parse_manifest(json.dumps(data))
+
+
+def test_pinned_dependency_without_pin_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["mcp"]["items"].append({
+        "id": "code-memory",
+        "description": "Codebase memory server",
+        "mode": "pinned-dependency",
+        "license": "MIT",
+        "inject": {
+            "kind": "mcp-server",
+            "target": ".mcp.json",
+            "server_name": "codebase-memory",
+            "command": "uvx",
+            "package": "codebase-memory-mcp",
+        },
+    })
+    with pytest.raises(ManifestError, match="pin"):
+        parse_manifest(json.dumps(data))
+
+
+def test_pin_on_builtin_item_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["pin"] = "1.0.0"
+    with pytest.raises(ManifestError, match="is only allowed for pinned-dependency"):
+        parse_manifest(json.dumps(data))
+
+
+def test_inject_on_builtin_item_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["inject"] = {
+        "kind": "mcp-server",
+        "target": ".mcp.json",
+        "server_name": "foo",
+        "command": "bar",
+        "package": "baz",
+    }
+    with pytest.raises(ManifestError, match="inject.*only allowed for pinned-dependency"):
+        parse_manifest(json.dumps(data))
+
+
+def test_unknown_inject_kind_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["mcp"]["items"].append({
+        "id": "code-memory",
+        "description": "Codebase memory server",
+        "mode": "pinned-dependency",
+        "license": "MIT",
+        "pin": "0.9.0",
+        "inject": {
+            "kind": "unknown-kind",
+            "target": ".mcp.json",
+            "package": "pkg",
+        },
+    })
+    with pytest.raises(ManifestError, match="inject field 'kind'"):
+        parse_manifest(json.dumps(data))
+
+
+def test_mcp_server_missing_server_name_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["mcp"]["items"].append({
+        "id": "code-memory",
+        "description": "Codebase memory server",
+        "mode": "pinned-dependency",
+        "license": "MIT",
+        "pin": "0.9.0",
+        "inject": {
+            "kind": "mcp-server",
+            "target": ".mcp.json",
+            "command": "uvx",
+            "package": "codebase-memory-mcp",
+        },
+    })
+    with pytest.raises(ManifestError, match="server_name"):
+        parse_manifest(json.dumps(data))
+
+
+def test_npm_dev_dependency_missing_scripts_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"].append({
+        "id": "react-doctor",
+        "description": "React doctor skill",
+        "mode": "pinned-dependency",
+        "license": "MIT",
+        "pin": "0.8.1",
+        "paths": [{"src": "claude/skills/react-doctor", "dest": ".claude/skills/react-doctor"}],
+        "inject": {
+            "kind": "npm-dev-dependency",
+            "target": "frontend/package.json",
+            "package": "react-doctor",
+        },
+    })
+    with pytest.raises(ManifestError, match="scripts"):
+        parse_manifest(json.dumps(data))
+
+
+def test_inject_target_traversal_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["mcp"]["items"].append({
+        "id": "code-memory",
+        "description": "Codebase memory server",
+        "mode": "pinned-dependency",
+        "license": "MIT",
+        "pin": "0.9.0",
+        "inject": {
+            "kind": "mcp-server",
+            "target": "../outside.json",
+            "server_name": "codebase-memory",
+            "command": "uvx",
+            "package": "codebase-memory-mcp",
+        },
+    })
+    with pytest.raises(ManifestError, match="target"):
+        parse_manifest(json.dumps(data))
+
+
+def test_item_with_neither_paths_nor_inject_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["mcp"]["items"].append({
+        "id": "empty-item",
+        "description": "Empty item",
+        "mode": "pinned-dependency",
+        "license": "MIT",
+        "pin": "1.0.0",
+    })
+    with pytest.raises(ManifestError, match="must define paths, inject, or both"):
+        parse_manifest(json.dumps(data))
+
+
+def test_builtin_items_regression() -> None:
+    manifest = load_default_manifest()
+    mcp_items = {item.id: item for item in manifest.components["mcp"]}
+    assert "code-memory" in mcp_items
+    assert mcp_items["code-memory"].pin == "0.9.0"
+    assert mcp_items["mcp-config"].pin is None
+    skills_items = {item.id: item for item in manifest.components["skills"]}
+    assert "react-doctor" in skills_items
+    assert skills_items["react-doctor"].pin == "0.8.1"
+    assert skills_items["react-doctor"].inject is not None
+    assert skills_items["react-doctor"].inject.kind == "npm-dev-dependency"
+
+
+

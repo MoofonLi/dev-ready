@@ -51,6 +51,22 @@
               "dest": ".claude/skills/project-orientation"
             }
           ]
+        },
+        {
+          "id": "react-doctor",
+          "description": "Wrapper skill teaching the agent when to run react-doctor on the frontend and how to act on its findings.",
+          "mode": "pinned-dependency",
+          "license": "MIT",
+          "pin": "0.8.1",
+          "paths": [
+            { "src": "claude/skills/react-doctor", "dest": ".claude/skills/react-doctor" }
+          ],
+          "inject": {
+            "kind": "npm-dev-dependency",
+            "target": "frontend/package.json",
+            "package": "react-doctor",
+            "scripts": { "doctor": "react-doctor" }
+          }
         }
       ]
     },
@@ -67,6 +83,20 @@
               "dest": ".mcp.json"
             }
           ]
+        },
+        {
+          "id": "code-memory",
+          "description": "Codebase-memory MCP server (DeusData/codebase-memory-mcp), launched on demand via uvx.",
+          "mode": "pinned-dependency",
+          "license": "MIT",
+          "pin": "0.9.0",
+          "inject": {
+            "kind": "mcp-server",
+            "target": ".mcp.json",
+            "server_name": "codebase-memory",
+            "command": "uvx",
+            "package": "codebase-memory-mcp"
+          }
         }
       ]
     }

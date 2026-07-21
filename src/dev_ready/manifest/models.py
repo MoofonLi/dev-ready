@@ -29,6 +29,16 @@ class UpstreamPin:
 
 
 @dataclass(frozen=True)
+class Injection:
+    kind: str
+    target: str
+    package: str
+    server_name: str | None = None
+    command: str | None = None
+    scripts: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True)
 class ItemPath:
     src: str
     dest: str
@@ -40,7 +50,9 @@ class CatalogItem:
     description: str
     mode: str
     license: str
-    paths: tuple[ItemPath, ...]
+    paths: tuple[ItemPath, ...] = ()
+    pin: str | None = None
+    inject: Injection | None = None
 
 
 @dataclass(frozen=True)

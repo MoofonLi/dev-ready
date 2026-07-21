@@ -270,15 +270,18 @@ def test_missing_overlay_asset_raises_overlay_error(
 
 
 def test_render_stamp_structure(tmp_path: Path) -> None:
-    ans = _answers(tmp_path, skills_items=frozenset({"project-orientation"}), mcp_items=frozenset())
+    ans = _answers(tmp_path, skills_items=frozenset({"project-orientation", "react-doctor"}), mcp_items=frozenset({"code-memory"}))
     stamp_text = render_stamp(ans, PIN, CATALOG)
     data = json.loads(stamp_text)
-    assert data["stamp_version"] == 1
+    assert data["stamp_version"] == 2
     assert data["dev_ready_version"] == __version__
     assert data["components"]["skills"]["included"] is True
-    assert data["components"]["skills"]["items"] == ["project-orientation"]
-    assert data["components"]["mcp"]["included"] is False
-    assert data["components"]["mcp"]["items"] == []
+    assert data["components"]["skills"]["items"] == [
+        {"id": "project-orientation", "pin": None},
+        {"id": "react-doctor", "pin": "0.8.1"},
+    ]
+    assert data["components"]["mcp"]["included"] is True
+    assert data["components"]["mcp"]["items"] == [{"id": "code-memory", "pin": "0.9.0"}]
     assert data["components"]["docs"]["included"] is True
     assert data["components"]["agents"]["included"] is True
     assert data["upstream"]["repo"] == PIN.repo
@@ -297,3 +300,177 @@ def test_asset_read_via_importlib_resources() -> None:
     assert resource.is_file()
     content = resource.read_text(encoding="utf-8")
     assert '"mcpServers"' in content
+
+
+def test_code_memory_injection(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    apply_overlay(
+        _answers(tmp_path, mcp_items=frozenset({"mcp-config", "code-memory"})),
+        project_dir,
+        CATALOG,
+        PIN,
+    )
+    mcp_json = json.loads((project_dir / ".mcp.json").read_text(encoding="utf-8"))
+    assert "codebase-memory" in mcp_json["mcpServers"]
+    assert mcp_json["mcpServers"]["codebase-memory"] == {
+        "command": "uvx",
+        "args": ["codebase-memory-mcp==0.9.0"],
+    }
+
+
+def test_code_memory_preserves_existing_mcp_servers(tmp_path: Path) -> None:
+    import dev_ready.overlay as overlay_module
+
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    mcp_path = project_dir / ".mcp.json"
+    mcp_path.write_text(
+        json.dumps({"mcpServers": {"existing-server": {"command": "node", "args": ["index.js"]}}}),
+        encoding="utf-8",
+    )
+
+    code_memory_item = next(item for item in CATALOG["mcp"] if item.id == "code-memory")
+    overlay_module._inject_mcp_server(code_memory_item, project_dir)
+
+    mcp_json = json.loads(mcp_path.read_text(encoding="utf-8"))
+    assert "existing-server" in mcp_json["mcpServers"]
+    assert "codebase-memory" in mcp_json["mcpServers"]
+    assert mcp_json["mcpServers"]["existing-server"]["command"] == "node"
+    assert mcp_json["mcpServers"]["codebase-memory"]["args"] == ["codebase-memory-mcp==0.9.0"]
+
+
+def test_code_memory_without_mcp_config_raises_overlay_error(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    with pytest.raises(OverlayError, match="include 'mcp-config' as well"):
+        apply_overlay(
+            _answers(tmp_path, mcp_items=frozenset({"code-memory"})),
+            project_dir,
+            CATALOG,
+            PIN,
+        )
+
+
+def test_mcp_server_collision_raises_overlay_error(tmp_path: Path) -> None:
+    import dev_ready.overlay as overlay_module
+
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    (project_dir / ".mcp.json").write_text(
+        json.dumps({"mcpServers": {"codebase-memory": {"command": "existing"}}}),
+        encoding="utf-8",
+    )
+
+    code_memory_item = next(item for item in CATALOG["mcp"] if item.id == "code-memory")
+    with pytest.raises(OverlayError, match="already exists"):
+        overlay_module._inject_mcp_server(code_memory_item, project_dir)
+
+
+def test_react_doctor_skill_copy(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    (project_dir / "frontend").mkdir()
+    (project_dir / "frontend" / "package.json").write_text("{}", encoding="utf-8")
+    apply_overlay(
+        _answers(tmp_path, skills_items=frozenset({"react-doctor"})),
+        project_dir,
+        CATALOG,
+        PIN,
+    )
+    skill_path = project_dir / ".claude" / "skills" / "react-doctor" / "SKILL.md"
+    assert skill_path.exists()
+    content = skill_path.read_text(encoding="utf-8")
+    assert "react-doctor" in content
+    assert "npm run doctor" in content
+
+
+def test_npm_dev_dependency_injection_happy_path(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    pkg_json_path = project_dir / "frontend" / "package.json"
+    pkg_json_path.parent.mkdir()
+    pkg_json_path.write_text(
+        json.dumps({
+            "name": "frontend",
+            "scripts": {"dev": "vite", "build": "tsc && vite build"},
+            "devDependencies": {"typescript": "^5.0.0"},
+        }),
+        encoding="utf-8",
+    )
+
+    apply_overlay(
+        _answers(tmp_path, skills_items=frozenset({"react-doctor"})),
+        project_dir,
+        CATALOG,
+        PIN,
+    )
+
+    data = json.loads(pkg_json_path.read_text(encoding="utf-8"))
+    assert data["name"] == "frontend"
+    assert data["scripts"]["dev"] == "vite"
+    assert data["scripts"]["build"] == "tsc && vite build"
+    assert data["scripts"]["doctor"] == "react-doctor"
+    assert data["devDependencies"]["typescript"] == "^5.0.0"
+    assert data["devDependencies"]["react-doctor"] == "0.8.1"
+
+
+def test_npm_dev_dependency_missing_target_raises_overlay_error(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    with pytest.raises(OverlayError, match="is missing"):
+        apply_overlay(
+            _answers(tmp_path, skills_items=frozenset({"react-doctor"})),
+            project_dir,
+            CATALOG,
+            PIN,
+        )
+
+
+def test_npm_dev_dependency_unparseable_target_raises_overlay_error(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    pkg_json_path = project_dir / "frontend" / "package.json"
+    pkg_json_path.parent.mkdir()
+    pkg_json_path.write_text("{ not json", encoding="utf-8")
+
+    with pytest.raises(OverlayError, match="failed to parse"):
+        apply_overlay(
+            _answers(tmp_path, skills_items=frozenset({"react-doctor"})),
+            project_dir,
+            CATALOG,
+            PIN,
+        )
+
+
+def test_npm_dev_dependency_pkg_collision_raises_overlay_error(tmp_path: Path) -> None:
+    import dev_ready.overlay as overlay_module
+
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    pkg_json_path = project_dir / "frontend" / "package.json"
+    pkg_json_path.parent.mkdir()
+    pkg_json_path.write_text(
+        json.dumps({"devDependencies": {"react-doctor": "0.8.0"}}), encoding="utf-8"
+    )
+
+    react_doctor_item = next(item for item in CATALOG["skills"] if item.id == "react-doctor")
+    with pytest.raises(OverlayError, match="already declared"):
+        overlay_module._inject_npm_dev_dependency(react_doctor_item, project_dir)
+
+
+def test_npm_dev_dependency_script_collision_raises_overlay_error(tmp_path: Path) -> None:
+    import dev_ready.overlay as overlay_module
+
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    pkg_json_path = project_dir / "frontend" / "package.json"
+    pkg_json_path.parent.mkdir()
+    pkg_json_path.write_text(
+        json.dumps({"scripts": {"doctor": "echo doctor"}}), encoding="utf-8"
+    )
+
+    react_doctor_item = next(item for item in CATALOG["skills"] if item.id == "react-doctor")
+    with pytest.raises(OverlayError, match="already declared"):
+        overlay_module._inject_npm_dev_dependency(react_doctor_item, project_dir)
+

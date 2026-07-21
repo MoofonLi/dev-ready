@@ -8,6 +8,7 @@ the staged project still has the shape dev-ready depends on; it reads the
 staging directory only — no network, no writes (Module Boundary).
 """
 
+import json
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -92,4 +93,55 @@ def verify_project(
                     raise VerificationError(
                         f"unselected {component} item {item.id!r} left path {item_path.dest!r} in the output"
                     )
+
+            if item.inject is not None:
+                present = _check_inject_present(project_dir, item)
+                if expected and not present:
+                    raise VerificationError(
+                        f"selected {component} item {item.id!r} is missing its inject effect in {item.inject.target}"
+                    )
+                if not expected and present:
+                    raise VerificationError(
+                        f"unselected {component} item {item.id!r} left inject effect in {item.inject.target}"
+                    )
+
+
+def _check_inject_present(project_dir: Path, item: CatalogItem) -> bool:
+    inject = item.inject
+    assert inject is not None
+    target_path = project_dir / inject.target
+    if not target_path.exists():
+        return False
+
+    try:
+        data = json.loads(target_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise VerificationError(
+            f"failed to parse {inject.target} while verifying item {item.id!r}: {error}"
+        ) from error
+
+    if not isinstance(data, dict):
+        raise VerificationError(
+            f"{inject.target} root must be a JSON object while verifying item {item.id!r}"
+        )
+
+    if inject.kind == "mcp-server":
+        mcp_servers = data.get("mcpServers")
+        if not isinstance(mcp_servers, dict):
+            return False
+        assert inject.server_name is not None
+        return inject.server_name in mcp_servers
+
+    elif inject.kind == "npm-dev-dependency":
+        dev_deps = data.get("devDependencies")
+        if not isinstance(dev_deps, dict):
+            return False
+        scripts = data.get("scripts")
+        if not isinstance(scripts, dict):
+            return False
+        has_pkg = inject.package in dev_deps
+        has_scripts = all(name in scripts for name, _ in inject.scripts)
+        return has_pkg and has_scripts
+
+    return False
 

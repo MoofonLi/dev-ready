@@ -11,12 +11,14 @@ from importlib import resources
 from pathlib import Path
 
 from dev_ready.errors import ManifestError
-from dev_ready.manifest.models import CatalogItem, ItemPath, Manifest, UpstreamPin
+from dev_ready.manifest.models import CatalogItem, Injection, ItemPath, Manifest, UpstreamPin
 
 SUPPORTED_MANIFEST_VERSION = 1
 ALLOWED_MODES = ("builtin", "vendor", "pinned-dependency")
+ALLOWED_INJECT_KINDS = ("mcp-server", "npm-dev-dependency")
 CATALOG_COMPONENTS = ("skills", "mcp")
 _ITEM_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_PIN_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+.][0-9A-Za-z.-]+)?$")
 
 _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 # owner/name, GitHub-shaped: each side must start with an alphanumeric so no
@@ -229,20 +231,39 @@ def _parse_components(data: dict, source: str) -> dict[str, tuple[CatalogItem, .
                 )
 
             paths_raw = item_entry.get("paths")
-            if not isinstance(paths_raw, list) or not paths_raw:
-                raise ManifestError(
-                    f"{source}: component '{comp_name}' item '{item_id}' field 'paths' must be a non-empty list"
-                )
-
             parsed_paths: list[ItemPath] = []
-            for path_entry in paths_raw:
-                if not isinstance(path_entry, dict):
+            if paths_raw is not None:
+                if not isinstance(paths_raw, list):
                     raise ManifestError(
-                        f"{source}: component '{comp_name}' item '{item_id}' path entry must be an object"
+                        f"{source}: component '{comp_name}' item '{item_id}' field 'paths' must be a list"
                     )
-                src = _parse_catalog_path(comp_name, item_id, "src", path_entry.get("src"), source)
-                dest = _parse_catalog_path(comp_name, item_id, "dest", path_entry.get("dest"), source)
-                parsed_paths.append(ItemPath(src=src, dest=dest))
+                for path_entry in paths_raw:
+                    if not isinstance(path_entry, dict):
+                        raise ManifestError(
+                            f"{source}: component '{comp_name}' item '{item_id}' path entry must be an object"
+                        )
+                    src = _parse_catalog_path(comp_name, item_id, "src", path_entry.get("src"), source)
+                    dest = _parse_catalog_path(comp_name, item_id, "dest", path_entry.get("dest"), source)
+                    parsed_paths.append(ItemPath(src=src, dest=dest))
+
+            pin = item_entry.get("pin")
+            if mode == "pinned-dependency":
+                if not isinstance(pin, str) or not pin or not _PIN_PATTERN.fullmatch(pin):
+                    raise ManifestError(
+                        f"{source}: component '{comp_name}' item '{item_id}' field 'pin' must be a valid exact-semver string, got {pin!r}"
+                    )
+            else:
+                if pin is not None:
+                    raise ManifestError(
+                        f"{source}: component '{comp_name}' item '{item_id}' field 'pin' is only allowed for pinned-dependency items"
+                    )
+
+            inject = _parse_injection(comp_name, item_id, mode, item_entry.get("inject"), source)
+
+            if not parsed_paths and inject is None:
+                raise ManifestError(
+                    f"{source}: component '{comp_name}' item '{item_id}' must define paths, inject, or both"
+                )
 
             parsed_items.append(
                 CatalogItem(
@@ -251,11 +272,100 @@ def _parse_components(data: dict, source: str) -> dict[str, tuple[CatalogItem, .
                     mode=mode,
                     license=lic,
                     paths=tuple(parsed_paths),
+                    pin=pin,
+                    inject=inject,
                 )
             )
 
         result[comp_name] = tuple(parsed_items)
     return result
+
+
+def _parse_injection(
+    component: str, item_id: str, mode: str, raw: object, source: str
+) -> Injection | None:
+    if raw is None:
+        return None
+    if mode != "pinned-dependency":
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' field 'inject' is only allowed"
+            " for pinned-dependency items"
+        )
+    if not isinstance(raw, dict):
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' field 'inject' must be an object"
+        )
+
+    kind = raw.get("kind")
+    if not isinstance(kind, str) or kind not in ALLOWED_INJECT_KINDS:
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' inject field 'kind' must be"
+            f" one of {ALLOWED_INJECT_KINDS!r}, got {kind!r}"
+        )
+
+    target = _parse_catalog_path(component, item_id, "target", raw.get("target"), source)
+
+    package = raw.get("package")
+    if not isinstance(package, str) or not package:
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' inject field 'package' must be"
+            " a non-empty string"
+        )
+
+    if kind == "mcp-server":
+        if "scripts" in raw and raw.get("scripts") is not None:
+            raise ManifestError(
+                f"{source}: component '{component}' item '{item_id}' inject kind 'mcp-server' must not have 'scripts'"
+            )
+        server_name = raw.get("server_name")
+        if not isinstance(server_name, str) or not server_name:
+            raise ManifestError(
+                f"{source}: component '{component}' item '{item_id}' inject field 'server_name' must be"
+                " a non-empty string"
+            )
+        command = raw.get("command")
+        if not isinstance(command, str) or not command:
+            raise ManifestError(
+                f"{source}: component '{component}' item '{item_id}' inject field 'command' must be"
+                " a non-empty string"
+            )
+        return Injection(
+            kind=kind,
+            target=target,
+            package=package,
+            server_name=server_name,
+            command=command,
+        )
+
+    elif kind == "npm-dev-dependency":
+        if ("server_name" in raw and raw.get("server_name") is not None) or (
+            "command" in raw and raw.get("command") is not None
+        ):
+            raise ManifestError(
+                f"{source}: component '{component}' item '{item_id}' inject kind 'npm-dev-dependency' must not have 'server_name' or 'command'"
+            )
+        scripts_raw = raw.get("scripts")
+        if not isinstance(scripts_raw, dict) or not scripts_raw:
+            raise ManifestError(
+                f"{source}: component '{component}' item '{item_id}' inject field 'scripts' must be"
+                " a non-empty object"
+            )
+        scripts_list: list[tuple[str, str]] = []
+        for s_name, s_cmd in scripts_raw.items():
+            if not isinstance(s_name, str) or not s_name or not isinstance(s_cmd, str) or not s_cmd:
+                raise ManifestError(
+                    f"{source}: component '{component}' item '{item_id}' inject script entry must be"
+                    " a non-empty string -> non-empty string mapping"
+                )
+            scripts_list.append((s_name, s_cmd))
+        return Injection(
+            kind=kind,
+            target=target,
+            package=package,
+            scripts=tuple(scripts_list),
+        )
+
+    return None
 
 
 def _parse_catalog_path(

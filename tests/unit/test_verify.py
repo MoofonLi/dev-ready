@@ -31,6 +31,7 @@ def _answers(tmp_path: Path, **overrides: object) -> Answers:
 
 
 def _make_complete_project(root: Path, answers: Answers | None = None) -> None:
+    import json
     for rel_path in REQUIRED_UPSTREAM_PATHS:
         path = root / rel_path
         if rel_path in _DIRECTORY_ENTRIES:
@@ -48,7 +49,30 @@ def _make_complete_project(root: Path, answers: Answers | None = None) -> None:
                 for item_path in item.paths:
                     dest = root / item_path.dest
                     dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_text("stub", encoding="utf-8")
+                    if item_path.dest.endswith(".json"):
+                        dest.write_text("{}", encoding="utf-8")
+                    else:
+                        dest.write_text("stub", encoding="utf-8")
+
+                if item.inject is not None:
+                    target_path = root / item.inject.target
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        data = json.loads(target_path.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        data = {}
+
+                    if item.inject.kind == "mcp-server":
+                        servers = data.setdefault("mcpServers", {})
+                        servers[item.inject.server_name] = {"command": item.inject.command}
+                    elif item.inject.kind == "npm-dev-dependency":
+                        dev_deps = data.setdefault("devDependencies", {})
+                        dev_deps[item.inject.package] = item.pin
+                        scripts = data.setdefault("scripts", {})
+                        for s_name, s_cmd in item.inject.scripts:
+                            scripts[s_name] = s_cmd
+
+                    target_path.write_text(json.dumps(data), encoding="utf-8")
 
 
 def test_verify_passes_when_all_required_paths_present(tmp_path: Path) -> None:
@@ -145,5 +169,49 @@ def test_verify_always_applied_files_with_unselected_item_still_passes(tmp_path:
     # create always applied file CLAUDE.md
     (tmp_path / "CLAUDE.md").write_text("stub", encoding="utf-8")
     verify_project(tmp_path, ans, CATALOG)
+
+
+def test_verify_selection_matrix_all_on(tmp_path: Path) -> None:
+    ans = _answers(
+        tmp_path,
+        skills_items=frozenset({"project-orientation", "react-doctor"}),
+        mcp_items=frozenset({"mcp-config", "code-memory"}),
+    )
+    _make_complete_project(tmp_path, ans)
+    verify_project(tmp_path, ans, CATALOG)  # must not raise
+
+
+def test_verify_selection_matrix_all_off(tmp_path: Path) -> None:
+    ans = _answers(tmp_path, skills_items=frozenset(), mcp_items=frozenset())
+    _make_complete_project(tmp_path, ans)
+    verify_project(tmp_path, ans, CATALOG)  # must not raise
+
+
+def test_verify_selection_matrix_mixed_and_negative(tmp_path: Path) -> None:
+    import json
+
+    ans = _answers(
+        tmp_path,
+        skills_items=frozenset({"react-doctor"}),
+        mcp_items=frozenset({"mcp-config"}),
+    )
+    _make_complete_project(tmp_path, ans)
+    verify_project(tmp_path, ans, CATALOG)  # passes
+
+    # Leaked code-memory server entry while code-memory is unselected -> raises
+    mcp_json = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
+    mcp_json.setdefault("mcpServers", {})["codebase-memory"] = {"command": "uvx"}
+    (tmp_path / ".mcp.json").write_text(json.dumps(mcp_json), encoding="utf-8")
+    with pytest.raises(VerificationError, match="unselected mcp item 'code-memory' left inject effect"):
+        verify_project(tmp_path, ans, CATALOG)
+
+    # Clean up code-memory from .mcp.json
+    del mcp_json["mcpServers"]["codebase-memory"]
+    (tmp_path / ".mcp.json").write_text(json.dumps(mcp_json), encoding="utf-8")
+
+    # Missing react-doctor devDependency while selected -> raises
+    (tmp_path / "frontend" / "package.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(VerificationError, match="selected skills item 'react-doctor' is missing its inject effect"):
+        verify_project(tmp_path, ans, CATALOG)
 
 
