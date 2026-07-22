@@ -79,7 +79,7 @@ def test_init_success_exits_0_and_prints_summary(
 ) -> None:
     target_dir = tmp_path / "my-app"
 
-    def _fake_generate(answers: Answers, pin, catalog=None) -> list[Path]:
+    def _fake_generate(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
         assert answers.project_name == "my-app"
         return [Path("CLAUDE.md"), Path(".mcp.json")]
 
@@ -96,7 +96,7 @@ def test_init_success_exits_0_and_prints_summary(
 def test_init_success_omits_disabled_components_from_summary(
     tmp_path, monkeypatch: pytest.MonkeyPatch, capsys
 ) -> None:
-    monkeypatch.setattr(cli_module, "generate", lambda answers, pin, *_: [Path("CLAUDE.md")])
+    monkeypatch.setattr(cli_module, "generate", lambda answers, pin, *args, **kwargs: [Path("CLAUDE.md")])
 
     assert (
         main(
@@ -133,7 +133,7 @@ def test_init_success_omits_disabled_components_from_summary(
 def test_init_maps_generate_errors_to_exit_codes(
     monkeypatch: pytest.MonkeyPatch, capsys, error: Exception, expected_exit_code: int
 ) -> None:
-    def _raising_generate(answers: Answers, pin, catalog=None) -> list[Path]:
+    def _raising_generate(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
         raise error
 
     monkeypatch.setattr(cli_module, "generate", _raising_generate)
@@ -147,7 +147,7 @@ def test_init_flags_reach_generate_via_answers(
 ) -> None:
     captured: dict[str, Answers] = {}
 
-    def _capturing_generate(answers: Answers, pin, catalog=None) -> list[Path]:
+    def _capturing_generate(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
         captured["answers"] = answers
         return []
 
@@ -183,7 +183,17 @@ def test_build_answers_defaults() -> None:
     assert answers.target_dir == Path.cwd() / "my-app"
     assert answers.include_skills is True
     assert answers.include_mcp is True
-    assert answers.skills_items == frozenset({"project-orientation", "react-doctor"})
+    assert answers.skills_items == frozenset(
+        {
+            "project-orientation",
+            "react-doctor",
+            "caveman",
+            "security-audit",
+            "tdd",
+            "diagnosing-bugs",
+            "code-review",
+        }
+    )
     assert answers.mcp_items == frozenset({"mcp-config", "code-memory"})
     assert answers.include_docs is True
     assert answers.include_agents is True
@@ -233,7 +243,17 @@ def test_parser_accepts_all_documented_flags() -> None:
 def test_skills_and_mcp_item_flag_variations() -> None:
     # --skills all / --mcp none
     ans = build_answers(_init_args(skills="all", mcp="none"), CATALOG)
-    assert ans.skills_items == frozenset({"project-orientation", "react-doctor"})
+    assert ans.skills_items == frozenset(
+        {
+            "project-orientation",
+            "react-doctor",
+            "caveman",
+            "security-audit",
+            "tdd",
+            "diagnosing-bugs",
+            "code-review",
+        }
+    )
     assert ans.mcp_items == frozenset()
     assert ans.include_skills is True
     assert ans.include_mcp is False
@@ -248,7 +268,7 @@ def test_unknown_item_id_exits_2(capsys) -> None:
     assert main(["init", "my-app", "--yes", "--skills", "bogus"]) == 2
     err = capsys.readouterr().err
     assert "unknown skills item ids: ['bogus']" in err
-    assert "valid ids: ['project-orientation', 'react-doctor']" in err
+    assert "valid ids: ['caveman', 'code-review', 'diagnosing-bugs', 'project-orientation', 'react-doctor', 'security-audit', 'tdd']" in err
 
 
 def test_conflicting_flags_exits_2(capsys) -> None:
@@ -279,7 +299,7 @@ def test_init_interactive_confirm_accept_calls_generate_once(
     )
     monkeypatch.setattr(cli_module, "confirm_generation", lambda answers, pin, **_: True)
 
-    def _spy_generate(answers: Answers, pin, catalog=None) -> list[Path]:
+    def _spy_generate(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
         generate_calls.append(answers)
         return [Path("CLAUDE.md")]
 
@@ -328,7 +348,7 @@ def test_yes_path_never_imports_questionary(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     sys.modules.pop("questionary", None)
-    monkeypatch.setattr(cli_module, "generate", lambda answers, pin, *_: [Path("CLAUDE.md")])
+    monkeypatch.setattr(cli_module, "generate", lambda answers, pin, *args, **kwargs: [Path("CLAUDE.md")])
 
     target_dir = tmp_path / "my-app"
     assert main(["init", "my-app", "--yes", "--dir", str(target_dir)]) == 0

@@ -34,14 +34,14 @@ def test_build_path_mappings_single_entry(tmp_path: Path) -> None:
             "JuliusBrussee/caveman",
             "a" * 40,
             "MIT",
-            [ItemPath(src="SKILL.md", dest="templates/claude/skills/caveman/SKILL.md")],
+            [ItemPath(src="SKILL.md", dest="src/dev_ready/templates/claude/skills/caveman/SKILL.md")],
         )
     ]
     mappings = sync_vendored.build_path_mappings(vendored, tmp_path)
     assert len(mappings) == 1
     src, dest = mappings[0]
     assert src == "SKILL.md"
-    assert dest == tmp_path / "templates/claude/skills/caveman/SKILL.md"
+    assert dest == tmp_path / "src/dev_ready/templates/claude/skills/caveman/SKILL.md"
 
 
 def test_build_path_mappings_multiple_entries(tmp_path: Path) -> None:
@@ -51,22 +51,22 @@ def test_build_path_mappings_multiple_entries(tmp_path: Path) -> None:
             "a" * 40,
             "MIT",
             [
-                ItemPath(src="SKILL.md", dest="templates/claude/skills/caveman/SKILL.md"),
-                ItemPath(src="README.md", dest="templates/claude/skills/caveman/README.md"),
+                ItemPath(src="SKILL.md", dest="src/dev_ready/templates/claude/skills/caveman/SKILL.md"),
+                ItemPath(src="README.md", dest="src/dev_ready/templates/claude/skills/caveman/README.md"),
             ],
         ),
         _pin(
             "owner/other",
             "b" * 40,
             "Apache-2.0",
-            [ItemPath(src="foo.txt", dest="templates/mcp/foo.txt")],
+            [ItemPath(src="foo.txt", dest="src/dev_ready/templates/mcp/foo.txt")],
         ),
     ]
     mappings = sync_vendored.build_path_mappings(vendored, tmp_path)
     assert len(mappings) == 3
-    assert mappings[0] == ("SKILL.md", tmp_path / "templates/claude/skills/caveman/SKILL.md")
-    assert mappings[1] == ("README.md", tmp_path / "templates/claude/skills/caveman/README.md")
-    assert mappings[2] == ("foo.txt", tmp_path / "templates/mcp/foo.txt")
+    assert mappings[0] == ("SKILL.md", tmp_path / "src/dev_ready/templates/claude/skills/caveman/SKILL.md")
+    assert mappings[1] == ("README.md", tmp_path / "src/dev_ready/templates/claude/skills/caveman/README.md")
+    assert mappings[2] == ("foo.txt", tmp_path / "src/dev_ready/templates/mcp/foo.txt")
 
 
 def test_build_path_mappings_rejects_dest_outside_templates(tmp_path: Path) -> None:
@@ -88,7 +88,7 @@ def test_build_path_mappings_rejects_dest_traversal(tmp_path: Path) -> None:
             "owner/repo",
             "a" * 40,
             "MIT",
-            [ItemPath(src="SKILL.md", dest="templates/../evil.txt")],
+            [ItemPath(src="SKILL.md", dest="src/dev_ready/templates/../evil.txt")],
         )
     ]
     with pytest.raises(RuntimeError, match="escapes templates root"):

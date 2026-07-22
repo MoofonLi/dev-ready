@@ -474,3 +474,74 @@ def test_npm_dev_dependency_script_collision_raises_overlay_error(tmp_path: Path
     with pytest.raises(OverlayError, match="already declared"):
         overlay_module._inject_npm_dev_dependency(react_doctor_item, project_dir)
 
+
+def test_render_stamp_records_vendored_pins(tmp_path: Path) -> None:
+    manifest = load_default_manifest()
+    answers = _answers(tmp_path, skills_items=frozenset({"caveman", "project-orientation"}))
+    raw = render_stamp(answers, PIN, manifest.components, manifest.vendored)
+    data = json.loads(raw)
+    assert data["stamp_version"] == 2
+    items = data["components"]["skills"]["items"]
+    caveman_item = next(i for i in items if i["id"] == "caveman")
+    po_item = next(i for i in items if i["id"] == "project-orientation")
+    assert caveman_item["pin"] == "0d95a81d35a9f2d123a5e9430d1cfc43d55f1bb0"
+    assert po_item["pin"] is None
+
+
+def test_apply_overlay_writes_vendored_skills_and_docs(tmp_path: Path) -> None:
+    manifest = load_default_manifest()
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    skills_to_test = frozenset({"caveman", "security-audit", "tdd", "diagnosing-bugs", "code-review"})
+    answers = _answers(tmp_path, skills_items=skills_to_test, include_docs=True)
+
+    written = apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
+
+    for skill in skills_to_test:
+        assert (project_dir / ".claude" / "skills" / skill / "SKILL.md").exists()
+
+    assert (project_dir / "docs" / "design-stripe.md").exists()
+    assert (project_dir / "docs" / "design-linear.md").exists()
+    assert Path(".claude/skills/caveman/SKILL.md") in written
+    assert Path("docs/design-stripe.md") in written
+
+
+def test_apply_overlay_deselected_vendored_skills_are_absent(tmp_path: Path) -> None:
+    manifest = load_default_manifest()
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    # Select only builtin item; leave all vendored skills deselected
+    answers = _answers(tmp_path, skills_items=frozenset({"project-orientation"}))
+
+    written = apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
+
+    all_vendored_skills = {"caveman", "security-audit", "tdd", "diagnosing-bugs", "code-review"}
+    for skill in all_vendored_skills:
+        assert not (project_dir / ".claude" / "skills" / skill).exists()
+        assert Path(f".claude/skills/{skill}/SKILL.md") not in written
+
+
+def test_apply_overlay_mixed_vendored_skills_selection(tmp_path: Path) -> None:
+    manifest = load_default_manifest()
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    # Mixed selection: caveman selected, remaining vendored skills deselected
+    selected = frozenset({"project-orientation", "caveman"})
+    answers = _answers(tmp_path, skills_items=selected)
+
+    written = apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
+
+    assert (project_dir / ".claude" / "skills" / "caveman" / "SKILL.md").exists()
+    assert Path(".claude/skills/caveman/SKILL.md") in written
+
+    deselected_vendored = {"security-audit", "tdd", "diagnosing-bugs", "code-review"}
+    for skill in deselected_vendored:
+        assert not (project_dir / ".claude" / "skills" / skill).exists()
+        assert Path(f".claude/skills/{skill}/SKILL.md") not in written
+
+
+
+

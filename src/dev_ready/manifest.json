@@ -37,7 +37,64 @@
       ]
     }
   },
-  "vendored": [],
+  "vendored": [
+    {
+      "repo": "JuliusBrussee/caveman",
+      "commit": "0d95a81d35a9f2d123a5e9430d1cfc43d55f1bb0",
+      "license": "MIT",
+      "paths": [
+        {
+          "src": "skills/caveman",
+          "dest": "src/dev_ready/templates/claude/skills/caveman"
+        }
+      ]
+    },
+    {
+      "repo": "mattpocock/skills",
+      "commit": "ed37663cc5fbef691ddfecd080dff42f7e7e350d",
+      "license": "MIT",
+      "paths": [
+        {
+          "src": "skills/engineering/tdd",
+          "dest": "src/dev_ready/templates/claude/skills/tdd"
+        },
+        {
+          "src": "skills/engineering/diagnosing-bugs",
+          "dest": "src/dev_ready/templates/claude/skills/diagnosing-bugs"
+        },
+        {
+          "src": "skills/engineering/code-review",
+          "dest": "src/dev_ready/templates/claude/skills/code-review"
+        }
+      ]
+    },
+    {
+      "repo": "cloudflare/security-audit-skill",
+      "commit": "8bac42001ddd90a4dcd8d5a5045199283a8eba75",
+      "license": "MIT",
+      "paths": [
+        {
+          "src": "skills/security-audit",
+          "dest": "src/dev_ready/templates/claude/skills/security-audit"
+        }
+      ]
+    },
+    {
+      "repo": "VoltAgent/awesome-design-md",
+      "commit": "664b3e78fd1a298ba11973822da988483256d4b4",
+      "license": "MIT",
+      "paths": [
+        {
+          "src": "design-md/stripe/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-stripe.md"
+        },
+        {
+          "src": "design-md/linear.app/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-linear.md"
+        }
+      ]
+    }
+  ],
   "components": {
     "skills": {
       "items": [
@@ -68,6 +125,71 @@
             "package": "react-doctor",
             "scripts": { "doctor": "react-doctor" }
           }
+        },
+        {
+          "id": "caveman",
+          "description": "Token-discipline and concise response guidance for AI coding agents.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "JuliusBrussee/caveman",
+          "paths": [
+            {
+              "src": "claude/skills/caveman",
+              "dest": ".claude/skills/caveman"
+            }
+          ]
+        },
+        {
+          "id": "security-audit",
+          "description": "Multi-phase security auditing skill for vulnerability scanning and risk assessment.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "cloudflare/security-audit-skill",
+          "paths": [
+            {
+              "src": "claude/skills/security-audit",
+              "dest": ".claude/skills/security-audit"
+            }
+          ]
+        },
+        {
+          "id": "tdd",
+          "description": "TDD workflow and test-first mindset guidance for AI pair programming.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "mattpocock/skills",
+          "paths": [
+            {
+              "src": "claude/skills/tdd",
+              "dest": ".claude/skills/tdd"
+            }
+          ]
+        },
+        {
+          "id": "diagnosing-bugs",
+          "description": "Systematic root-cause analysis workflow for debugging complex software issues.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "mattpocock/skills",
+          "paths": [
+            {
+              "src": "claude/skills/diagnosing-bugs",
+              "dest": ".claude/skills/diagnosing-bugs"
+            }
+          ]
+        },
+        {
+          "id": "code-review",
+          "description": "Rigorous code review protocol evaluating logic, safety, and architectural fit.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "mattpocock/skills",
+          "paths": [
+            {
+              "src": "claude/skills/code-review",
+              "dest": ".claude/skills/code-review"
+            }
+          ]
         }
       ]
     },

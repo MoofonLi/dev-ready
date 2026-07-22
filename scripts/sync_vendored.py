@@ -37,7 +37,7 @@ def build_path_mappings(
 
     Pure function: no network, no filesystem reads/writes.
     """
-    templates_root = (repo_root / "templates").resolve()
+    templates_root = (repo_root / "src" / "dev_ready" / "templates").resolve()
     mappings: list[tuple[str, Path]] = []
     for entry in vendored:
         for path_pair in entry.paths:
@@ -87,6 +87,7 @@ def clone_or_fetch(repo: str, commit: str, target_dir: Path) -> None:
             cwd=target_dir,
             capture_output=True,
             text=True,
+            timeout=60,
         )
         if res.returncode != 0:
             res = subprocess.run(
@@ -94,6 +95,7 @@ def clone_or_fetch(repo: str, commit: str, target_dir: Path) -> None:
                 cwd=target_dir,
                 capture_output=True,
                 text=True,
+                timeout=60,
             )
             if res.returncode != 0:
                 raise RuntimeError(f"git fetch failed for {repo}: {res.stderr}")
@@ -103,6 +105,7 @@ def clone_or_fetch(repo: str, commit: str, target_dir: Path) -> None:
             ["git", "clone", "--filter=blob:none", "--no-checkout", url, str(target_dir)],
             capture_output=True,
             text=True,
+            timeout=60,
         )
         if res.returncode != 0:
             raise RuntimeError(f"git clone failed for {repo}: {res.stderr}")
@@ -112,6 +115,7 @@ def clone_or_fetch(repo: str, commit: str, target_dir: Path) -> None:
         cwd=target_dir,
         capture_output=True,
         text=True,
+        timeout=60,
     )
     if res.returncode != 0:
         raise RuntimeError(f"git checkout failed for {repo} at commit {commit}: {res.stderr}")
@@ -148,7 +152,7 @@ def sync_all(
 def _compare_trees(
     synced_root: Path,
     repo_root: Path,
-    vendored: tuple[VendoredPin, ...],
+    vendored: tuple[VendoredPin, ...] | list[VendoredPin],
 ) -> list[str]:
     """Return a list of paths that differ (synced vs committed).
 
@@ -161,18 +165,38 @@ def _compare_trees(
     for entry in vendored:
         for path_pair in entry.paths:
             dest = path_pair.dest
-            synced_file = synced_root / dest
-            committed_file = repo_root / dest
-            if not synced_file.exists():
+            synced_path = synced_root / dest
+            committed_path = repo_root / dest
+            if not synced_path.exists():
                 diffs.append(f"{dest}: missing in sync output")
                 continue
-            if not committed_file.exists():
+            if not committed_path.exists():
                 diffs.append(f"{dest}: missing in committed tree")
                 continue
-            synced_text = synced_file.read_text(encoding="utf-8", errors="replace")
-            committed_text = committed_file.read_text(encoding="utf-8", errors="replace")
-            if synced_text.replace("\r\n", "\n") != committed_text.replace("\r\n", "\n"):
-                diffs.append(f"{dest}: content differs")
+
+            if synced_path.is_dir():
+                synced_files = {p.relative_to(synced_path) for p in synced_path.rglob("*") if p.is_file()}
+                committed_files = {p.relative_to(committed_path) for p in committed_path.rglob("*") if p.is_file()}
+                all_rel_files = sorted(synced_files | committed_files)
+                for rel_f in all_rel_files:
+                    s_file = synced_path / rel_f
+                    c_file = committed_path / rel_f
+                    rel_dest_str = f"{dest}/{rel_f.as_posix()}"
+                    if not s_file.exists():
+                        diffs.append(f"{rel_dest_str}: missing in sync output")
+                        continue
+                    if not c_file.exists():
+                        diffs.append(f"{rel_dest_str}: missing in committed tree")
+                        continue
+                    s_text = s_file.read_text(encoding="utf-8", errors="replace")
+                    c_text = c_file.read_text(encoding="utf-8", errors="replace")
+                    if s_text.replace("\r\n", "\n") != c_text.replace("\r\n", "\n"):
+                        diffs.append(f"{rel_dest_str}: content differs")
+            else:
+                synced_text = synced_path.read_text(encoding="utf-8", errors="replace")
+                committed_text = committed_path.read_text(encoding="utf-8", errors="replace")
+                if synced_text.replace("\r\n", "\n") != committed_text.replace("\r\n", "\n"):
+                    diffs.append(f"{dest}: content differs")
     return diffs
 
 

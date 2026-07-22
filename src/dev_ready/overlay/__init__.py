@@ -13,7 +13,7 @@ from pathlib import Path
 
 from dev_ready import __version__
 from dev_ready.errors import OverlayError
-from dev_ready.manifest import CatalogItem, UpstreamPin
+from dev_ready.manifest import CatalogItem, UpstreamPin, VendoredPin
 from dev_ready.prompts import Answers
 
 __all__ = ["apply_overlay", "render_stamp"]
@@ -24,14 +24,22 @@ _TEMPLATE_TOKEN = "{{project_name}}"
 
 
 def render_stamp(
-    answers: Answers, pin: UpstreamPin, catalog: Mapping[str, tuple[CatalogItem, ...]]
+    answers: Answers,
+    pin: UpstreamPin,
+    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    vendored: Collection[VendoredPin] = (),
 ) -> str:
+    vendored_map = {v.repo: v.commit for v in vendored}
+
     def _stamp_items(component: str, selected: Collection[str]) -> list[dict[str, str | None]]:
-        out = [
-            {"id": item.id, "pin": item.pin}
-            for item in catalog.get(component, ())
-            if item.id in selected
-        ]
+        out = []
+        for item in catalog.get(component, ()):
+            if item.id not in selected:
+                continue
+            item_pin = item.pin
+            if item.mode == "vendor" and item.vendored_repo and item.vendored_repo in vendored_map:
+                item_pin = vendored_map[item.vendored_repo]
+            out.append({"id": item.id, "pin": item_pin})
         return sorted(out, key=lambda d: str(d["id"]))
 
     data = {
@@ -53,6 +61,7 @@ def apply_overlay(
     project_dir: Path,
     catalog: Mapping[str, tuple[CatalogItem, ...]],
     pin: UpstreamPin,
+    vendored: Collection[VendoredPin] = (),
 ) -> list[Path]:
     """Apply the selected overlay components onto `project_dir`.
 
@@ -123,7 +132,7 @@ def apply_overlay(
     if stamp_path.exists() or stamp_path.is_symlink():
         raise OverlayError("overlay destination already exists: .dev-ready.json")
     try:
-        stamp_path.write_text(render_stamp(answers, pin, catalog), encoding="utf-8")
+        stamp_path.write_text(render_stamp(answers, pin, catalog, vendored), encoding="utf-8")
     except OSError as error:
         raise OverlayError(f"failed to write .dev-ready.json: {error}") from error
     written.append(Path(".dev-ready.json"))

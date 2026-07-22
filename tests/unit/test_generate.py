@@ -201,7 +201,7 @@ def test_verify_runs_after_overlay_and_before_move(
         call_order.append("fetch")
         return _fake_fetch_ok(pin, dest)
 
-    def _spy_overlay(passed_answers: Answers, project_dir: Path, cat, pin) -> list[Path]:
+    def _spy_overlay(passed_answers: Answers, project_dir: Path, cat, pin, **kwargs) -> list[Path]:
         call_order.append("overlay")
         return []
 

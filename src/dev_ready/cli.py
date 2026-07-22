@@ -218,7 +218,7 @@ def _run_init(args: argparse.Namespace) -> int:
             print("aborted: nothing was written", file=sys.stderr)
             return 1
 
-    written = generate(answers, pin, manifest.components)
+    written = generate(answers, pin, manifest.components, vendored=manifest.vendored)
     print(render_report(answers, pin, written))
     return 0
 

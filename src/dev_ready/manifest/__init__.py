@@ -9,7 +9,7 @@ from dev_ready.manifest.loader import (
     load_manifest,
     parse_manifest,
 )
-from dev_ready.manifest.models import CatalogItem, Injection, ItemPath, Manifest, UpstreamPin
+from dev_ready.manifest.models import CatalogItem, Injection, ItemPath, Manifest, UpstreamPin, VendoredPin
 
 __all__ = [
     "SUPPORTED_MANIFEST_VERSION",
@@ -18,6 +18,7 @@ __all__ = [
     "ItemPath",
     "Manifest",
     "UpstreamPin",
+    "VendoredPin",
     "load_default_manifest",
     "load_manifest",
     "parse_manifest",
