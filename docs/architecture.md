@@ -40,7 +40,7 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | [ADR-006](decisions/adr-006-manifest-prune-list.md) | Manifest-driven prune list, separate from exclude (v0.2) | Accepted (2026-07-16) |
 | [ADR-007](decisions/adr-007-multi-agent-handoff-protocol.md) | Multi-agent development team and handoff protocol (v0.2) | Accepted (2026-07-16) |
 | [ADR-008](decisions/adr-008-integration-modes-vendor-vs-pinned.md) | Two third-party integration modes — vendor vs pinned dependency (v0.3+) | Accepted (2026-07-17) |
-| [ADR-009](decisions/adr-009-manifest-vendored-provenance.md) | Manifest `vendored` section with enforced provenance (v0.4) | Proposed (2026-07-17), implemented in v0.4 (FR-15/FR-16/FR-18) |
+| [ADR-009](decisions/adr-009-manifest-vendored-provenance.md) | Manifest `vendored` section with enforced provenance (v0.4) | Implemented |
 | [ADR-010](decisions/adr-010-item-level-catalog-selection.md) | Item-level component selection with a data-driven catalog (v0.3) | Accepted (2026-07-17) |
 | [ADR-011](decisions/adr-011-agent-config-restructure.md) | Standard agent-config layout: AGENTS.md, docs/decisions/, docs/handoff/, .agents/skills/ | Accepted (2026-07-20) |
 

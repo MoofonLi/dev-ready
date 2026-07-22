@@ -13,13 +13,20 @@ The upstream template is pinned to a CI-verified commit (never an untested "late
 A generated project based on [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) (FastAPI, React, SQLModel, PostgreSQL, Docker Compose), plus an AI tooling overlay so it works well with coding agents out of the box:
 
 - `CLAUDE.md` — project instructions for Claude Code
-- Claude Code skills (e.g. project orientation)
+- Claude Code skills — seven pre-configured skills selectable at generation time:
+  - **project-orientation** (built-in) — codebase orientation helper
+  - **react-doctor** (pinned devDependency) — frontend dependency health checks
+  - **caveman** (vendored, MIT) — token-discipline communication mode
+  - **tdd** (vendored, MIT) — test-driven development loop
+  - **diagnosing-bugs** (vendored, MIT) — diagnosis loop for hard bugs
+  - **code-review** (vendored, MIT) — review against coding standards and spec
+  - **security-audit** (vendored, MIT) — multi-phase security audit
 - MCP server configuration (`mcp.json`)
 - Design-doc templates (`architecture.md`, `requirements.md`)
 - Agent-team handoff scaffold (`docs/handoffs/` — a document-driven multi-agent workflow: Tech Lead → Senior → Junior → QA/Security/SRE)
 - Generation stamp — every generated project gets a `.dev-ready.json` recording the dev-ready version, selected components/items, and pinned upstream commit
 - Pinned tool integrations — optional, selectable MCP and skill items: a codebase-memory MCP server (`uvx codebase-memory-mcp`) and a `react-doctor` frontend wrapper skill + devDependency
-- item-level selection — pick individual items inside the skills and MCP components, not just the whole component
+- Item-level selection — pick individual skills (including vendored ones) and MCP items; vendored skills include their upstream provenance in `.dev-ready.json`
 
 Every generated project also gets its own `README.md` (the upstream template's repo README and other repo-maintenance files — `CONTRIBUTING.md`, release notes, deploy workflows, screenshots — are pruned, so nothing template-repo-specific leaks into your project).
 
