@@ -5,13 +5,23 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
+      - '.agents/**'
       - '.bob/**'
+      - '.claude/**'
+      - '.vscode/**'
+      - '.gitignore'
+      - 'LICENSE'
   push:
     branches: [main]
     paths-ignore:
       - 'docs/**'
       - '*.md'
+      - '.agents/**'
       - '.bob/**'
+      - '.claude/**'
+      - '.vscode/**'
+      - '.gitignore'
+      - 'LICENSE'
 
 permissions:
   contents: read
@@ -28,6 +38,18 @@ jobs:
         run: uv run ruff check .
       - name: Test
         run: uv run pytest
+
+  vendored-drift:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - name: Sync dependencies
+        run: uv sync --dev
+      - name: Run vendored drift check
+        run: |
+          python3 scripts/sync_vendored.py --check
 
   # FR-5 lives here, not on the user's machine (docs/architecture.md,
   # Deployment Architecture): generate a real project against the

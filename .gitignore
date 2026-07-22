@@ -221,3 +221,5 @@ docs/handoff/
 .bob/reviews/
 
 .vscode/
+.sync-cache/
+

@@ -45,6 +45,23 @@ class ItemPath:
 
 
 @dataclass(frozen=True)
+class VendoredPin:
+    """One pinned vendored source (external repo at an exact commit).
+
+    `repo` is in `owner/name` shape. `commit` is a 40-char lowercase hex sha.
+    `license` is a non-empty SPDX-style string (e.g. "MIT"). `paths` maps each
+    upstream source path (relative to the cloned repo root) to its destination
+    path under `templates/` (relative to the repo root) — literal path pairs,
+    no gitwildmatch patterns.
+    """
+
+    repo: str
+    commit: str
+    license: str
+    paths: tuple[ItemPath, ...]
+
+
+@dataclass(frozen=True)
 class CatalogItem:
     id: str
     description: str
@@ -53,6 +70,7 @@ class CatalogItem:
     paths: tuple[ItemPath, ...] = ()
     pin: str | None = None
     inject: Injection | None = None
+    vendored_repo: str | None = None
 
 
 @dataclass(frozen=True)
@@ -63,4 +81,6 @@ class Manifest:
     upstream: dict[str, UpstreamPin]
     overlay_version: str
     components: dict[str, tuple[CatalogItem, ...]]
+    vendored: tuple[VendoredPin, ...] = ()
+
 

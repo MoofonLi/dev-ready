@@ -11,7 +11,14 @@ from importlib import resources
 from pathlib import Path
 
 from dev_ready.errors import ManifestError
-from dev_ready.manifest.models import CatalogItem, Injection, ItemPath, Manifest, UpstreamPin
+from dev_ready.manifest.models import (
+    CatalogItem,
+    Injection,
+    ItemPath,
+    Manifest,
+    UpstreamPin,
+    VendoredPin,
+)
 
 SUPPORTED_MANIFEST_VERSION = 1
 ALLOWED_MODES = ("builtin", "vendor", "pinned-dependency")
@@ -69,7 +76,8 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
         raise ManifestError(f"{source}: 'upstream' must be a non-empty object")
     upstream = {name: _parse_pin(name, entry, source) for name, entry in upstream_raw.items()}
 
-    components = _parse_components(data, source)
+    vendored = _parse_vendored(data, source)
+    components = _parse_components(data, source, vendored)
 
     overlay_version = data.get("overlay_version")
     if not isinstance(overlay_version, str) or not overlay_version:
@@ -80,7 +88,9 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
         upstream=upstream,
         overlay_version=overlay_version,
         components=components,
+        vendored=vendored,
     )
+
 
 
 def _parse_pin(name: str, entry: object, source: str) -> UpstreamPin:
@@ -173,7 +183,76 @@ def _parse_path_list(name: str, entry: dict, source: str, field: str) -> tuple[s
     return tuple(patterns)
 
 
-def _parse_components(data: dict, source: str) -> dict[str, tuple[CatalogItem, ...]]:
+def _parse_vendored_pin(index: int, entry: object, source: str) -> VendoredPin:
+    if not isinstance(entry, dict):
+        raise ManifestError(f"{source}: vendored entry[{index}] must be an object")
+
+    repo = entry.get("repo")
+    if not isinstance(repo, str) or not repo or not _REPO_PATTERN.fullmatch(repo):
+        raise ManifestError(
+            f"{source}: vendored entry[{index}] repo must look like 'owner/name', got {repo!r}"
+        )
+
+    commit = entry.get("commit")
+    if not isinstance(commit, str) or not commit or not _COMMIT_PATTERN.fullmatch(commit):
+        raise ManifestError(
+            f"{source}: vendored entry[{index}] commit must be a 40-character lowercase hex sha, got {commit!r}"
+        )
+
+    lic = entry.get("license")
+    if not isinstance(lic, str) or not lic:
+        raise ManifestError(
+            f"{source}: vendored entry[{index}] field 'license' must be a non-empty string"
+        )
+
+    paths_raw = entry.get("paths")
+    parsed_paths: list[ItemPath] = []
+    if paths_raw is not None:
+        if not isinstance(paths_raw, list):
+            raise ManifestError(
+                f"{source}: vendored entry[{index}] field 'paths' must be a list"
+            )
+        for path_entry in paths_raw:
+            if not isinstance(path_entry, dict):
+                raise ManifestError(
+                    f"{source}: vendored entry[{index}] path entry must be an object"
+                )
+            src = _parse_catalog_path("vendored", f"entry[{index}]", "src", path_entry.get("src"), source)
+            dest = _parse_catalog_path("vendored", f"entry[{index}]", "dest", path_entry.get("dest"), source)
+            parsed_paths.append(ItemPath(src=src, dest=dest))
+
+    return VendoredPin(
+        repo=repo,
+        commit=commit,
+        license=lic,
+        paths=tuple(parsed_paths),
+    )
+
+
+def _parse_vendored(data: dict, source: str) -> tuple[VendoredPin, ...]:
+    if "vendored" not in data:
+        return ()
+    raw = data["vendored"]
+    if not isinstance(raw, list):
+        raise ManifestError(f"{source}: 'vendored' must be a list")
+
+    pins: list[VendoredPin] = []
+    seen: set[tuple[str, str]] = set()
+    for idx, entry in enumerate(raw):
+        pin = _parse_vendored_pin(idx, entry, source)
+        key = (pin.repo, pin.commit)
+        if key in seen:
+            raise ManifestError(
+                f"{source}: duplicate vendored entry for repo {pin.repo!r} and commit {pin.commit!r}"
+            )
+        seen.add(key)
+        pins.append(pin)
+    return tuple(pins)
+
+
+def _parse_components(
+    data: dict, source: str, vendored: tuple[VendoredPin, ...]
+) -> dict[str, tuple[CatalogItem, ...]]:
     raw = data.get("components")
     if not isinstance(raw, dict):
         raise ManifestError(f"{source}: 'components' must be an object")
@@ -230,6 +309,27 @@ def _parse_components(data: dict, source: str) -> dict[str, tuple[CatalogItem, .
                     f"{source}: component '{comp_name}' item '{item_id}' field 'license' must be a non-empty string"
                 )
 
+            vendored_repo_val = item_entry.get("vendored_repo")
+            if mode == "vendor":
+                if not isinstance(vendored_repo_val, str) or not vendored_repo_val:
+                    raise ManifestError(
+                        f"{source}: component '{comp_name}' item '{item_id}' with mode 'vendor'"
+                        " must have a non-empty 'vendored_repo' field"
+                    )
+                # cross-reference: the named repo must appear in vendored
+                vendored_repos = {v.repo for v in vendored}
+                if vendored_repo_val not in vendored_repos:
+                    raise ManifestError(
+                        f"{source}: component '{comp_name}' item '{item_id}' references"
+                        f" vendored_repo {vendored_repo_val!r} which is not in the 'vendored' section"
+                    )
+            else:
+                if vendored_repo_val is not None:
+                    raise ManifestError(
+                        f"{source}: component '{comp_name}' item '{item_id}' field 'vendored_repo'"
+                        " is only allowed for mode 'vendor' items"
+                    )
+
             paths_raw = item_entry.get("paths")
             parsed_paths: list[ItemPath] = []
             if paths_raw is not None:
@@ -274,6 +374,7 @@ def _parse_components(data: dict, source: str) -> dict[str, tuple[CatalogItem, .
                     paths=tuple(parsed_paths),
                     pin=pin,
                     inject=inject,
+                    vendored_repo=vendored_repo_val if mode == "vendor" else None,
                 )
             )
 

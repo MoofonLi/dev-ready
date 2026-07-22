@@ -1,0 +1,51 @@
+name: Monthly vendored bump
+
+on:
+  schedule:
+    - cron: "0 6 1 * *"  # 1st of every month, 06:00 UTC
+  workflow_dispatch:
+
+# For CI to run automatically on the opened PR, this workflow must use a token
+# other than the default GITHUB_TOKEN. See the IMPORTANT note in upstream-bump.yml.
+# Set up a fine-grained PAT with contents:write + pull-requests:write and save
+# it as the BUMP_PR_TOKEN repository secret. If the secret is missing, the PR
+# must be closed and reopened manually (or pushed to) to trigger CI.
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: vendored-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve latest commits and update manifest
+        id: bump
+        run: python3 scripts/bump_vendored.py
+
+      - name: Run vendored sync
+        if: steps.bump.outputs.changed == 'true'
+        run: python3 scripts/sync_vendored.py
+
+      - name: Open pull request
+        if: steps.bump.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.BUMP_PR_TOKEN || secrets.GITHUB_TOKEN }}
+          commit-message: "chore: bump vendored pins"
+          title: "chore: bump vendored pins"
+          branch: chore/vendored-bump
+          delete-branch: true
+          body: |
+            Bumps vendored repo commit pins in `src/dev_ready/manifest.json` and
+            re-materializes snapshots under `templates/`.
+
+            **Bump checklist (complete before merging):**
+            - [ ] Re-check the upstream LICENSE file for each bumped repo at the new commit — confirm the license has not changed from what `manifest.json` records.
+            - [ ] Review the diff in `templates/` for each vendored repo — confirm no unexpected content was added.
+            - [ ] CI `vendored-drift` job passes.

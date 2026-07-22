@@ -561,4 +561,146 @@ def test_builtin_items_regression() -> None:
     assert skills_items["react-doctor"].inject.kind == "npm-dev-dependency"
 
 
+VALID_VENDORED_ENTRY = {
+    "repo": "JuliusBrussee/caveman",
+    "commit": "a" * 40,
+    "license": "MIT",
+    "paths": [{"src": "SKILL.md", "dest": "templates/claude/skills/caveman/SKILL.md"}],
+}
+
+
+def test_parse_manifest_with_empty_vendored_list() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["vendored"] = []
+    manifest = parse_manifest(json.dumps(data))
+    assert manifest.vendored == ()
+
+
+def test_parse_manifest_with_absent_vendored_key() -> None:
+    data = json.loads(json.dumps(VALID))
+    data.pop("vendored", None)
+    manifest = parse_manifest(json.dumps(data))
+    assert manifest.vendored == ()
+
+
+def test_parse_manifest_with_valid_vendored_entry() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["vendored"] = [VALID_VENDORED_ENTRY]
+    manifest = parse_manifest(json.dumps(data))
+    assert len(manifest.vendored) == 1
+    v = manifest.vendored[0]
+    assert v.repo == "JuliusBrussee/caveman"
+    assert v.commit == "a" * 40
+    assert v.license == "MIT"
+    assert len(v.paths) == 1
+    assert v.paths[0].src == "SKILL.md"
+    assert v.paths[0].dest == "templates/claude/skills/caveman/SKILL.md"
+
+
+def test_vendored_39hex_commit_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    bad_entry = json.loads(json.dumps(VALID_VENDORED_ENTRY))
+    bad_entry["commit"] = "a" * 39
+    data["vendored"] = [bad_entry]
+    with pytest.raises(ManifestError, match="commit"):
+        parse_manifest(json.dumps(data))
+
+
+def test_vendored_uppercase_commit_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    bad_entry = json.loads(json.dumps(VALID_VENDORED_ENTRY))
+    bad_entry["commit"] = "A" * 40
+    data["vendored"] = [bad_entry]
+    with pytest.raises(ManifestError, match="commit"):
+        parse_manifest(json.dumps(data))
+
+
+def test_vendored_bad_repo_shape_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    bad_entry = json.loads(json.dumps(VALID_VENDORED_ENTRY))
+    bad_entry["repo"] = "not-a-repo"
+    data["vendored"] = [bad_entry]
+    with pytest.raises(ManifestError, match="repo"):
+        parse_manifest(json.dumps(data))
+
+
+def test_vendored_dotdot_path_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    bad_entry = json.loads(json.dumps(VALID_VENDORED_ENTRY))
+    bad_entry["paths"] = [{"src": "../outside", "dest": "templates/foo"}]
+    data["vendored"] = [bad_entry]
+    with pytest.raises(ManifestError, match=r"relative path without '\.\.'"):
+        parse_manifest(json.dumps(data))
+
+
+def test_vendored_leading_slash_path_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    bad_entry = json.loads(json.dumps(VALID_VENDORED_ENTRY))
+    bad_entry["paths"] = [{"src": "/README.md", "dest": "templates/foo"}]
+    data["vendored"] = [bad_entry]
+    with pytest.raises(ManifestError, match=r"relative path without '\.\.'"):
+        parse_manifest(json.dumps(data))
+
+
+def test_vendored_empty_license_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    bad_entry = json.loads(json.dumps(VALID_VENDORED_ENTRY))
+    bad_entry["license"] = ""
+    data["vendored"] = [bad_entry]
+    with pytest.raises(ManifestError, match="license"):
+        parse_manifest(json.dumps(data))
+
+
+def test_vendored_duplicate_repo_commit_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["vendored"] = [VALID_VENDORED_ENTRY, VALID_VENDORED_ENTRY]
+    with pytest.raises(ManifestError, match="duplicate"):
+        parse_manifest(json.dumps(data))
+
+
+def test_vendor_mode_item_without_vendored_repo_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["vendored"] = [VALID_VENDORED_ENTRY]
+    data["components"]["skills"]["items"].append({
+        "id": "caveman",
+        "description": "Caveman skill",
+        "mode": "vendor",
+        "license": "MIT",
+        "paths": [{"src": "SKILL.md", "dest": "templates/claude/skills/caveman/SKILL.md"}],
+    })
+    with pytest.raises(ManifestError, match="vendored_repo"):
+        parse_manifest(json.dumps(data))
+
+
+def test_vendor_mode_item_dangling_vendored_repo_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["vendored"] = [VALID_VENDORED_ENTRY]
+    data["components"]["skills"]["items"].append({
+        "id": "caveman",
+        "description": "Caveman skill",
+        "mode": "vendor",
+        "license": "MIT",
+        "vendored_repo": "other/repo",
+        "paths": [{"src": "SKILL.md", "dest": "templates/claude/skills/caveman/SKILL.md"}],
+    })
+    with pytest.raises(ManifestError, match="not in the 'vendored' section"):
+        parse_manifest(json.dumps(data))
+
+
+def test_vendored_repo_on_non_vendor_item_rejected() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["vendored"] = [VALID_VENDORED_ENTRY]
+    data["components"]["skills"]["items"].append({
+        "id": "builtin-skill",
+        "description": "Builtin skill with vendored_repo",
+        "mode": "builtin",
+        "license": "MIT",
+        "vendored_repo": "JuliusBrussee/caveman",
+        "paths": [{"src": "claude/skills/foo", "dest": ".claude/skills/foo"}],
+    })
+    with pytest.raises(ManifestError, match="only allowed for mode 'vendor'"):
+        parse_manifest(json.dumps(data))
+
+
+
 

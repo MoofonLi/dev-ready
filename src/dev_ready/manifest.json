@@ -37,6 +37,7 @@
       ]
     }
   },
+  "vendored": [],
   "components": {
     "skills": {
       "items": [

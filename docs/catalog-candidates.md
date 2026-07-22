@@ -69,6 +69,15 @@ if third-party) → removed from this file.
   applicability field; verify/stamp/upgrade must be template-aware.
 - Target: post-v0.6; requires its own ADR before implementation.
 
+### D-3. Generation progress/status indicator (CLI UX)
+
+- Decision: Add step-based progress feedback / spinner during generation
+  (fetch → overlay → verify → finalize).
+- Motivation: Prevents the CLI from appearing frozen/stuck during multi-second
+  template downloading, Copier rendering, overlay copying, and verification.
+- Implementation note: Must check `sys.stdout.isatty()` and gracefully fallback
+  to plain text log lines in non-interactive/CI environments.
+
 ---
 
 ## Init flow (agreed shape, v0.3 baseline + preserved decisions)
@@ -93,8 +102,8 @@ if third-party) → removed from this file.
    - memory (exclusive: pick one): code-memory | graphify [candidate]
    - dev/quality (multi): react-doctor, security-audit [v0.4], caveman
      [v0.4], ...
-6. Generate → verify → stamp (`.dev-ready.json` records language, template,
-   items, pins)
+6. Generate (with step-based status/spinner feedback, D-3) → verify → stamp
+   (`.dev-ready.json` records language, template, items, pins)
 
 Catalog schema additions implied (fold into FR-14 while the CLI contract is
 open): item `category`, per-category `exclusive: bool`, and later
