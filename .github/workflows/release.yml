@@ -35,7 +35,7 @@ jobs:
           /tmp/dev-ready-smoke-venv/bin/dev-ready --version
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.14.0
+        uses: pypa/gh-action-pypi-publish@v1.14.1
 
       - name: Create GitHub Release
         run: gh release create "$GITHUB_REF_NAME" --generate-notes dist/*
