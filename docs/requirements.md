@@ -55,8 +55,8 @@ Agreed 2026-07-17. Full detail, rationale, and per-version grouping live in
 - FR-16 (v0.4, shipped). Vendored snapshot sync tooling + CI byte-equality drift guard + monthly vendored-bump workflow.
 - FR-17 (v0.4, shipped). MIT-wave vendoring (curated subsets, each a catalog item): caveman, mattpocock/skills, cloudflare/security-audit-skill, awesome-design-md.
 - FR-18 (v0.4, shipped). THIRD_PARTY_NOTICES ↔ manifest `vendored` sync check in CI.
-- FR-19 (v0.5). anthropics/skills Apache 2.0 example subset with NOTICE propagation (document-processing skills permanently excluded).
-- FR-20 (v0.5). Karpathy guardrails content in generated CLAUDE.md — MIT per the upstream README declaration (no standalone LICENSE file; pinned commit preserves the grant), with attribution in NOTICES.
+- FR-19 (v0.5, shipped). anthropics/skills Apache 2.0 example subset with NOTICE propagation (document-processing skills permanently excluded).
+- FR-20 (v0.5, shipped). Karpathy guardrails content in generated CLAUDE.md — MIT per the upstream README declaration (no standalone LICENSE file; pinned commit preserves the grant), with attribution in NOTICES.
 - FR-21 (v0.6). `dev-ready check`: read-only validation of an existing project against its stamp and the CLI's manifest.
 - FR-22 (v0.6). `dev-ready upgrade`: re-apply overlay-managed files only (per the stamp's item selection); never touches upstream application code; never silently overwrites user edits.
 
@@ -84,7 +84,7 @@ NFR-5. Cross-platform: macOS, Linux, Windows.
 2. v0.2: prune list (FR-7), project README (FR-8), verify leak guard (FR-9), agent-team overlay (FR-10). DONE (v0.2.2).
 3. v0.3: pinned tool integrations + selection — generation stamp (FR-11), codebase-memory MCP (FR-12), react-doctor (FR-13), item-level selection (FR-14). See [version-plan.md](version-plan.md). DONE (v0.3.0).
 4. v0.4: vendoring infrastructure + MIT wave (FR-15..FR-18). DONE (v0.4.0).
-5. v0.5: Apache wave + pending items (FR-19, FR-20).
+5. v0.5: Apache wave + karpathy guardrails (FR-19, FR-20). DONE (v0.5.0).
 6. v0.6: lifecycle commands — `check` / `upgrade` (FR-21, FR-22).
 7. Beyond: additional base templates; possible Web UI companion (decisions deferred).
 

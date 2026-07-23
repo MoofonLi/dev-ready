@@ -12,8 +12,8 @@ The upstream template is pinned to a CI-verified commit (never an untested "late
 
 A generated project based on [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) (FastAPI, React, SQLModel, PostgreSQL, Docker Compose), plus an AI tooling overlay so it works well with coding agents out of the box:
 
-- `CLAUDE.md` — project instructions for Claude Code
-- Claude Code skills — seven pre-configured skills selectable at generation time:
+- `CLAUDE.md` — project instructions for Claude Code, including Karpathy-derived development guardrails (MIT, per the upstream README)
+- Claude Code skills — nine pre-configured skills selectable at generation time:
   - **project-orientation** (built-in) — codebase orientation helper
   - **react-doctor** (pinned devDependency) — frontend dependency health checks
   - **caveman** (vendored, MIT) — token-discipline communication mode
@@ -21,6 +21,8 @@ A generated project based on [fastapi/full-stack-fastapi-template](https://githu
   - **diagnosing-bugs** (vendored, MIT) — diagnosis loop for hard bugs
   - **code-review** (vendored, MIT) — review against coding standards and spec
   - **security-audit** (vendored, MIT) — multi-phase security audit
+  - **webapp-testing** (vendored, Apache-2.0) — browser-automation end-to-end testing
+  - **frontend-design** (vendored, Apache-2.0) — frontend UI design methodology
 - MCP server configuration (`mcp.json`)
 - Design-doc templates (`architecture.md`, `requirements.md`)
 - Agent-team handoff scaffold (`docs/handoffs/` — a document-driven multi-agent workflow: Tech Lead → Senior → Junior → QA/Security/SRE)
