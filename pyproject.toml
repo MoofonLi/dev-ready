@@ -29,6 +29,7 @@ packages = ["src/dev_ready"]
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
+extend-exclude = ["src/dev_ready/templates"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

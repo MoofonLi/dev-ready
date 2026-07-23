@@ -93,6 +93,21 @@
           "dest": "src/dev_ready/templates/docs/design-linear.md"
         }
       ]
+    },
+    {
+      "repo": "anthropics/skills",
+      "commit": "1f630fdf9259cec4a14913127dfd7c3b69ef72eb",
+      "license": "Apache-2.0",
+      "paths": [
+        {
+          "src": "skills/webapp-testing",
+          "dest": "src/dev_ready/templates/claude/skills/webapp-testing"
+        },
+        {
+          "src": "skills/frontend-design",
+          "dest": "src/dev_ready/templates/claude/skills/frontend-design"
+        }
+      ]
     }
   ],
   "components": {
@@ -188,6 +203,32 @@
             {
               "src": "claude/skills/code-review",
               "dest": ".claude/skills/code-review"
+            }
+          ]
+        },
+        {
+          "id": "webapp-testing",
+          "description": "Browser-automation skill for testing web apps end-to-end — drives a headless browser to exercise UI flows, capture console logs, and discover elements. Vendored from anthropics/skills (Apache-2.0).",
+          "mode": "vendor",
+          "license": "Apache-2.0",
+          "vendored_repo": "anthropics/skills",
+          "paths": [
+            {
+              "src": "claude/skills/webapp-testing",
+              "dest": ".claude/skills/webapp-testing"
+            }
+          ]
+        },
+        {
+          "id": "frontend-design",
+          "description": "Methodology skill for how to build high-quality frontend UI — layout, spacing, visual hierarchy, and interaction polish. Distinct from the awesome-design-md DESIGN.md reference templates in the docs component (which show what good design systems like Stripe and Linear look like): this is the how-to process, those are the what-good-looks-like references. Vendored from anthropics/skills (Apache-2.0).",
+          "mode": "vendor",
+          "license": "Apache-2.0",
+          "vendored_repo": "anthropics/skills",
+          "paths": [
+            {
+              "src": "claude/skills/frontend-design",
+              "dest": ".claude/skills/frontend-design"
             }
           ]
         }

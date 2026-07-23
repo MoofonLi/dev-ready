@@ -53,12 +53,17 @@ def parse_notices_content(content: str) -> dict[str, dict[str, str]]:
     return results
 
 
-def check_notices_sync(manifest_path: Path, notices_path: Path) -> list[str]:
+def check_notices_sync(
+    manifest_path: Path, notices_path: Path, repo_root: Path | None = None
+) -> list[str]:
     """Return a list of drift error messages between manifest and NOTICES file."""
     if not manifest_path.exists():
         return [f"manifest file missing: {manifest_path}"]
     if not notices_path.exists():
         return [f"NOTICES file missing: {notices_path}"]
+
+    if repo_root is None:
+        repo_root = manifest_path.resolve().parents[2]
 
     manifest = load_manifest(manifest_path)
     manifest_map = {
@@ -71,8 +76,10 @@ def check_notices_sync(manifest_path: Path, notices_path: Path) -> list[str]:
 
     diffs: list[str] = []
 
-    # Check direction 1: manifest -> NOTICES
-    for repo, info in manifest_map.items():
+    # Check direction 1: manifest -> NOTICES & Apache LICENSE presence
+    for entry in manifest.vendored:
+        repo = entry.repo
+        info = {"commit": entry.commit.lower(), "license": entry.license}
         if repo not in notices_map:
             diffs.append(f"NOTICES mismatch: {repo} is in manifest.json vendored but missing from THIRD_PARTY_NOTICES.md")
         else:
@@ -85,6 +92,23 @@ def check_notices_sync(manifest_path: Path, notices_path: Path) -> list[str]:
                 diffs.append(
                     f"NOTICES mismatch: {repo} license mismatch (manifest: {info['license']}, NOTICES: {notice_info['license']})"
                 )
+
+        if entry.license == "Apache-2.0":
+            for path_map in entry.paths:
+                committed = repo_root / path_map.dest
+                has_license = False
+                if committed.is_dir():
+                    for file_path in committed.rglob("*"):
+                        if file_path.is_file() and file_path.name.lower().startswith("license"):
+                            has_license = True
+                            break
+                elif committed.is_file() and committed.name.lower().startswith("license"):
+                    has_license = True
+
+                if not has_license:
+                    diffs.append(
+                        f"NOTICES mismatch: Apache-2.0 entry {repo} path '{path_map.dest}' has no LICENSE file in its snapshot"
+                    )
 
     # Check direction 2: NOTICES -> manifest
     for repo in notices_map:

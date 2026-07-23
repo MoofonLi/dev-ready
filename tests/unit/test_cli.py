@@ -192,6 +192,8 @@ def test_build_answers_defaults() -> None:
             "tdd",
             "diagnosing-bugs",
             "code-review",
+            "webapp-testing",
+            "frontend-design",
         }
     )
     assert answers.mcp_items == frozenset({"mcp-config", "code-memory"})
@@ -252,6 +254,8 @@ def test_skills_and_mcp_item_flag_variations() -> None:
             "tdd",
             "diagnosing-bugs",
             "code-review",
+            "webapp-testing",
+            "frontend-design",
         }
     )
     assert ans.mcp_items == frozenset()
@@ -268,7 +272,7 @@ def test_unknown_item_id_exits_2(capsys) -> None:
     assert main(["init", "my-app", "--yes", "--skills", "bogus"]) == 2
     err = capsys.readouterr().err
     assert "unknown skills item ids: ['bogus']" in err
-    assert "valid ids: ['caveman', 'code-review', 'diagnosing-bugs', 'project-orientation', 'react-doctor', 'security-audit', 'tdd']" in err
+    assert "valid ids: ['caveman', 'code-review', 'diagnosing-bugs', 'frontend-design', 'project-orientation', 'react-doctor', 'security-audit', 'tdd', 'webapp-testing']" in err
 
 
 def test_conflicting_flags_exits_2(capsys) -> None:

@@ -37,6 +37,13 @@ dev-ready does not ship a copy of this template inside the wheel. At generation 
 - Source: https://github.com/VoltAgent/awesome-design-md
 - Subset: Selected `DESIGN.md` templates (`design-md/stripe/DESIGN.md`, `design-md/linear.app/DESIGN.md`) vendored into `src/dev_ready/templates/docs/`.
 
+## anthropics/skills
+
+- License: Apache-2.0
+- Pinned Commit: 1f630fdf9259cec4a14913127dfd7c3b69ef72eb
+- Source: https://github.com/anthropics/skills
+- Subset: `skills/webapp-testing` and `skills/frontend-design` vendored into `src/dev_ready/templates/claude/skills/`. Each skill carries its own Apache-2.0 `LICENSE.txt` inside its snapshot, which ships into every generated project that selects the skill.
+
 ---
 
 Everything else dev-ready writes into a generated project — `CLAUDE.md`, the built-in Claude Code skills overlay (`project-orientation`), MCP configuration, and base design-doc templates under `src/dev_ready/templates/` — is original to this project and is not derived from a third-party source.

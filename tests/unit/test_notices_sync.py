@@ -202,3 +202,163 @@ def test_check_notices_sync_detects_commit_or_license_mismatch(tmp_path: Path) -
     diffs = check_notices_sync_mod.check_notices_sync(manifest_path, notices_path)
     assert len(diffs) == 1
     assert "commit mismatch" in diffs[0]
+
+
+def test_check_notices_sync_apache_license_presence(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "src" / "dev_ready" / "manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    notices_path = tmp_path / "THIRD_PARTY_NOTICES.md"
+
+    commit = "a" * 40
+    dest_dir = "src/dev_ready/templates/claude/skills/apache-skill"
+    (tmp_path / dest_dir).mkdir(parents=True)
+    (tmp_path / dest_dir / "LICENSE.txt").write_text("Apache License 2.0", encoding="utf-8")
+
+    manifest_path.write_text(
+        f"""{{
+  "manifest_version": 1,
+  "upstream": {{
+    "base_template": {{
+      "repo": "fastapi/full-stack-fastapi-template",
+      "ref": "master",
+      "commit": "{commit}",
+      "license": "MIT"
+    }}
+  }},
+  "vendored": [
+    {{
+      "repo": "owner/apache-repo",
+      "commit": "{commit}",
+      "license": "Apache-2.0",
+      "paths": [
+        {{
+          "src": "skills/apache-skill",
+          "dest": "{dest_dir}"
+        }}
+      ]
+    }}
+  ],
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "overlay_version": "0.1.0"
+}}""",
+        encoding="utf-8",
+    )
+
+    notices_path.write_text(
+        f"""# Notices
+## owner/apache-repo
+- License: Apache-2.0
+- Pinned Commit: {commit}
+""",
+        encoding="utf-8",
+    )
+
+    diffs = check_notices_sync_mod.check_notices_sync(manifest_path, notices_path, repo_root=tmp_path)
+    assert diffs == []
+
+
+def test_check_notices_sync_apache_license_missing_fails(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "src" / "dev_ready" / "manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    notices_path = tmp_path / "THIRD_PARTY_NOTICES.md"
+
+    commit = "a" * 40
+    dest_dir = "src/dev_ready/templates/claude/skills/apache-skill"
+    (tmp_path / dest_dir).mkdir(parents=True)
+    # Intentionally omit LICENSE.txt
+
+    manifest_path.write_text(
+        f"""{{
+  "manifest_version": 1,
+  "upstream": {{
+    "base_template": {{
+      "repo": "fastapi/full-stack-fastapi-template",
+      "ref": "master",
+      "commit": "{commit}",
+      "license": "MIT"
+    }}
+  }},
+  "vendored": [
+    {{
+      "repo": "owner/apache-repo",
+      "commit": "{commit}",
+      "license": "Apache-2.0",
+      "paths": [
+        {{
+          "src": "skills/apache-skill",
+          "dest": "{dest_dir}"
+        }}
+      ]
+    }}
+  ],
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "overlay_version": "0.1.0"
+}}""",
+        encoding="utf-8",
+    )
+
+    notices_path.write_text(
+        f"""# Notices
+## owner/apache-repo
+- License: Apache-2.0
+- Pinned Commit: {commit}
+""",
+        encoding="utf-8",
+    )
+
+    diffs = check_notices_sync_mod.check_notices_sync(manifest_path, notices_path, repo_root=tmp_path)
+    assert len(diffs) == 1
+    assert "has no LICENSE file in its snapshot" in diffs[0]
+
+
+def test_check_notices_sync_mit_without_license_does_not_fail(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "src" / "dev_ready" / "manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    notices_path = tmp_path / "THIRD_PARTY_NOTICES.md"
+
+    commit = "a" * 40
+    dest_dir = "src/dev_ready/templates/claude/skills/mit-skill"
+    (tmp_path / dest_dir).mkdir(parents=True)
+    # No LICENSE file in MIT dest dir
+
+    manifest_path.write_text(
+        f"""{{
+  "manifest_version": 1,
+  "upstream": {{
+    "base_template": {{
+      "repo": "fastapi/full-stack-fastapi-template",
+      "ref": "master",
+      "commit": "{commit}",
+      "license": "MIT"
+    }}
+  }},
+  "vendored": [
+    {{
+      "repo": "owner/mit-repo",
+      "commit": "{commit}",
+      "license": "MIT",
+      "paths": [
+        {{
+          "src": "skills/mit-skill",
+          "dest": "{dest_dir}"
+        }}
+      ]
+    }}
+  ],
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "overlay_version": "0.1.0"
+}}""",
+        encoding="utf-8",
+    )
+
+    notices_path.write_text(
+        f"""# Notices
+## owner/mit-repo
+- License: MIT
+- Pinned Commit: {commit}
+""",
+        encoding="utf-8",
+    )
+
+    diffs = check_notices_sync_mod.check_notices_sync(manifest_path, notices_path, repo_root=tmp_path)
+    assert diffs == []

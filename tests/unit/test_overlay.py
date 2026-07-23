@@ -493,7 +493,17 @@ def test_apply_overlay_writes_vendored_skills_and_docs(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
 
-    skills_to_test = frozenset({"caveman", "security-audit", "tdd", "diagnosing-bugs", "code-review"})
+    skills_to_test = frozenset(
+        {
+            "caveman",
+            "security-audit",
+            "tdd",
+            "diagnosing-bugs",
+            "code-review",
+            "webapp-testing",
+            "frontend-design",
+        }
+    )
     answers = _answers(tmp_path, skills_items=skills_to_test, include_docs=True)
 
     written = apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
@@ -517,7 +527,15 @@ def test_apply_overlay_deselected_vendored_skills_are_absent(tmp_path: Path) -> 
 
     written = apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
 
-    all_vendored_skills = {"caveman", "security-audit", "tdd", "diagnosing-bugs", "code-review"}
+    all_vendored_skills = {
+        "caveman",
+        "security-audit",
+        "tdd",
+        "diagnosing-bugs",
+        "code-review",
+        "webapp-testing",
+        "frontend-design",
+    }
     for skill in all_vendored_skills:
         assert not (project_dir / ".claude" / "skills" / skill).exists()
         assert Path(f".claude/skills/{skill}/SKILL.md") not in written
@@ -537,10 +555,69 @@ def test_apply_overlay_mixed_vendored_skills_selection(tmp_path: Path) -> None:
     assert (project_dir / ".claude" / "skills" / "caveman" / "SKILL.md").exists()
     assert Path(".claude/skills/caveman/SKILL.md") in written
 
-    deselected_vendored = {"security-audit", "tdd", "diagnosing-bugs", "code-review"}
+    deselected_vendored = {
+        "security-audit",
+        "tdd",
+        "diagnosing-bugs",
+        "code-review",
+        "webapp-testing",
+        "frontend-design",
+    }
     for skill in deselected_vendored:
         assert not (project_dir / ".claude" / "skills" / skill).exists()
         assert Path(f".claude/skills/{skill}/SKILL.md") not in written
+
+
+def test_anthropics_skills_selection_and_license_propagation(tmp_path: Path) -> None:
+    manifest = load_default_manifest()
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    answers = _answers(
+        tmp_path,
+        skills_items=frozenset({"webapp-testing", "frontend-design"}),
+    )
+
+    written = apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
+
+    expected_files = [
+        ".claude/skills/webapp-testing/SKILL.md",
+        ".claude/skills/webapp-testing/LICENSE.txt",
+        ".claude/skills/webapp-testing/scripts/with_server.py",
+        ".claude/skills/webapp-testing/examples/console_logging.py",
+        ".claude/skills/frontend-design/SKILL.md",
+        ".claude/skills/frontend-design/LICENSE.txt",
+    ]
+
+    for rel_path in expected_files:
+        full_path = project_dir / rel_path
+        assert full_path.exists(), f"Expected {rel_path} to exist"
+        assert full_path.stat().st_size > 0, f"Expected {rel_path} to be non-empty"
+        assert Path(rel_path) in written
+
+
+def test_anthropics_skills_deselected_not_written(tmp_path: Path) -> None:
+    manifest = load_default_manifest()
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    answers = _answers(tmp_path, skills_items=frozenset({"project-orientation"}))
+
+    apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
+
+    assert not (project_dir / ".claude" / "skills" / "webapp-testing").exists()
+    assert not (project_dir / ".claude" / "skills" / "frontend-design").exists()
+
+
+def test_render_stamp_records_anthropics_pin(tmp_path: Path) -> None:
+    manifest = load_default_manifest()
+    answers = _answers(tmp_path, skills_items=frozenset({"webapp-testing"}))
+    raw = render_stamp(answers, PIN, manifest.components, manifest.vendored)
+    data = json.loads(raw)
+    assert data["stamp_version"] == 2
+    items = data["components"]["skills"]["items"]
+    webapp_item = next(i for i in items if i["id"] == "webapp-testing")
+    assert webapp_item["pin"] == "1f630fdf9259cec4a14913127dfd7c3b69ef72eb"
 
 
 
