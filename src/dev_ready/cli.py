@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from dev_ready import __version__
+from dev_ready.check import check_project
 from dev_ready.errors import AbortedError, DevReadyError, InvalidArgumentsError
 from dev_ready.generate import generate
 from dev_ready.manifest import CatalogItem, load_default_manifest
@@ -69,7 +70,24 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument(
         "--no-agents", action="store_true", help="Exclude the agent-team handoff scaffold (docs/handoffs/)."
     )
+
+    check_parser = subparsers.add_parser(
+        "check", help="Inspect an existing project for structural or pin drift"
+    )
+    check_parser.add_argument(
+        "target_dir",
+        nargs="?",
+        type=Path,
+        default=Path("."),
+        help="Target project directory to check (default: .)",
+    )
+    check_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output report in JSON format",
+    )
     return parser
+
 
 
 def _resolve_item_selection(
@@ -223,6 +241,13 @@ def _run_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_check(args: argparse.Namespace) -> int:
+    target_dir = args.target_dir if args.target_dir is not None else Path(".")
+    report = check_project(target_dir, json_output=args.json)
+    print(report, end="")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -232,6 +257,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "init":
             return _run_init(args)
+        if args.command == "check":
+            return _run_check(args)
         raise InvalidArgumentsError(f"unknown command: {args.command}")
     except AbortedError:
         print("aborted: nothing was written", file=sys.stderr)
@@ -239,3 +266,4 @@ def main(argv: list[str] | None = None) -> int:
     except DevReadyError as error:
         print(f"error: {error}", file=sys.stderr)
         return error.exit_code
+

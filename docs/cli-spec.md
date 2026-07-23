@@ -21,7 +21,18 @@ Generate a new project.
 
 Unknown item ids in `--skills` or `--mcp` fail fast with an invalid-arguments error (exit 2) listing valid item ids. Conflicting flags (e.g. `--no-skills` with `--skills <id>`) exit 2.
 
-Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification.
+Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification; 6 stamp missing or invalid; 7 drift detected.
+
+### `dev-ready check [PATH]`
+
+Inspect an existing generated project directory against its `.dev-ready.json` stamp and the running CLI manifest. Read-only operation.
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `PATH` | path | `.` | Target project directory to check |
+| `--json` | bool | false | Output report in JSON format |
+
+Exit codes: 0 clean (no drift); 6 stamp missing or unparseable/invalid (including projects generated before v0.3); 7 drift detected.
 
 ### `dev-ready --version` / `dev-ready --help`
 
@@ -44,5 +55,6 @@ Declining the confirmation, or cancelling any prompt (Ctrl-C), prints `aborted: 
 
 ## Planned (see docs/version-plan.md)
 
-- v0.6 — `dev-ready check` (validate an existing generated project against its `.dev-ready.json` stamp and the manifest) and `dev-ready upgrade` (re-apply overlay-managed files only).
+- v0.6 — `dev-ready upgrade` (re-apply overlay-managed files only).
+
 

@@ -51,3 +51,22 @@ class VerificationError(DevReadyError):
     """Generated project failed a post-generation structural check."""
 
     exit_code = 5
+
+
+class StampMissingError(DevReadyError):
+    """The target directory is missing a .dev-ready.json stamp file."""
+
+    exit_code = 6
+
+
+class StampInvalidError(DevReadyError):
+    """The .dev-ready.json stamp is unparseable or has an invalid schema/version."""
+
+    exit_code = 6
+
+
+class DriftError(DevReadyError):
+    """The project state has drifted from the running CLI manifest or required paths."""
+
+    exit_code = 7
+

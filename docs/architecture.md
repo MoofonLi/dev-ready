@@ -55,6 +55,9 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | `manifest` | Load/validate manifest.json; single source of truth for pins | be bypassed by other modules |
 | `report` | Post-generation summary and next steps | mutate the generated project |
 | `verify` | Cheap, offline, structural post-generation checks on the staging dir | perform network I/O, write to the project, or run the heavy FR-5 checks (docker build, health endpoint — those run in CI, see Deployment Architecture) |
+| `stamp` | Load, parse, and validate `.dev-ready.json` project stamp | import `fetch` or perform network I/O |
+| `check` | Offline, read-only structural drift inspection of generated project against manifest | import `fetch`, perform network I/O, or modify target project |
+
 
 ## Dependency Rules
 
