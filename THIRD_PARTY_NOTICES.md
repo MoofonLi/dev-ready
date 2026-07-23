@@ -44,6 +44,14 @@ dev-ready does not ship a copy of this template inside the wheel. At generation 
 - Source: https://github.com/anthropics/skills
 - Subset: `skills/webapp-testing` and `skills/frontend-design` vendored into `src/dev_ready/templates/claude/skills/`. Each skill carries its own Apache-2.0 `LICENSE.txt` inside its snapshot, which ships into every generated project that selects the skill.
 
+## multica-ai/andrej-karpathy-skills
+
+- License: MIT, per README at 2c606141936f1eeef17fa3043a72095b4765b9c2
+- Pinned Commit: 2c606141936f1eeef17fa3043a72095b4765b9c2
+- Integration: adapted-rewrite — attribution only; NOT vendored (no snapshot under `src/dev_ready/templates/`)
+- Source: https://github.com/multica-ai/andrej-karpathy-skills
+- Basis: the upstream repo carries no standalone LICENSE file; its README declares "License MIT". The pinned commit above preserves that grant as evidence. dev-ready adapts (substantially rewords and condenses) the four-principle guardrail guidance into the generated `CLAUDE.md`; it does not redistribute the upstream files verbatim, so there is no `vendored` manifest entry and no drift-checked snapshot.
+
 ---
 
 Everything else dev-ready writes into a generated project — `CLAUDE.md`, the built-in Claude Code skills overlay (`project-orientation`), MCP configuration, and base design-doc templates under `src/dev_ready/templates/` — is original to this project and is not derived from a third-party source.

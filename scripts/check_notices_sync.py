@@ -23,6 +23,9 @@ from dev_ready.manifest.loader import load_manifest  # noqa: E402
 _SECTION_PATTERN = re.compile(r"^##\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)", re.MULTILINE)
 _COMMIT_PATTERN = re.compile(r"^\s*-\s*Pinned Commit:\s*([a-fA-F0-9]{40})", re.MULTILINE)
 _LICENSE_PATTERN = re.compile(r"^\s*-\s*License:\s*([^\r\n]+)", re.MULTILINE)
+_ATTRIBUTION_ONLY_PATTERN = re.compile(
+    r"^\s*-\s*Integration:\s*adapted", re.IGNORECASE | re.MULTILINE
+)
 
 
 def parse_notices_content(content: str) -> dict[str, dict[str, str]]:
@@ -48,7 +51,10 @@ def parse_notices_content(content: str) -> dict[str, dict[str, str]]:
         license_match = _LICENSE_PATTERN.search(section)
         license_str = license_match.group(1).strip() if license_match else ""
 
-        results[repo] = {"commit": commit, "license": license_str}
+        entry = {"commit": commit, "license": license_str}
+        if _ATTRIBUTION_ONLY_PATTERN.search(section):
+            entry["attribution_only"] = "true"
+        results[repo] = entry
 
     return results
 
@@ -111,7 +117,9 @@ def check_notices_sync(
                     )
 
     # Check direction 2: NOTICES -> manifest
-    for repo in notices_map:
+    for repo, info in notices_map.items():
+        if info.get("attribution_only"):
+            continue
         if repo not in manifest_map:
             diffs.append(f"NOTICES mismatch: {repo} is in THIRD_PARTY_NOTICES.md but missing from manifest.json vendored")
 

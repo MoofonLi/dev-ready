@@ -31,6 +31,18 @@ defines a fixed-role, document-driven workflow (Tech Lead, Senior, Junior, QA/Se
 with per-phase handoff files under `docs/handoffs/phase-N/`. See that README before
 coordinating multiple agents.
 
+## Development guardrails
+
+Behavioral guardrails that reduce common AI-coding mistakes — adapted from
+[multica-ai/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills)
+(MIT, per its README), after Andrej Karpathy's notes on LLM coding pitfalls. They
+bias toward caution over speed; use judgment on trivial changes.
+
+- **Think before coding.** State assumptions; when intent is ambiguous, ask instead of guessing. Surface tradeoffs and push back when a simpler path exists.
+- **Simplicity first.** Write the minimum code that solves the task — no speculative abstractions, options, or handling for impossible cases. If 200 lines could be 50, rewrite it.
+- **Surgical changes.** Touch only what the task requires; don't refactor or reformat adjacent code, match the existing style, and flag unrelated dead code rather than deleting it.
+- **Goal-driven execution.** Turn each task into a verifiable goal — write the failing test, then make it pass — and loop until the criteria are met.
+
 ## Working with this repo
 
 Read `docs/architecture.md` and `docs/requirements.md` (if present) before making structural changes. This file and any `.claude/skills/` were added by dev-ready; everything else in the tree comes from the upstream template linked above.

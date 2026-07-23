@@ -620,5 +620,22 @@ def test_render_stamp_records_anthropics_pin(tmp_path: Path) -> None:
     assert webapp_item["pin"] == "1f630fdf9259cec4a14913127dfd7c3b69ef72eb"
 
 
+def test_claude_md_contains_karpathy_guardrails(tmp_path: Path) -> None:
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    apply_overlay(_answers(tmp_path), project_dir, CATALOG, PIN)
+
+    claude_md = (project_dir / "CLAUDE.md").read_text(encoding="utf-8")
+    # Attribution (Security-reviewed wording): MIT + README basis + upstream repo.
+    assert "multica-ai/andrej-karpathy-skills" in claude_md
+    assert "(MIT, per its README)" in claude_md
+    # A representative guardrail line is folded in.
+    assert "Simplicity first" in claude_md
+    # Length budget is an acceptance property, not a preference.
+    assert len(claude_md.splitlines()) <= 75
+    assert "{{" not in claude_md
+
+
+
 
 

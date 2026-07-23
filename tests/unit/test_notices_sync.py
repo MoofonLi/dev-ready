@@ -362,3 +362,77 @@ def test_check_notices_sync_mit_without_license_does_not_fail(tmp_path: Path) ->
 
     diffs = check_notices_sync_mod.check_notices_sync(manifest_path, notices_path, repo_root=tmp_path)
     assert diffs == []
+
+
+def test_attribution_only_entry_is_recognized(tmp_path: Path) -> None:
+    """An adapted-rewrite (attribution-only) NOTICES entry is NOT an orphan."""
+    manifest_path = tmp_path / "manifest.json"
+    notices_path = tmp_path / "THIRD_PARTY_NOTICES.md"
+    commit = "2c606141936f1eeef17fa3043a72095b4765b9c2"
+    manifest_path.write_text(
+        f"""{{
+  "manifest_version": 1,
+  "upstream": {{"base_template": {{"repo": "fastapi/full-stack-fastapi-template", "ref": "master", "commit": "{'a' * 40}", "license": "MIT"}}}},
+  "vendored": [],
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "overlay_version": "0.1.0"
+}}""",
+        encoding="utf-8",
+    )
+    notices_path.write_text(
+        f"""# Notices
+## multica-ai/andrej-karpathy-skills
+- License: MIT, per README at {commit}
+- Pinned Commit: {commit}
+- Integration: adapted-rewrite — attribution only; NOT vendored
+""",
+        encoding="utf-8",
+    )
+    diffs = check_notices_sync_mod.check_notices_sync(manifest_path, notices_path)
+    assert diffs == []
+
+
+def test_attribution_only_without_marker_is_orphan(tmp_path: Path) -> None:
+    """Drop the Integration marker and the same entry is flagged as an orphan again."""
+    manifest_path = tmp_path / "manifest.json"
+    notices_path = tmp_path / "THIRD_PARTY_NOTICES.md"
+    commit = "2c606141936f1eeef17fa3043a72095b4765b9c2"
+    manifest_path.write_text(
+        f"""{{
+  "manifest_version": 1,
+  "upstream": {{"base_template": {{"repo": "fastapi/full-stack-fastapi-template", "ref": "master", "commit": "{'a' * 40}", "license": "MIT"}}}},
+  "vendored": [],
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "overlay_version": "0.1.0"
+}}""",
+        encoding="utf-8",
+    )
+    notices_path.write_text(
+        f"""# Notices
+## multica-ai/andrej-karpathy-skills
+- License: MIT, per README at {commit}
+- Pinned Commit: {commit}
+""",
+        encoding="utf-8",
+    )
+    diffs = check_notices_sync_mod.check_notices_sync(manifest_path, notices_path)
+    assert len(diffs) == 1
+    assert "missing from manifest.json vendored" in diffs[0]
+
+
+def test_parse_marks_only_attribution_only_sections(tmp_path: Path) -> None:
+    """The attribution_only key is added ONLY to marked sections, never to normal ones."""
+    content = """# Notices
+## owner/vendored-repo
+- License: MIT
+- Pinned Commit: 0123456789abcdef0123456789abcdef01234567
+
+## multica-ai/andrej-karpathy-skills
+- License: MIT, per README at 2c606141936f1eeef17fa3043a72095b4765b9c2
+- Pinned Commit: 2c606141936f1eeef17fa3043a72095b4765b9c2
+- Integration: adapted-rewrite — attribution only
+"""
+    result = check_notices_sync_mod.parse_notices_content(content)
+    assert "attribution_only" not in result["owner/vendored-repo"]
+    assert result["multica-ai/andrej-karpathy-skills"].get("attribution_only") == "true"
+
