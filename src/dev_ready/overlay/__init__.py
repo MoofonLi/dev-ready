@@ -1,9 +1,11 @@
-"""overlay: apply dev-ready files (CLAUDE.md, skills, MCP config, docs) onto the base.
+"""Build and apply dev-ready overlay content.
 
-Pure local file operations — must never fetch from the network.
-See docs/architecture.md.
+Overlay assets are local package resources.  This module never fetches from the
+network; ``build_overlay_content`` is also shared with the offline upgrader so
+there is one authoritative rendering of managed files.
 """
 
+import hashlib
 import json
 import re
 from collections.abc import Collection, Mapping
@@ -16,7 +18,7 @@ from dev_ready.errors import OverlayError
 from dev_ready.manifest import CatalogItem, UpstreamPin, VendoredPin
 from dev_ready.prompts import Answers
 
-__all__ = ["apply_overlay", "render_stamp"]
+__all__ = ["apply_overlay", "build_overlay_content", "content_inventory", "render_stamp"]
 
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 _TEMPLATE_SUFFIX = ".tmpl"
@@ -28,7 +30,9 @@ def render_stamp(
     pin: UpstreamPin,
     catalog: Mapping[str, tuple[CatalogItem, ...]],
     vendored: Collection[VendoredPin] = (),
+    inventory: Collection[tuple[str, str]] = (),
 ) -> str:
+    """Render the v3 project stamp without writing it."""
     vendored_map = {v.repo: v.commit for v in vendored}
 
     def _stamp_items(component: str, selected: Collection[str]) -> list[dict[str, str | None]]:
@@ -43,8 +47,9 @@ def render_stamp(
         return sorted(out, key=lambda d: str(d["id"]))
 
     data = {
-        "stamp_version": 2,
+        "stamp_version": 3,
         "dev_ready_version": __version__,
+        "project_name": answers.project_name,
         "components": {
             "skills": {"included": answers.include_skills, "items": _stamp_items("skills", answers.skills_items)},
             "mcp": {"included": answers.include_mcp, "items": _stamp_items("mcp", answers.mcp_items)},
@@ -52,8 +57,63 @@ def render_stamp(
             "agents": {"included": answers.include_agents},
         },
         "upstream": {"repo": pin.repo, "commit": pin.commit},
+        "inventory": [{"path": path, "sha256": digest} for path, digest in sorted(inventory)],
     }
     return json.dumps(data, indent=2) + "\n"
+
+
+def build_overlay_content(
+    answers: Answers, catalog: Mapping[str, tuple[CatalogItem, ...]]
+) -> dict[str, bytes]:
+    """Return every whole-file overlay write, rendered but not injected or written.
+
+    Keys are POSIX-relative project paths and preserve generation's historical
+    write order.  Reading package resources is necessary; this function never
+    reads from or mutates the destination project.
+    """
+    _validate_project_name(answers.project_name)
+    templates_root = resources.files("dev_ready").joinpath("templates")
+    content: dict[str, bytes] = {}
+
+    def add(source: Traversable, dest_rel: Path) -> None:
+        path = dest_rel.as_posix()
+        if path in content:
+            raise OverlayError(f"overlay destination collision: {path}")
+        content[path] = _render_asset(source, dest_rel, answers.project_name)
+
+    def collect(source: Traversable, dest_rel: Path) -> None:
+        if source.is_dir():
+            for entry in sorted(source.iterdir(), key=lambda item: item.name):
+                next_name = entry.name.removesuffix(_TEMPLATE_SUFFIX) if not entry.is_dir() else entry.name
+                collect(entry, dest_rel / next_name)
+            return
+        add(source, dest_rel)
+
+    add(templates_root.joinpath("claude", "CLAUDE.md.tmpl"), Path("CLAUDE.md"))
+    add(templates_root.joinpath("readme", "README.md.tmpl"), Path("README.md"))
+
+    for component, selected in (("skills", answers.skills_items), ("mcp", answers.mcp_items)):
+        for item in catalog.get(component, ()):
+            if item.id not in selected:
+                continue
+            for item_path in item.paths:
+                collect(
+                    templates_root.joinpath(*item_path.src.split("/")),
+                    Path(item_path.dest),
+                )
+
+    if answers.include_docs:
+        collect(templates_root.joinpath("docs"), Path("docs"))
+    if answers.include_agents:
+        collect(templates_root.joinpath("agents"), Path("docs") / "handoffs")
+    return content
+
+
+def content_inventory(content: Mapping[str, bytes]) -> tuple[tuple[str, str], ...]:
+    """Return a deterministic SHA-256 inventory for rendered overlay files."""
+    return tuple(
+        (path, hashlib.sha256(data).hexdigest()) for path, data in sorted(content.items())
+    )
 
 
 def apply_overlay(
@@ -63,80 +123,36 @@ def apply_overlay(
     pin: UpstreamPin,
     vendored: Collection[VendoredPin] = (),
 ) -> list[Path]:
-    """Apply the selected overlay components onto `project_dir`.
-
-    CLAUDE.md and README.md are always applied; `.claude/skills/`, `.mcp.json`, `docs/`, and `docs/handoffs/`
-    follow `answers.skills_items` / `mcp_items` / `include_docs` / `include_agents`.
-
-    Returns the paths written, relative to `project_dir`. Raises
-    `OverlayError` on any destination collision, missing asset, or leftover
-    `{{` template marker — never silently overwrites or partially templates.
-    """
-    _validate_project_name(answers.project_name)
-
-    templates_root = resources.files("dev_ready").joinpath("templates")
-    written: list[Path] = [
-        _apply_file(
-            templates_root.joinpath("claude", "CLAUDE.md.tmpl"),
-            project_dir,
-            Path("CLAUDE.md"),
-            answers.project_name,
-        ),
-        _apply_file(
-            templates_root.joinpath("readme", "README.md.tmpl"),
-            project_dir,
-            Path("README.md"),
-            answers.project_name,
-        ),
-    ]
+    """Apply selected overlay content and return paths written relative to the project."""
+    content = build_overlay_content(answers, catalog)
+    written: list[Path] = []
+    for path, data in content.items():
+        dest_rel = Path(path)
+        dest = project_dir / dest_rel
+        if dest.exists() or dest.is_symlink():
+            raise OverlayError(f"overlay destination already exists: {dest_rel}")
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+        except OSError as error:
+            raise OverlayError(f"failed to write {dest_rel}: {error}") from error
+        written.append(dest_rel)
 
     for component, selected in (("skills", answers.skills_items), ("mcp", answers.mcp_items)):
         for item in catalog.get(component, ()):
-            if item.id not in selected:
-                continue
-            for item_path in item.paths:
-                source = templates_root.joinpath(*item_path.src.split("/"))
-                dest_rel = Path(item_path.dest)
-                if source.is_dir():
-                    written.extend(_apply_tree(source, project_dir, dest_rel, answers.project_name))
-                else:
-                    written.append(_apply_file(source, project_dir, dest_rel, answers.project_name))
-
-    for component, selected in (("skills", answers.skills_items), ("mcp", answers.mcp_items)):
-        for item in catalog.get(component, ()):
-            if item.id not in selected or item.inject is None:
-                continue
-            _apply_injection(item, project_dir)
-
-    if answers.include_docs:
-        written.extend(
-            _apply_tree(
-                templates_root.joinpath("docs"),
-                project_dir,
-                Path("docs"),
-                answers.project_name,
-            )
-        )
-
-    if answers.include_agents:
-        written.extend(
-            _apply_tree(
-                templates_root.joinpath("agents"),
-                project_dir,
-                Path("docs") / "handoffs",
-                answers.project_name,
-            )
-        )
+            if item.id in selected and item.inject is not None:
+                _apply_injection(item, project_dir)
 
     stamp_path = project_dir / ".dev-ready.json"
     if stamp_path.exists() or stamp_path.is_symlink():
         raise OverlayError("overlay destination already exists: .dev-ready.json")
     try:
-        stamp_path.write_text(render_stamp(answers, pin, catalog, vendored), encoding="utf-8")
+        stamp_path.write_bytes(
+            render_stamp(answers, pin, catalog, vendored, content_inventory(content)).encode("utf-8")
+        )
     except OSError as error:
         raise OverlayError(f"failed to write .dev-ready.json: {error}") from error
     written.append(Path(".dev-ready.json"))
-
     return written
 
 
@@ -145,50 +161,19 @@ def _validate_project_name(project_name: str) -> None:
         raise OverlayError(f"invalid project name {project_name!r}")
 
 
-def _apply_tree(
-    source_dir: Traversable, project_dir: Path, dest_root: Path, project_name: str
-) -> list[Path]:
-    if not source_dir.is_dir():
-        raise OverlayError(f"overlay asset directory missing: {source_dir}")
-
-    written: list[Path] = []
-    for entry in sorted(source_dir.iterdir(), key=lambda item: item.name):
-        if entry.is_dir():
-            written.extend(_apply_tree(entry, project_dir, dest_root / entry.name, project_name))
-            continue
-        dest_name = (
-            entry.name[: -len(_TEMPLATE_SUFFIX)]
-            if entry.name.endswith(_TEMPLATE_SUFFIX)
-            else entry.name
-        )
-        written.append(_apply_file(entry, project_dir, dest_root / dest_name, project_name))
-    return written
-
-
-def _apply_file(
-    source: Traversable, project_dir: Path, dest_rel: Path, project_name: str
-) -> Path:
+def _render_asset(source: Traversable, dest_rel: Path, project_name: str) -> bytes:
+    """Render one package asset without writing it."""
     if not source.is_file():
         raise OverlayError(f"overlay asset missing: {source}")
-
-    dest = project_dir / dest_rel
-    # is_symlink() also catches dangling symlinks, which exists() reports as False.
-    if dest.exists() or dest.is_symlink():
-        raise OverlayError(f"overlay destination already exists: {dest_rel}")
-
     try:
-        dest.parent.mkdir(parents=True, exist_ok=True)
         if source.name.endswith(_TEMPLATE_SUFFIX):
-            content = source.read_text(encoding="utf-8").replace(_TEMPLATE_TOKEN, project_name)
-            if "{{" in content or "}}" in content:
+            rendered = source.read_text(encoding="utf-8").replace(_TEMPLATE_TOKEN, project_name)
+            if "{{" in rendered or "}}" in rendered:
                 raise OverlayError(f"unresolved template marker left in {dest_rel}")
-            dest.write_text(content, encoding="utf-8")
-        else:
-            dest.write_bytes(source.read_bytes())
+            return rendered.encode("utf-8")
+        return source.read_bytes()
     except OSError as error:
-        raise OverlayError(f"failed to write {dest_rel}: {error}") from error
-
-    return dest_rel
+        raise OverlayError(f"failed to read overlay asset for {dest_rel}: {error}") from error
 
 
 def _apply_injection(item: CatalogItem, project_dir: Path) -> None:
@@ -207,32 +192,22 @@ def _inject_mcp_server(item: CatalogItem, project_dir: Path) -> None:
     target_path = project_dir / item.inject.target
     if not target_path.exists():
         raise OverlayError(
-            f"item '{item.id}' requires base target '{item.inject.target}' from 'mcp-config' — include 'mcp-config' as well"
+            f"item '{item.id}' requires base target '{item.inject.target}' from 'mcp-config' â€” include 'mcp-config' as well"
         )
-
     try:
-        raw_text = target_path.read_text(encoding="utf-8")
-        data = json.loads(raw_text)
+        data = json.loads(target_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise OverlayError(f"failed to parse {item.inject.target}: {error}") from error
-
     if not isinstance(data, dict):
         raise OverlayError(f"{item.inject.target} root must be a JSON object")
-
     mcp_servers = data.setdefault("mcpServers", {})
     if not isinstance(mcp_servers, dict):
         raise OverlayError(f"'mcpServers' field in {item.inject.target} must be a JSON object")
-
     server_name = item.inject.server_name
     assert server_name is not None
     if server_name in mcp_servers:
         raise OverlayError(f"server '{server_name}' already exists in {item.inject.target}")
-
-    mcp_servers[server_name] = {
-        "command": item.inject.command,
-        "args": [f"{item.inject.package}=={item.pin}"],
-    }
-
+    mcp_servers[server_name] = {"command": item.inject.command, "args": [f"{item.inject.package}=={item.pin}"]}
     try:
         target_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     except OSError as error:
@@ -244,41 +219,29 @@ def _inject_npm_dev_dependency(item: CatalogItem, project_dir: Path) -> None:
     target_path = project_dir / item.inject.target
     if not target_path.exists():
         raise OverlayError(
-            f"item '{item.id}' target '{item.inject.target}' is missing — upstream layout changed or fetch incomplete"
+            f"item '{item.id}' target '{item.inject.target}' is missing â€” upstream layout changed or fetch incomplete"
         )
-
     try:
-        raw_text = target_path.read_text(encoding="utf-8")
-        data = json.loads(raw_text)
+        data = json.loads(target_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise OverlayError(f"failed to parse {item.inject.target}: {error}") from error
-
     if not isinstance(data, dict):
         raise OverlayError(f"{item.inject.target} root must be a JSON object")
-
     dev_deps = data.setdefault("devDependencies", {})
     if not isinstance(dev_deps, dict):
         raise OverlayError(f"'devDependencies' in {item.inject.target} must be a JSON object")
-
     pkg_name = item.inject.package
     if pkg_name in dev_deps:
-        raise OverlayError(
-            f"package '{pkg_name}' already declared in {item.inject.target} devDependencies"
-        )
+        raise OverlayError(f"package '{pkg_name}' already declared in {item.inject.target} devDependencies")
     assert item.pin is not None
     dev_deps[pkg_name] = item.pin
-
     scripts = data.setdefault("scripts", {})
     if not isinstance(scripts, dict):
         raise OverlayError(f"'scripts' in {item.inject.target} must be a JSON object")
-
     for s_name, s_cmd in item.inject.scripts:
         if s_name in scripts:
-            raise OverlayError(
-                f"script '{s_name}' already declared in {item.inject.target} scripts"
-            )
+            raise OverlayError(f"script '{s_name}' already declared in {item.inject.target} scripts")
         scripts[s_name] = s_cmd
-
     try:
         target_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     except OSError as error:

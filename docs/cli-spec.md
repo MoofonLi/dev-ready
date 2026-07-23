@@ -21,7 +21,7 @@ Generate a new project.
 
 Unknown item ids in `--skills` or `--mcp` fail fast with an invalid-arguments error (exit 2) listing valid item ids. Conflicting flags (e.g. `--no-skills` with `--skills <id>`) exit 2.
 
-Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification; 6 stamp missing or invalid; 7 drift detected.
+Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification; 6 stamp missing or invalid; 7 drift detected; 8 upgrade not supported (pre-v0.6 stamp); 9 upgrade failed (rolled back).
 
 ### `dev-ready check [PATH]`
 
@@ -33,6 +33,17 @@ Inspect an existing generated project directory against its `.dev-ready.json` st
 | `--json` | bool | false | Output report in JSON format |
 
 Exit codes: 0 clean (no drift); 6 stamp missing or unparseable/invalid (including projects generated before v0.3); 7 drift detected.
+
+### `dev-ready upgrade [PATH]`
+
+Re-apply only overlay-managed whole-file content to an existing generated project. It never touches upstream application code. User-modified files, missing files, and shared injection targets are reported and left unchanged; all planned writes commit all-or-nothing.
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `PATH` | path | `.` | Target project directory to upgrade |
+| `--dry-run` | bool | false | Report planned changes without modifying the project |
+
+The project stamp is now `stamp_version` 3 and records the project name and a managed-file inventory. Version 1 and 2 stamps remain checkable but cannot be upgraded. Exit codes: 0 success; 6 invalid or missing stamp; 8 pre-v3 stamp cannot be upgraded; 9 upgrade failure after rollback.
 
 ### `dev-ready --version` / `dev-ready --help`
 
@@ -52,9 +63,3 @@ All answers collect into a single `Answers` model shared with the flag-based pat
 Declining the confirmation, or cancelling any prompt (Ctrl-C), prints `aborted: nothing was written` to stderr and exits 1 — nothing has been written at that point by construction. `--yes` bypasses every prompt in this flow, including confirmation. A non-TTY stdin with missing inputs and no `--yes` fails fast with an invalid-arguments error (exit 2) instead of hanging.
 
 **Windows compatibility:** interactive prompts are tested against Windows Terminal. Legacy `cmd.exe` may render the checkbox prompt incorrectly (missing VT/ANSI support). In environments where terminal support is uncertain, use `--yes` with explicit `--no-skills`/`--no-mcp`/`--no-docs`/`--no-agents` flags instead of relying on prompts.
-
-## Planned (see docs/version-plan.md)
-
-- v0.6 — `dev-ready upgrade` (re-apply overlay-managed files only).
-
-

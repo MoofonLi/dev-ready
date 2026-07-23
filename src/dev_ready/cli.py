@@ -18,6 +18,7 @@ from dev_ready.generate import generate
 from dev_ready.manifest import CatalogItem, load_default_manifest
 from dev_ready.prompts import Answers, PartialAnswers, collect_answers, confirm_generation
 from dev_ready.report import render_report
+from dev_ready.upgrade import upgrade_project
 
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
@@ -85,6 +86,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--json",
         action="store_true",
         help="Output report in JSON format",
+    )
+
+    upgrade_parser = subparsers.add_parser(
+        "upgrade", help="Re-apply managed overlay files without touching application code"
+    )
+    upgrade_parser.add_argument(
+        "target_dir",
+        nargs="?",
+        type=Path,
+        default=Path("."),
+        help="Target project directory to upgrade (default: .)",
+    )
+    upgrade_parser.add_argument(
+        "--dry-run", action="store_true", help="Report planned changes without writing files"
     )
     return parser
 
@@ -248,6 +263,12 @@ def _run_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_upgrade(args: argparse.Namespace) -> int:
+    report = upgrade_project(args.target_dir, dry_run=args.dry_run)
+    print(report, end="")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -259,6 +280,8 @@ def main(argv: list[str] | None = None) -> int:
             return _run_init(args)
         if args.command == "check":
             return _run_check(args)
+        if args.command == "upgrade":
+            return _run_upgrade(args)
         raise InvalidArgumentsError(f"unknown command: {args.command}")
     except AbortedError:
         print("aborted: nothing was written", file=sys.stderr)
@@ -266,4 +289,3 @@ def main(argv: list[str] | None = None) -> int:
     except DevReadyError as error:
         print(f"error: {error}", file=sys.stderr)
         return error.exit_code
-

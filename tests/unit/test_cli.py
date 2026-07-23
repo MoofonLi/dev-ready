@@ -242,6 +242,35 @@ def test_parser_accepts_all_documented_flags() -> None:
     assert args.no_agents is True
 
 
+def test_upgrade_parser_accepts_path_and_dry_run() -> None:
+    args = build_parser().parse_args(["upgrade", "project", "--dry-run"])
+    assert args.command == "upgrade"
+    assert args.target_dir == Path("project")
+    assert args.dry_run is True
+
+
+def test_upgrade_success_and_dry_run_are_wiring_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_upgrade(target: Path, dry_run: bool = False) -> str:
+        captured["target"] = target
+        captured["dry_run"] = dry_run
+        return "upgrade report\n"
+
+    monkeypatch.setattr(cli_module, "upgrade_project", fake_upgrade)
+    target = tmp_path / "project"
+    assert main(["upgrade", str(target), "--dry-run"]) == 0
+    assert captured == {"target": target, "dry_run": True}
+    assert capsys.readouterr().out == "upgrade report\n"
+
+
+def test_upgrade_missing_stamp_exits_6(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["upgrade", str(tmp_path)]) == 6
+    assert "missing .dev-ready.json" in capsys.readouterr().err
+
+
 def test_skills_and_mcp_item_flag_variations() -> None:
     # --skills all / --mcp none
     ans = build_answers(_init_args(skills="all", mcp="none"), CATALOG)

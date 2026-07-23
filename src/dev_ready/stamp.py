@@ -6,10 +6,13 @@ Reads `.dev-ready.json` project stamps. Pure local I/O — must never import `de
 from dataclasses import dataclass
 import json
 from pathlib import Path
+import re
 
 from dev_ready.errors import StampInvalidError, StampMissingError
 
-__all__ = ["Stamp", "StampItem", "UpstreamStampInfo", "load_stamp"]
+__all__ = ["InventoryEntry", "Stamp", "StampItem", "UpstreamStampInfo", "load_stamp"]
+
+_PROJECT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
 
 @dataclass(frozen=True)
@@ -25,6 +28,12 @@ class UpstreamStampInfo:
 
 
 @dataclass(frozen=True)
+class InventoryEntry:
+    path: str
+    sha256: str
+
+
+@dataclass(frozen=True)
 class Stamp:
     stamp_version: int
     dev_ready_version: str
@@ -35,6 +44,8 @@ class Stamp:
     docs_included: bool
     agents_included: bool
     upstream: UpstreamStampInfo
+    project_name: str | None = None
+    inventory: tuple[InventoryEntry, ...] = ()
 
 
 def load_stamp(project_dir: Path) -> Stamp:
@@ -66,9 +77,9 @@ def load_stamp(project_dir: Path) -> Stamp:
     if not isinstance(version, int) or isinstance(version, bool):
         raise StampInvalidError(".dev-ready.json is missing a valid integer 'stamp_version'")
 
-    if version < 1 or version > 2:
+    if version < 1 or version > 3:
         raise StampInvalidError(
-            f"unsupported stamp_version {version}; this CLI supports stamp versions 1 and 2."
+            f"unsupported stamp_version {version}; this CLI supports stamp versions 1, 2 and 3."
         )
 
     dev_ready_ver = data.get("dev_ready_version")
@@ -122,6 +133,24 @@ def load_stamp(project_dir: Path) -> Stamp:
     agents_raw = components.get("agents")
     agents_included = bool(agents_raw.get("included", False)) if isinstance(agents_raw, dict) else False
 
+    project_name = data.get("project_name")
+    if project_name is not None:
+        if not isinstance(project_name, str) or not _PROJECT_NAME_PATTERN.fullmatch(project_name):
+            raise StampInvalidError(".dev-ready.json has an invalid 'project_name'")
+
+    inventory_raw = data.get("inventory", [])
+    if not isinstance(inventory_raw, list):
+        raise StampInvalidError(".dev-ready.json 'inventory' must be a list")
+    inventory: list[InventoryEntry] = []
+    for entry in inventory_raw:
+        if not isinstance(entry, dict):
+            raise StampInvalidError(".dev-ready.json inventory entries must be objects")
+        path = entry.get("path")
+        digest = entry.get("sha256")
+        if not isinstance(path, str) or not isinstance(digest, str):
+            raise StampInvalidError(".dev-ready.json inventory entries require string 'path' and 'sha256'")
+        inventory.append(InventoryEntry(path=path, sha256=digest))
+
     return Stamp(
         stamp_version=version,
         dev_ready_version=dev_ready_ver,
@@ -132,4 +161,6 @@ def load_stamp(project_dir: Path) -> Stamp:
         docs_included=docs_included,
         agents_included=agents_included,
         upstream=UpstreamStampInfo(repo=repo, commit=commit),
+        project_name=project_name,
+        inventory=tuple(inventory),
     )

@@ -1,6 +1,7 @@
 """Unit tests for dev_ready.overlay (no network, filesystem confined to tmp_path)."""
 
 from pathlib import Path
+import hashlib
 
 import pytest
 
@@ -78,6 +79,17 @@ def test_happy_path_writes_every_component_with_substitution(tmp_path: Path) -> 
 
     handoffs_readme = (project_dir / "docs" / "handoffs" / "README.md").read_text(encoding="utf-8")
     assert "{{" not in handoffs_readme
+
+
+def test_apply_overlay_stamp_inventory_hashes_rendered_non_inject_files(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    apply_overlay(_answers(tmp_path), project_dir, CATALOG, PIN)
+
+    stamp = json.loads((project_dir / ".dev-ready.json").read_text(encoding="utf-8"))
+    inventory = {entry["path"]: entry["sha256"] for entry in stamp["inventory"]}
+    for path in ("CLAUDE.md", ".claude/skills/project-orientation/SKILL.md"):
+        assert inventory[path] == hashlib.sha256((project_dir / path).read_bytes()).hexdigest()
 
 
 @pytest.mark.parametrize(
@@ -226,18 +238,13 @@ def test_invalid_project_name_raises_overlay_error(tmp_path: Path, bad_name: str
 
 
 def test_leftover_template_marker_raises_overlay_error(tmp_path: Path) -> None:
-    """Exercises the real substitution + leftover-marker guard in _apply_file."""
+    """Exercises the real substitution + leftover-marker guard in _render_asset."""
     import dev_ready.overlay as overlay_module
 
     source = tmp_path / "asset.txt.tmpl"
     source.write_text("hello {{project_name}}, also {{unresolved}}", encoding="utf-8")
-    project_dir = tmp_path / "project"
-    project_dir.mkdir()
-
     with pytest.raises(OverlayError, match="template marker"):
-        overlay_module._apply_file(source, project_dir, Path("out.txt"), "my-app")
-
-    assert not (project_dir / "out.txt").exists()
+        overlay_module._render_asset(source, Path("out.txt"), "my-app")
 
 
 class _MissingAssetTraversable:
@@ -273,7 +280,9 @@ def test_render_stamp_structure(tmp_path: Path) -> None:
     ans = _answers(tmp_path, skills_items=frozenset({"project-orientation", "react-doctor"}), mcp_items=frozenset({"code-memory"}))
     stamp_text = render_stamp(ans, PIN, CATALOG)
     data = json.loads(stamp_text)
-    assert data["stamp_version"] == 2
+    assert data["stamp_version"] == 3
+    assert data["project_name"] == "my-app"
+    assert data["inventory"] == []
     assert data["dev_ready_version"] == __version__
     assert data["components"]["skills"]["included"] is True
     assert data["components"]["skills"]["items"] == [
@@ -480,7 +489,7 @@ def test_render_stamp_records_vendored_pins(tmp_path: Path) -> None:
     answers = _answers(tmp_path, skills_items=frozenset({"caveman", "project-orientation"}))
     raw = render_stamp(answers, PIN, manifest.components, manifest.vendored)
     data = json.loads(raw)
-    assert data["stamp_version"] == 2
+    assert data["stamp_version"] == 3
     items = data["components"]["skills"]["items"]
     caveman_item = next(i for i in items if i["id"] == "caveman")
     po_item = next(i for i in items if i["id"] == "project-orientation")
@@ -614,7 +623,7 @@ def test_render_stamp_records_anthropics_pin(tmp_path: Path) -> None:
     answers = _answers(tmp_path, skills_items=frozenset({"webapp-testing"}))
     raw = render_stamp(answers, PIN, manifest.components, manifest.vendored)
     data = json.loads(raw)
-    assert data["stamp_version"] == 2
+    assert data["stamp_version"] == 3
     items = data["components"]["skills"]["items"]
     webapp_item = next(i for i in items if i["id"] == "webapp-testing")
     assert webapp_item["pin"] == "1f630fdf9259cec4a14913127dfd7c3b69ef72eb"

@@ -70,3 +70,15 @@ class DriftError(DevReadyError):
 
     exit_code = 7
 
+
+class UpgradeNotSupportedError(DevReadyError):
+    """The project's stamp predates the upgrade inventory."""
+
+    exit_code = 8
+
+
+class UpgradeError(DevReadyError):
+    """An upgrade failed after changes began and was rolled back."""
+
+    exit_code = 9
+

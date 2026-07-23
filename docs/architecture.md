@@ -57,12 +57,14 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | `verify` | Cheap, offline, structural post-generation checks on the staging dir | perform network I/O, write to the project, or run the heavy FR-5 checks (docker build, health endpoint — those run in CI, see Deployment Architecture) |
 | `stamp` | Load, parse, and validate `.dev-ready.json` project stamp | import `fetch` or perform network I/O |
 | `check` | Offline, read-only structural drift inspection of generated project against manifest | import `fetch`, perform network I/O, or modify target project |
+| `upgrade` | Offline re-apply of overlay-managed files onto an existing project; all-or-nothing | import `fetch`, perform network I/O, or touch upstream/non-overlay paths |
 
 
 ## Dependency Rules
 
 - Direction: `cli` -> `prompts`/`manifest`/`fetch`/`overlay`/`report`/`verify`. Lower modules never import `cli`.
 - `fetch`, `overlay`, and `verify` are independent of each other; only `generate` (called only by `cli`) sequences them.
+- `upgrade` (called only by `cli`) sequences `overlay` and `stamp` offline, analogous to `generate`.
 - Runtime dependencies are kept minimal (current: questionary, copier — see ADR-005; rich optional). Every new dependency requires a note here.
 - No module reads `manifest.json` directly except `manifest`.
 - `scripts/` (CI-only maintainer tooling, e.g. `scripts/bump_upstream.py`) is not part of the wheel and is not subject to the `fetch/`-only network-call rule above, which governs `src/dev_ready` only.
