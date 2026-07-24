@@ -59,6 +59,9 @@ Agreed 2026-07-17. Full detail, rationale, and per-version grouping live in
 - FR-20 (v0.5, shipped). Karpathy guardrails content in generated CLAUDE.md — MIT per the upstream README declaration (no standalone LICENSE file; pinned commit preserves the grant), with attribution in NOTICES.
 - FR-21 (v0.6, shipped). `dev-ready check`: read-only validation of an existing project against its stamp and the CLI's manifest.
 - FR-22 (v0.6, shipped). `dev-ready upgrade`: re-apply overlay-managed whole files only (per the stamp's item selection); refuses pre-v3 stamps, never touches upstream application code, and never silently overwrites user edits.
+- FR-23..FR-27 (v0.7+, reserved). Post-v0.6 roadmap decisions D-1..D-5 in [version-plan.md](version-plan.md); full entries land here when each version's development starts.
+- FR-28 (v0.7, planned). Spec Loop bundle (ADR-012): single catalog item `spec-loop` vendoring the four missing loop steps from mattpocock/skills, plus the conditional four-phase CLAUDE.md integration section and an `architecture.md` template in the `docs` component.
+- FR-29 (v0.7, planned). Progress reporting for `init`: staged status lines (TTY spinner, plain non-TTY), no new dependencies, progress callback from `cli` into `generate()`.
 
 ## Non-functional Requirements
 
@@ -85,10 +88,12 @@ NFR-5. Cross-platform: macOS, Linux, Windows.
 4. v0.4: vendoring infrastructure + MIT wave (FR-15..FR-18). DONE (v0.4.0).
 5. v0.5: Apache wave + karpathy guardrails (FR-19, FR-20). DONE (v0.5.0).
 6. v0.6: lifecycle commands — `check` / `upgrade` (FR-21, FR-22). DONE (v0.6.0).
-7. Beyond: additional base templates; possible Web UI companion (decisions deferred).
+7. v0.7: Handoff Protocol config (FR-23), Spec Loop bundle (FR-28), generate skill (FR-24), progress reporting (FR-29). See the 2026-07-24 (PM) amendment in [version-plan.md](version-plan.md).
+8. v0.8: CLI i18n (FR-25), multi-agent render targets (FR-26).
+9. v1.0: second template — Next.js (FR-27, gated on the defined real-users checklist); Web UI decision revisited.
 
-## Pre-start Checklist (carried from planning)
+## Pre-start Checklist (carried from planning; closed out 2026-07-24)
 
-- [ ] Package name availability on PyPI (`dev-ready`)
-- [ ] License verification for redistributing upstream snapshots (upstream is MIT — confirm attribution requirements)
-- [ ] Confirm upstream health check endpoint used for post-generation verification
+- [x] Package name availability on PyPI (`dev-ready`) — confirmed in practice: v0.1.4 through v0.6.0 published under this name.
+- [x] License verification for redistributing upstream snapshots — resolved by ADR-008 (integration modes), ADR-009 (manifest `vendored` provenance), and the THIRD_PARTY_NOTICES machinery (FR-18/FR-19).
+- [x] Confirm upstream health check endpoint used for post-generation verification — in continuous use by CI's generate-and-verify job (health-check poll, ADR-002).

@@ -1,6 +1,7 @@
-# Version Plan — dev-ready v0.3 → v0.6
+# Version Plan — dev-ready v0.3 → v0.6 (+ post-v0.6 roadmap)
 
 Status: Accepted (2026-07-17). Decided by CEO + Tech Lead as the final pre-agreed roadmap.
+Amended 2026-07-24 (afternoon): v0.7 scope expanded — see "2026-07-24 (PM) amendment" below.
 Numbering continues from requirements.md (FR-1..FR-10 shipped in v0.1/v0.2).
 
 ## End goal
@@ -61,6 +62,9 @@ of the MIT declaration in its README (see Curation principles).
 
 - Every vendored skill must answer "what does the user lose if we drop it?" — no
   answer, no inclusion. Hard cap: **10 skills** in the skill catalog.
+  (Amended 2026-07-24, ADR-012: a workflow *bundle* — multiple asset directories
+  whose value only exists as a whole cycle, selected as one unit — counts as one
+  item against the cap. First instance: `spec-loop`.)
 - The cap governs the *catalog*; the user picks any subset of it per project
   (FR-14), so catalog discipline is about maintenance cost and default quality,
   not about forcing content on users.
@@ -260,8 +264,9 @@ Status: Directions **Accepted** (CEO + Tech Lead, final architecture session,
 section may pull work forward into those versions. The decisions and mechanisms
 below are settled; the version assignments (v0.7 / v0.8 / v1.0) are a proposed
 sequencing to be re-confirmed at v0.6 close. FR numbering FR-23..FR-27 is
-reserved here; requirements.md gains the full entries when each version's
-development starts (same flow as v0.3–v0.6).
+reserved here (FR-28..FR-29 added by the 2026-07-24 PM amendment below);
+requirements.md gains the full entries when each version's development starts
+(same flow as v0.3–v0.6).
 
 ### D-1. Mechanism/policy separation for the agent-team workflow (FR-23)
 
@@ -272,8 +277,10 @@ overlay guarantees staleness. dev-ready's durable product is the *mechanism*:
 role definitions, handoff document templates, folder structure, and loop rules
 (hard-bug escalation, report obligations, who commits).
 
-Concretely: generated projects carry a workflow config
-(`docs/handoffs/workflow.yaml`) declaring roles as data —
+Concretely: generated projects carry the Handoff Protocol as config
+(`docs/handoffs/protocol.yaml` — renamed from the provisional `workflow.yaml`
+on 2026-07-24, ADR-012: "workflow" is reserved for GitHub Actions files)
+declaring roles as data —
 `{id, title, model, responsibilities, never_does}` — plus the handoff sequence
 and loop rules. Handoff templates and the CLAUDE.md agent-roles section render
 role names and models from this config, never from literals. Two design rules:
@@ -332,6 +339,16 @@ per-target layouts are pinned at implementation time, not now.
 
 ### D-5. Multi-template — second stack (FR-27, v1.x)
 
+**Stack selected (2026-07-24, CEO):** the second template is a standalone
+full-stack **Next.js** template; Vue is permanently out. It enters the manifest
+as its own registry entry via the non-Copier strategies below
+(`wrapped-generator` for `create-next-app`, or `degit-style` for a community
+starter — concrete base pinned at implementation time, per this section's
+original rule). A hybrid "FastAPI backend + Next.js frontend" variant was
+rejected: maintaining the splice against upstream is a fork (violates ADR-001
+and the solo-maintainer budget). Timing unchanged: v1.0, all hard gates below
+still apply.
+
 Confirmed: still the last thing. Mechanism decided now so v0.x work does not
 paint us into a corner: templates become **registry entries** in the manifest —
 `{id, source, fetch_strategy, pinned_ref, overlay_set, smoke_test}` — and the
@@ -365,9 +382,9 @@ it?" — the same test as the curation principle.
 
 | Version | Contents | Rationale |
 |---|---|---|
-| v0.7 | FR-23 workflow config, FR-24 generate skill | Cheap, self-contained; deepens the existing agents/skills story with no new external surface |
+| v0.7 | FR-23 Handoff Protocol config, FR-28 Spec Loop, FR-24 generate skill, FR-29 progress reporting | See the 2026-07-24 (PM) amendment: FR-23×FR-28 share the same CLAUDE.md surface (design once); FR-29 lands before FR-25 so the i18n catalog is built over the final string set |
 | v0.8 | FR-25 CLI i18n, FR-26 multi-agent render targets | Widens the audience once content and catalog are stable |
-| v1.0 | FR-27 second template; Web UI decision revisited | Platform step; gated on real-user feedback and the D-5 hard gates |
+| v1.0 | FR-27 second template (Next.js — selected 2026-07-24, see D-5); Web UI decision revisited | Platform step; gated on real-user feedback and the D-5 hard gates |
 
 **2026-07-24 — v0.6 close-out re-confirmation (CEO-confirmed, Moofon):**
 At v0.6 close the proposed post-v0.6 sequencing is confirmed unchanged — v0.7 =
@@ -375,3 +392,64 @@ FR-23 (workflow config) + FR-24 (generate skill); v0.8 = FR-25 (CLI i18n) +
 FR-26 (multi-agent render targets); v1.0 = FR-27 (second template) + Web UI
 decision. No amendment. Ratified by the CEO (Moofon) on 2026-07-24; the v0.6.0
 release commit may proceed.
+
+---
+
+## 2026-07-24 (PM) amendment — v0.7 scope expansion (CEO-confirmed, Moofon)
+
+Decided in the post-close-out grilling session of 2026-07-24; **supersedes the
+same-day close-out confirmation above** for v0.7 scope only. v0.8 and v1.0 are
+unchanged. Core decision record: ADR-012.
+
+### v0.7 — Methodology + polish (FR-23, FR-28, FR-24, FR-29)
+
+FR-28. **Spec Loop bundle + methodology layering (ADR-012).** A single new
+catalog item `spec-loop` (a *bundle*, one selection unit) vendors the four
+missing steps of the within-session development loop from mattpocock/skills
+(grill, to-spec, to-tickets, improve-architecture; tdd/diagnosing-bugs/
+code-review are already catalog items — same repo, same pin). Catalog lands at
+10/10. Three sub-deliverables:
+- **Four-phase integration section** in generated CLAUDE.md, rendered **only**
+  when both `agents` and `spec-loop` are selected: Planning (Lead:
+  grill/to-spec) → Dispatch (Senior: to-tickets + handoff) → Execution (Junior:
+  tdd/code-review) → Verification (QA/Security/SRE gates). Conditional
+  rendering is an acceptance criterion: selecting only one side must produce
+  no reference to the other side's skills.
+- **`architecture.md` template** in the `docs` component (system overview /
+  module boundaries / dependency rules skeleton), maintained by the Tech Lead
+  role, linked from CLAUDE.md. No root `CONTEXT.md` in generated projects
+  (single-entry-point rule, ADR-012).
+- FR-23's config file is `docs/handoffs/protocol.yaml` (see D-1 as amended).
+  FR-23 and FR-28 modify the same CLAUDE.md agent-roles surface and are
+  designed together — this coupling is why FR-28 lives in v0.7.
+
+FR-29. **Progress reporting for `init`.** Staged status lines on stderr
+(`[1/4] Fetching base template (commit <pin>)…` → `done (12.3s)`), covering
+fetch → overlay → verify → move. TTY gets a spinner; non-TTY degrades to plain
+lines. No fabricated percentages (git clone has no trustworthy progress
+fraction) and **zero new dependencies**: `cli` passes a progress callback into
+`generate()`; lower modules never touch the terminal (module-boundary table
+unchanged). Sequenced before FR-25 so the i18n message catalog is created over
+the final string set.
+
+### v0.7 entry condition — cross-version upgrade E2E
+
+Before any v0.7 feature work merges, CI gains a permanent job: install the
+released `dev-ready==0.6.0` from PyPI, generate a project, then run the working
+tree's `check` + `upgrade --dry-run` + `upgrade` against it and assert the
+results. This is the first real exercise of FR-22's core promise (an old
+project receiving a newer overlay) — it must exist before v0.7 ships, and it
+remains as the standing N-1 → N regression test thereafter. (This CI job
+installs from the network; it is CI tooling, not `src/dev_ready/`, so the
+fetch-only network boundary does not apply.)
+
+### v0.7 release rider — distribution + a decidable real-users gate
+
+The D-5 hard gate "real users on the FastAPI template" is now **defined**:
+≥ 3 external signals not originating from the maintainer (GitHub
+issues/discussions/PRs, or attributable user feedback), **or** organic PyPI
+download growth for 4 consecutive weeks after discounting CI noise. The v1.0
+go/no-go reads this checklist, not a feeling. To give the gate a chance to
+ever pass, the v0.7 release includes three distribution actions (~1 day, no
+new FR): list the FR-24 generate skill on skills.sh; one launch post
+(Show HN / r/FastAPI / X); a clear "report an issue" entry point in the README.

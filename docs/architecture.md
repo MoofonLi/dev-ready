@@ -43,6 +43,8 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | [ADR-009](decisions/adr-009-manifest-vendored-provenance.md) | Manifest `vendored` section with enforced provenance (v0.4) | Implemented |
 | [ADR-010](decisions/adr-010-item-level-catalog-selection.md) | Item-level component selection with a data-driven catalog (v0.3) | Accepted (2026-07-17) |
 | [ADR-011](decisions/adr-011-agent-config-restructure.md) | Standard agent-config layout: AGENTS.md, docs/decisions/, docs/handoff/, .agents/skills/ | Accepted (2026-07-20) |
+| [ADR-012](decisions/adr-012-spec-loop-bundle-and-methodology-layering.md) | Spec Loop as a single bundled catalog item, layered with the Handoff Protocol (v0.7) | Accepted (2026-07-24) |
+| [ADR-013](decisions/adr-013-internal-process-v2-spec-loop-adoption.md) | Internal process v2 — the Spec Loop layered into the Handoff Protocol (amends ADR-007/011) | Accepted (2026-07-24) |
 
 ## Module Boundary
 
