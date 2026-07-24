@@ -219,7 +219,7 @@ __marimo__/
 
 docs/handoff/
 docs/temp/
-.bob/reviews/
+.bob/
 
 .vscode/
 .sync-cache/
