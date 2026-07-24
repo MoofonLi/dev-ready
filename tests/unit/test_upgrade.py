@@ -11,7 +11,7 @@ from dev_ready.cli import main
 from dev_ready.errors import UpgradeError, UpgradeNotSupportedError
 from dev_ready.manifest import load_default_manifest
 from dev_ready.overlay import apply_overlay
-from dev_ready.prompts import Answers
+from dev_ready.prompts import Answers, ProjectSelection
 from dev_ready.stamp import load_stamp
 from dev_ready.upgrade import upgrade_project
 
@@ -35,12 +35,13 @@ def _make_project(tmp_path: Path, *, code_memory: bool = False) -> Path:
     answers = Answers(
         project_name="upgrade-app",
         target_dir=project,
-        include_skills=True,
-        include_mcp=True,
-        include_docs=False,
-        include_agents=False,
-        skills_items=frozenset({"project-orientation"}),
-        mcp_items=mcp_items,
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            skills=frozenset({"project-orientation"}),
+            mcp=mcp_items,
+            docs=False,
+            agents=False,
+        ),
     )
     apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
     return project
@@ -215,6 +216,24 @@ def test_selected_inject_target_without_overlay_file_is_reported(tmp_path: Path)
     stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     report = upgrade_project(project)
     assert "frontend/package.json" in report
+
+
+def test_removed_catalog_item_in_stamp_does_not_block_upgrade(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["components"]["skills"]["items"].append(
+        {"id": "removed-skill", "pin": "1.0.0"}
+    )
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    upgrade_project(project)
+
+    rewritten = json.loads(stamp_path.read_text(encoding="utf-8"))
+    rewritten_ids = {
+        item["id"] for item in rewritten["components"]["skills"]["items"]
+    }
+    assert "removed-skill" not in rewritten_ids
 
 
 def test_upgrade_rewrites_v3_stamp_inventory(tmp_path: Path) -> None:

@@ -366,12 +366,8 @@ def test_valid_pinned_dependency_mcp_server() -> None:
     assert item.mode == "pinned-dependency"
     assert item.pin == "0.9.0"
     assert item.paths == ()
-    assert item.inject is not None
-    assert item.inject.kind == "mcp-server"
-    assert item.inject.target == ".mcp.json"
-    assert item.inject.package == "codebase-memory-mcp"
-    assert item.inject.server_name == "codebase-memory"
-    assert item.inject.command == "uvx"
+    assert item.effect is not None
+    assert item.effect.target == ".mcp.json"
 
 
 def test_valid_pinned_dependency_npm_dev_dependency() -> None:
@@ -394,9 +390,8 @@ def test_valid_pinned_dependency_npm_dev_dependency() -> None:
     item = manifest.components["skills"][1]
     assert item.id == "react-doctor"
     assert item.pin == "0.8.1"
-    assert item.inject is not None
-    assert item.inject.kind == "npm-dev-dependency"
-    assert item.inject.scripts == (("doctor", "react-doctor"),)
+    assert item.effect is not None
+    assert item.effect.target == "frontend/package.json"
 
 
 @pytest.mark.parametrize("bad_pin", ["", "latest", "^1.2.3", "1.2", "1.2.3 "])
@@ -557,8 +552,8 @@ def test_builtin_items_regression() -> None:
     skills_items = {item.id: item for item in manifest.components["skills"]}
     assert "react-doctor" in skills_items
     assert skills_items["react-doctor"].pin == "0.8.1"
-    assert skills_items["react-doctor"].inject is not None
-    assert skills_items["react-doctor"].inject.kind == "npm-dev-dependency"
+    assert skills_items["react-doctor"].effect is not None
+    assert skills_items["react-doctor"].effect.target == "frontend/package.json"
 
 
 VALID_VENDORED_ENTRY = {

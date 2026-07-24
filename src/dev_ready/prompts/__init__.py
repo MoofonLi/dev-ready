@@ -6,7 +6,7 @@ Only `_questionary_asker.py` imports questionary, and only lazily — the
 never triggers that import (ADR-004).
 """
 
-from dev_ready.prompts.answers import Answers, PartialAnswers
+from dev_ready.prompts.answers import Answers, PartialAnswers, ProjectSelection
 from dev_ready.prompts.asker import Asker
 from dev_ready.prompts.collect import collect_answers, confirm_generation
 
@@ -14,6 +14,7 @@ __all__ = [
     "Answers",
     "Asker",
     "PartialAnswers",
+    "ProjectSelection",
     "collect_answers",
     "confirm_generation",
 ]

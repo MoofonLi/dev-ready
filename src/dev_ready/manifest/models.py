@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from dev_ready.catalog_effects import CatalogEffect
+
 
 @dataclass(frozen=True)
 class UpstreamPin:
@@ -26,16 +28,6 @@ class UpstreamPin:
     verified_at: str | None = None
     exclude: tuple[str, ...] = ()
     prune: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class Injection:
-    kind: str
-    target: str
-    package: str
-    server_name: str | None = None
-    command: str | None = None
-    scripts: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -69,7 +61,7 @@ class CatalogItem:
     license: str
     paths: tuple[ItemPath, ...] = ()
     pin: str | None = None
-    inject: Injection | None = None
+    effect: CatalogEffect | None = None
     vendored_repo: str | None = None
 
 

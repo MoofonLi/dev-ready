@@ -6,10 +6,11 @@ import tempfile
 from pathlib import Path
 
 from dev_ready import __version__
+from dev_ready.catalog_effects import classify_shared_targets
 from dev_ready.errors import UpgradeError, UpgradeNotSupportedError
 from dev_ready.manifest import load_default_manifest
 from dev_ready.overlay import build_overlay_content, content_inventory, render_stamp
-from dev_ready.prompts import Answers
+from dev_ready.prompts import Answers, ProjectSelection
 from dev_ready.stamp import load_stamp
 
 
@@ -94,29 +95,21 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
 
     manifest = load_default_manifest()
     pin = manifest.upstream["base_template"]
+    known_skills = frozenset(item.id for item in manifest.components.get("skills", ()))
+    known_mcp = frozenset(item.id for item in manifest.components.get("mcp", ()))
     answers = Answers(
         project_name=stamp.project_name,
         target_dir=resolved,
-        include_skills=stamp.skills_included,
-        include_mcp=stamp.mcp_included,
-        include_docs=stamp.docs_included,
-        include_agents=stamp.agents_included,
-        skills_items=frozenset(item.id for item in stamp.skills_items),
-        mcp_items=frozenset(item.id for item in stamp.mcp_items),
+        selection=ProjectSelection.from_items(
+            manifest.components,
+            skills=frozenset(item.id for item in stamp.skills_items) & known_skills,
+            mcp=frozenset(item.id for item in stamp.mcp_items) & known_mcp,
+            docs=stamp.docs_included,
+            agents=stamp.agents_included,
+        ),
     )
     new_content = build_overlay_content(answers, manifest.components)
-    inject_targets = {
-        item.inject.target
-        for items in manifest.components.values()
-        for item in items
-        if item.inject is not None
-    }
-    selected_inject_targets = {
-        item.inject.target
-        for component, selected in (("skills", answers.skills_items), ("mcp", answers.mcp_items))
-        for item in manifest.components.get(component, ())
-        if item.id in selected and item.inject is not None
-    }
+    shared_targets = classify_shared_targets(manifest.components, answers.selection)
     recorded = {entry.path: entry.sha256 for entry in stamp.inventory}
     groups: dict[str, list[str]] = {
         "upgraded": [],
@@ -137,7 +130,7 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         if _has_symlink_component(resolved, target):
             groups["conflict"].append(path)
             continue
-        if path in inject_targets:
+        if path in shared_targets.all:
             groups["skipped_shared"].append(path)
             continue
         if path in recorded:
@@ -168,7 +161,7 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
     # never touches them.
     already_reported_shared = set(groups["skipped_shared"])
     groups["skipped_shared"].extend(
-        sorted(selected_inject_targets - already_reported_shared - set(new_content))
+        sorted(shared_targets.selected - already_reported_shared - set(new_content))
     )
 
     new_stamp = render_stamp(

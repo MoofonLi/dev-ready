@@ -8,7 +8,13 @@ import pytest
 import dev_ready.prompts.collect as collect_module
 from dev_ready.errors import AbortedError, InvalidArgumentsError
 from dev_ready.manifest import UpstreamPin, load_default_manifest
-from dev_ready.prompts import Answers, PartialAnswers, collect_answers, confirm_generation
+from dev_ready.prompts import (
+    Answers,
+    PartialAnswers,
+    ProjectSelection,
+    collect_answers,
+    confirm_generation,
+)
 
 PIN = UpstreamPin(
     repo="fastapi/full-stack-fastapi-template",
@@ -62,42 +68,46 @@ class _RaisingAsker:
         raise KeyboardInterrupt
 
 
-def _partial(**overrides: object) -> PartialAnswers:
-    defaults: dict[str, object] = {
-        "project_name": "my-app",
-        "target_dir": None,
-        "include_skills": True,
-        "include_mcp": True,
-        "include_docs": True,
-        "include_agents": True,
-        "components_explicit": True,
-        "skills_selection": None,
-        "mcp_selection": None,
-        "assume_yes": False,
-    }
-    defaults.update(overrides)
-    if defaults["components_explicit"]:
-        if defaults["skills_selection"] is None:
-            defaults["skills_selection"] = (
-                frozenset({"project-orientation"}) if defaults["include_skills"] else frozenset()
-            )
-        if defaults["mcp_selection"] is None:
-            defaults["mcp_selection"] = (
-                frozenset({"mcp-config"}) if defaults["include_mcp"] else frozenset()
-            )
-    return PartialAnswers(**defaults)  # type: ignore[arg-type]
+def _partial(
+    *,
+    project_name: str | None = "my-app",
+    target_dir: Path | None = None,
+    components_explicit: bool = True,
+    selection: ProjectSelection | None = None,
+    assume_yes: bool = False,
+) -> PartialAnswers:
+    if components_explicit and selection is None:
+        selection = ProjectSelection.from_items(
+            CATALOG,
+            skills=frozenset({"project-orientation"}),
+            mcp=frozenset({"mcp-config"}),
+        )
+    if not components_explicit:
+        selection = None
+    return PartialAnswers(
+        project_name=project_name,
+        target_dir=target_dir,
+        selection=selection,
+        assume_yes=assume_yes,
+    )
 
 
 
-def _answers(**overrides: object) -> Answers:
-    defaults: dict[str, object] = {
-        "project_name": "my-app",
-        "target_dir": Path("/does/not/exist/my-app"),
-        "skills_items": frozenset({"project-orientation"}),
-        "mcp_items": frozenset({"mcp-config"}),
-    }
-    defaults.update(overrides)
-    return Answers(**defaults)  # type: ignore[arg-type]
+def _answers(
+    *,
+    project_name: str = "my-app",
+    selection: ProjectSelection | None = None,
+) -> Answers:
+    return Answers(
+        project_name=project_name,
+        target_dir=Path("/does/not/exist/my-app"),
+        selection=selection
+        or ProjectSelection.from_items(
+            CATALOG,
+            skills=frozenset({"project-orientation"}),
+            mcp=frozenset({"mcp-config"}),
+        ),
+    )
 
 
 
@@ -133,21 +143,35 @@ def test_name_prompt_result_lands_in_answers() -> None:
 
 
 def test_component_prompt_fires_only_when_no_explicit_flag() -> None:
-    asker = FakeAsker(checkboxes=[["skills", "mcp", "docs", "agents"]])
-    answers = collect_answers(_partial(components_explicit=False), asker=asker)
+    asker = FakeAsker(
+        checkboxes=[
+            ["skills", "mcp", "docs", "agents"],
+            ["project-orientation"],
+            ["mcp-config"],
+        ]
+    )
+    answers = collect_answers(
+        _partial(components_explicit=False), catalog=CATALOG, asker=asker
+    )
     assert (answers.include_skills, answers.include_mcp, answers.include_docs, answers.include_agents) == (
         True,
         True,
         True,
         True,
     )
-    assert len(asker.checkbox_calls) == 1
+    assert len(asker.checkbox_calls) == 3
 
 
 def test_component_prompt_skipped_when_flag_explicit() -> None:
     asker = FakeAsker(checkboxes=[["skills", "mcp", "docs", "agents"]])
     answers = collect_answers(
-        _partial(components_explicit=True, include_skills=False, include_mcp=True, include_docs=True, include_agents=True),
+        _partial(
+            components_explicit=True,
+            selection=ProjectSelection.from_items(
+                CATALOG,
+                mcp=frozenset({"mcp-config"}),
+            ),
+        ),
         asker=asker,
     )
     assert answers.include_skills is False
@@ -155,8 +179,10 @@ def test_component_prompt_skipped_when_flag_explicit() -> None:
 
 
 def test_component_prompt_selection_can_disable_some() -> None:
-    asker = FakeAsker(checkboxes=[["mcp"]])
-    answers = collect_answers(_partial(components_explicit=False), asker=asker)
+    asker = FakeAsker(checkboxes=[["mcp"], ["mcp-config"]])
+    answers = collect_answers(
+        _partial(components_explicit=False), catalog=CATALOG, asker=asker
+    )
     assert (answers.include_skills, answers.include_mcp, answers.include_docs, answers.include_agents) == (
         False,
         True,
@@ -175,8 +201,15 @@ def test_component_prompt_selection_can_disable_some() -> None:
     ]
 )
 def test_component_matrix(selected, expected_skills, expected_mcp, expected_docs, expected_agents) -> None:
-    asker = FakeAsker(checkboxes=[selected])
-    answers = collect_answers(_partial(components_explicit=False), asker=asker)
+    item_responses = []
+    if "skills" in selected:
+        item_responses.append(["project-orientation"])
+    if "mcp" in selected:
+        item_responses.append(["mcp-config"])
+    asker = FakeAsker(checkboxes=[selected, *item_responses])
+    answers = collect_answers(
+        _partial(components_explicit=False), catalog=CATALOG, asker=asker
+    )
     assert answers.include_skills is expected_skills
     assert answers.include_mcp is expected_mcp
     assert answers.include_docs is expected_docs
@@ -241,10 +274,10 @@ def test_interactive_level2_cancel_raises_aborted() -> None:
 def test_flags_explicit_path_no_prompts() -> None:
     partial = _partial(
         components_explicit=True,
-        skills_selection=frozenset({"project-orientation"}),
-        mcp_selection=frozenset(),
-        include_skills=True,
-        include_mcp=False,
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            skills=frozenset({"project-orientation"}),
+        ),
     )
     asker = FakeAsker()
     answers = collect_answers(partial, catalog=CATALOG, asker=asker)
@@ -307,20 +340,24 @@ def test_interactive_and_flag_paths_produce_identical_answers(tmp_path: Path) ->
     flag_answers = Answers(
         project_name="my-app",
         target_dir=target_dir,
-        include_skills=False,
-        include_mcp=True,
-        include_docs=True,
-        include_agents=True,
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            mcp=frozenset({"mcp-config"}),
+        ),
         assume_yes=False,
     )
 
-    asker = FakeAsker(texts=["my-app"], checkboxes=[["mcp", "docs", "agents"]])
+    asker = FakeAsker(
+        texts=["my-app"],
+        checkboxes=[["mcp", "docs", "agents"], ["mcp-config"]],
+    )
     prompt_answers = collect_answers(
         _partial(
             project_name=None,
             target_dir=target_dir,
             components_explicit=False,
         ),
+        catalog=CATALOG,
         asker=asker,
     )
 
@@ -406,8 +443,18 @@ def test_confirm_non_tty_without_injected_asker_raises_invalid_arguments(
 def test_render_confirmation_summary_includes_agents() -> None:
     from dev_ready.prompts.collect import _render_confirmation_summary
     # when agents is True
-    summary_on = _render_confirmation_summary(_answers(include_agents=True), PIN)
+    summary_on = _render_confirmation_summary(_answers(), PIN)
     assert "agents" in summary_on
     # when agents is False
-    summary_off = _render_confirmation_summary(_answers(include_agents=False), PIN)
+    summary_off = _render_confirmation_summary(
+        _answers(
+            selection=ProjectSelection.from_items(
+                CATALOG,
+                skills=frozenset({"project-orientation"}),
+                mcp=frozenset({"mcp-config"}),
+                agents=False,
+            )
+        ),
+        PIN,
+    )
     assert "agents" not in summary_off

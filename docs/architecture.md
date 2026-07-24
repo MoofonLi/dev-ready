@@ -53,17 +53,19 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | `fetch` | Generate the upstream base via Copier at the manifest-pinned commit | know about overlay content |
 | `overlay` | Apply dev-ready files onto the fetched base; templating of names/values | fetch anything from the network |
 | `manifest` | Load/validate manifest.json; single source of truth for pins | be bypassed by other modules |
+| `catalog_effects` | Validate, apply, and observe catalog-item injected effects through one local-project interface | read manifest.json, perform network I/O, or choose CLI error/report policy |
 | `report` | Post-generation summary and next steps | mutate the generated project |
-| `verify` | Cheap, offline, structural post-generation checks on the staging dir | perform network I/O, write to the project, or run the heavy FR-5 checks (docker build, health endpoint — those run in CI, see Deployment Architecture) |
+| `inspection` | Read-only observation of generated-project structure shared by generation and lifecycle policies | perform network I/O, write to the project, or choose exit codes |
+| `verify` | Map the first shared inspection issue to a generation-blocking error | perform network I/O, write to the project, or duplicate structural traversal |
 | `stamp` | Load, parse, and validate `.dev-ready.json` project stamp | import `fetch` or perform network I/O |
-| `check` | Offline, read-only structural drift inspection of generated project against manifest | import `fetch`, perform network I/O, or modify target project |
+| `check` | Compare stamp/current pins and render shared inspection issues as an offline drift report | import `fetch`, perform network I/O, modify target project, or import `verify` internals |
 | `upgrade` | Offline re-apply of overlay-managed files onto an existing project; all-or-nothing | import `fetch`, perform network I/O, or touch upstream/non-overlay paths |
 
 
 ## Dependency Rules
 
 - Direction: `cli` -> `prompts`/`manifest`/`fetch`/`overlay`/`report`/`verify`. Lower modules never import `cli`.
-- `fetch`, `overlay`, and `verify` are independent of each other; only `generate` (called only by `cli`) sequences them.
+- `fetch`, `overlay`, and `verify` are independent of each other; only `generate` (called only by `cli`) sequences them. `manifest`, `overlay`, `verify`, `check`, and `upgrade` may depend on `catalog_effects`; `verify` and `check` may depend on `inspection`.
 - `upgrade` (called only by `cli`) sequences `overlay` and `stamp` offline, analogous to `generate`.
 - Runtime dependencies are kept minimal (current: questionary, copier — see ADR-005; rich optional). Every new dependency requires a note here.
 - No module reads `manifest.json` directly except `manifest`.

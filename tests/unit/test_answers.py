@@ -1,0 +1,66 @@
+"""Behavior tests for the canonical generation-intent seam."""
+
+from pathlib import Path
+
+import pytest
+
+from dev_ready.errors import InvalidArgumentsError
+from dev_ready.manifest import load_default_manifest
+from dev_ready.prompts import Answers, ProjectSelection
+
+
+CATALOG = load_default_manifest().components
+
+
+def test_flag_and_prompt_adapters_share_one_canonical_selection() -> None:
+    selection = ProjectSelection.from_flags(
+        catalog=CATALOG,
+        skills="project-orientation, tdd",
+        mcp="none",
+        no_skills=False,
+        no_mcp=False,
+        no_docs=True,
+        no_agents=False,
+    )
+
+    assert selection is not None
+    answers = Answers(
+        project_name="my-app",
+        target_dir=Path("my-app"),
+        selection=selection,
+    )
+    assert answers.items("skills") == frozenset({"project-orientation", "tdd"})
+    assert answers.items("mcp") == frozenset()
+    assert answers.includes("skills") is True
+    assert answers.includes("mcp") is False
+    assert answers.includes("docs") is False
+    assert answers.includes("agents") is True
+
+
+def test_no_selection_flags_leave_selection_unresolved() -> None:
+    assert (
+        ProjectSelection.from_flags(
+            catalog=CATALOG,
+            skills=None,
+            mcp=None,
+            no_skills=False,
+            no_mcp=False,
+            no_docs=False,
+            no_agents=False,
+        )
+        is None
+    )
+
+
+def test_answers_rejects_invalid_project_name_at_its_interface() -> None:
+    with pytest.raises(InvalidArgumentsError, match="invalid project name"):
+        Answers(
+            project_name="../escape",
+            target_dir=Path("escape"),
+            selection=ProjectSelection.empty(),
+        )
+
+
+def test_canonical_selection_rejects_unknown_catalog_items() -> None:
+    with pytest.raises(InvalidArgumentsError, match="unknown skills item ids"):
+        ProjectSelection.from_items(CATALOG, skills=frozenset({"ghost-skill"}))

@@ -6,7 +6,6 @@ Responsibilities (see docs/architecture.md, Module Boundary):
 """
 
 import argparse
-import re
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -16,12 +15,15 @@ from dev_ready.check import check_project
 from dev_ready.errors import AbortedError, DevReadyError, InvalidArgumentsError
 from dev_ready.generate import generate
 from dev_ready.manifest import CatalogItem, load_default_manifest
-from dev_ready.prompts import Answers, PartialAnswers, collect_answers, confirm_generation
+from dev_ready.prompts import (
+    Answers,
+    PartialAnswers,
+    ProjectSelection,
+    collect_answers,
+    confirm_generation,
+)
 from dev_ready.report import render_report
 from dev_ready.upgrade import upgrade_project
-
-_PROJECT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -105,42 +107,6 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 
-def _resolve_item_selection(
-    component: str, raw_value: str | None, no_flag: bool, catalog_ids: frozenset[str]
-) -> frozenset[str] | None:
-    """None => unspecified (prompt or default-all later). Else a concrete id set."""
-    if no_flag and raw_value is not None and raw_value.strip().lower() != "none":
-        raise InvalidArgumentsError(
-            f"--no-{component} conflicts with --{component} {raw_value!r}; use one."
-        )
-    if no_flag:
-        return frozenset()
-    if raw_value is None:
-        return None
-
-    val = raw_value.strip().lower()
-    if val == "all":
-        return catalog_ids
-    if val == "none":
-        return frozenset()
-
-    requested = set()
-    for item in raw_value.split(","):
-        stripped = item.strip()
-        if stripped:
-            requested.add(stripped)
-
-    if not requested:
-        raise InvalidArgumentsError(f"empty item selection for --{component}")
-
-    unknown = sorted(requested - catalog_ids)
-    if unknown:
-        raise InvalidArgumentsError(
-            f"unknown {component} item ids: {unknown!r}; valid ids: {sorted(catalog_ids)!r}"
-        )
-    return frozenset(requested)
-
-
 def build_answers(
     args: argparse.Namespace, catalog: Mapping[str, tuple[CatalogItem, ...]]
 ) -> Answers:
@@ -155,31 +121,21 @@ def build_answers(
         raise InvalidArgumentsError(
             "project name is required: dev-ready init <project-name>"
         )
-    if not _PROJECT_NAME_PATTERN.fullmatch(name):
-        raise InvalidArgumentsError(
-            f"invalid project name {name!r}: use letters, digits, '.', '_', '-',"
-            " starting with a letter or digit"
-        )
-
-    all_skill_ids = frozenset(i.id for i in catalog.get("skills", ()))
-    all_mcp_ids = frozenset(i.id for i in catalog.get("mcp", ()))
-
-    skills_resolved = _resolve_item_selection("skills", args.skills, args.no_skills, all_skill_ids)
-    mcp_resolved = _resolve_item_selection("mcp", args.mcp, args.no_mcp, all_mcp_ids)
-
-    skills_items = skills_resolved if skills_resolved is not None else all_skill_ids
-    mcp_items = mcp_resolved if mcp_resolved is not None else all_mcp_ids
+    selection = ProjectSelection.from_flags(
+        catalog=catalog,
+        skills=args.skills,
+        mcp=args.mcp,
+        no_skills=args.no_skills,
+        no_mcp=args.no_mcp,
+        no_docs=args.no_docs,
+        no_agents=args.no_agents,
+    ) or ProjectSelection.all(catalog)
 
     target_dir = args.target_dir if args.target_dir is not None else Path.cwd() / name
     return Answers(
         project_name=name,
         target_dir=target_dir,
-        include_skills=bool(skills_items),
-        include_mcp=bool(mcp_items),
-        include_docs=not args.no_docs,
-        include_agents=not args.no_agents,
-        skills_items=skills_items,
-        mcp_items=mcp_items,
+        selection=selection,
         assume_yes=args.yes,
     )
 
@@ -191,49 +147,20 @@ def _build_partial_answers(
     `collect_answers` prompts for whatever this leaves unanswered.
     """
     name = args.project_name
-    if name is not None and not _PROJECT_NAME_PATTERN.fullmatch(name):
-        raise InvalidArgumentsError(
-            f"invalid project name {name!r}: use letters, digits, '.', '_', '-',"
-            " starting with a letter or digit"
-        )
-
-    all_skill_ids = frozenset(i.id for i in catalog.get("skills", ()))
-    all_mcp_ids = frozenset(i.id for i in catalog.get("mcp", ()))
-
-    skills_resolved = _resolve_item_selection("skills", args.skills, args.no_skills, all_skill_ids)
-    mcp_resolved = _resolve_item_selection("mcp", args.mcp, args.no_mcp, all_mcp_ids)
-
-    components_explicit = (
-        args.no_skills
-        or args.no_mcp
-        or args.no_docs
-        or args.no_agents
-        or args.skills is not None
-        or args.mcp is not None
+    selection = ProjectSelection.from_flags(
+        catalog=catalog,
+        skills=args.skills,
+        mcp=args.mcp,
+        no_skills=args.no_skills,
+        no_mcp=args.no_mcp,
+        no_docs=args.no_docs,
+        no_agents=args.no_agents,
     )
-
-    if components_explicit:
-        skills_selection = skills_resolved if skills_resolved is not None else all_skill_ids
-        mcp_selection = mcp_resolved if mcp_resolved is not None else all_mcp_ids
-    else:
-        skills_selection = None
-        mcp_selection = None
-
-    include_skills = (
-        bool(skills_selection) if skills_selection is not None else (not args.no_skills)
-    )
-    include_mcp = bool(mcp_selection) if mcp_selection is not None else (not args.no_mcp)
 
     return PartialAnswers(
         project_name=name,
         target_dir=args.target_dir,
-        include_skills=include_skills,
-        include_mcp=include_mcp,
-        include_docs=not args.no_docs,
-        include_agents=not args.no_agents,
-        components_explicit=components_explicit,
-        skills_selection=skills_selection,
-        mcp_selection=mcp_selection,
+        selection=selection,
         assume_yes=args.yes,
     )
 

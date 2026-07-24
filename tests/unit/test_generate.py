@@ -9,7 +9,7 @@ import dev_ready.generate as generate_module
 from dev_ready.errors import FetchError, OverlayError, TargetDirectoryError, VerificationError
 from dev_ready.generate import generate
 from dev_ready.manifest import UpstreamPin, load_default_manifest
-from dev_ready.prompts import Answers
+from dev_ready.prompts import Answers, ProjectSelection
 from dev_ready.verify import REQUIRED_UPSTREAM_PATHS
 
 PIN = UpstreamPin(
@@ -23,19 +23,16 @@ CATALOG = load_default_manifest().components
 _VERIFY_DIRECTORY_ENTRIES = {"backend", "frontend"}
 
 
-def _answers(target_dir: Path, **overrides: object) -> Answers:
-    defaults: dict[str, object] = {
-        "project_name": "my-app",
-        "target_dir": target_dir,
-        "include_skills": True,
-        "include_mcp": True,
-        "include_docs": True,
-        "include_agents": True,
-        "skills_items": frozenset({"project-orientation"}),
-        "mcp_items": frozenset({"mcp-config"}),
-    }
-    defaults.update(overrides)
-    return Answers(**defaults)  # type: ignore[arg-type]
+def _answers(target_dir: Path, *, project_name: str = "my-app") -> Answers:
+    return Answers(
+        project_name=project_name,
+        target_dir=target_dir,
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            skills=frozenset({"project-orientation"}),
+            mcp=frozenset({"mcp-config"}),
+        ),
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -241,4 +238,3 @@ def test_fetch_receives_template_data_with_generated_secrets(
     for key in ("secret_key", "postgres_password", "first_superuser_password"):
         assert received[key] != "changethis"
         assert len(received[key]) >= 16
-

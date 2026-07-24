@@ -6,19 +6,17 @@ always supplies its own `asker` (tests, or the `--yes` flag path in cli.py,
 which never calls into this module at all) never triggers the import.
 """
 
-import re
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from dev_ready.errors import AbortedError, InvalidArgumentsError
 from dev_ready.manifest import CatalogItem, UpstreamPin
-from dev_ready.prompts.answers import Answers, PartialAnswers
+from dev_ready.prompts.answers import Answers, PartialAnswers, ProjectSelection, validate_project_name
 from dev_ready.prompts.asker import Asker
 
 __all__ = ["collect_answers", "confirm_generation"]
 
-_PROJECT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 _COMPONENT_CHOICES = ("skills", "mcp", "docs", "agents")
 
 
@@ -46,7 +44,7 @@ def collect_answers(
     is not a TTY (and no `asker` was injected).
     """
     needs_name = partial.project_name is None
-    needs_components = not partial.components_explicit
+    needs_components = partial.selection is None
 
     if needs_name and asker is None and not _is_interactive():
         raise InvalidArgumentsError(
@@ -86,30 +84,21 @@ def collect_answers(
             else:
                 mcp_items = frozenset()
 
-            include_skills = bool(skills_items)
-            include_mcp = bool(mcp_items)
         else:
             skills_items = frozenset()
             mcp_items = frozenset()
-            include_skills = skills_on
-            include_mcp = mcp_on
+        if catalog is None and (skills_on or mcp_on):
+            raise InvalidArgumentsError("catalog is required to validate selected items")
+        selection = ProjectSelection.from_items(
+            catalog or {},
+            skills=skills_items if skills_on else frozenset(),
+            mcp=mcp_items if mcp_on else frozenset(),
+            docs=include_docs,
+            agents=include_agents,
+        )
     else:
-        skills_items = (
-            partial.skills_selection if partial.skills_selection is not None else frozenset()
-        )
-        mcp_items = (
-            partial.mcp_selection if partial.mcp_selection is not None else frozenset()
-        )
-        include_skills = (
-            bool(skills_items)
-            if partial.skills_selection is not None
-            else partial.include_skills
-        )
-        include_mcp = (
-            bool(mcp_items) if partial.mcp_selection is not None else partial.include_mcp
-        )
-        include_docs = partial.include_docs
-        include_agents = partial.include_agents
+        assert partial.selection is not None
+        selection = partial.selection
 
     target_dir = (
         partial.target_dir if partial.target_dir is not None else Path.cwd() / project_name
@@ -118,12 +107,7 @@ def collect_answers(
     return Answers(
         project_name=project_name,
         target_dir=target_dir,
-        include_skills=include_skills,
-        include_mcp=include_mcp,
-        include_docs=include_docs,
-        include_agents=include_agents,
-        skills_items=skills_items,
-        mcp_items=mcp_items,
+        selection=selection,
         assume_yes=partial.assume_yes,
     )
 
@@ -153,15 +137,17 @@ def confirm_generation(
 
 def _render_confirmation_summary(answers: Answers, pin: UpstreamPin) -> str:
     comp_parts = []
-    if answers.include_skills:
-        skills_str = ", ".join(sorted(answers.skills_items)) if answers.skills_items else "(none)"
+    if answers.includes("skills"):
+        skills = answers.items("skills")
+        skills_str = ", ".join(sorted(skills)) if skills else "(none)"
         comp_parts.append(f"skills ({skills_str})")
-    if answers.include_mcp:
-        mcp_str = ", ".join(sorted(answers.mcp_items)) if answers.mcp_items else "(none)"
+    if answers.includes("mcp"):
+        mcp = answers.items("mcp")
+        mcp_str = ", ".join(sorted(mcp)) if mcp else "(none)"
         comp_parts.append(f"mcp ({mcp_str})")
-    if answers.include_docs:
+    if answers.includes("docs"):
         comp_parts.append("docs")
-    if answers.include_agents:
+    if answers.includes("agents"):
         comp_parts.append("agents")
 
     components_line = ", ".join(comp_parts) if comp_parts else "(none)"
@@ -185,7 +171,11 @@ def _prompt_project_name(asker: Asker) -> str:
             name = None
         if name is None:
             raise AbortedError("project name prompt cancelled")
-        if _PROJECT_NAME_PATTERN.fullmatch(name):
+        try:
+            validate_project_name(name)
+        except InvalidArgumentsError:
+            pass
+        else:
             return name
         message = (
             f"invalid project name {name!r}: use letters, digits, '.', '_', '-', "
@@ -217,4 +207,3 @@ def _prompt_items(asker: Asker, component: str, item_ids: Sequence[str]) -> froz
     if selected is None:
         raise AbortedError(f"{component} item selection cancelled")
     return frozenset(selected)
-

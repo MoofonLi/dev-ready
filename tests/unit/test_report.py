@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from dev_ready.manifest import UpstreamPin
-from dev_ready.prompts import Answers
+from dev_ready.prompts import Answers, ProjectSelection
 from dev_ready.report import render_report
 
 PIN = UpstreamPin(
@@ -45,9 +45,7 @@ def test_report_omits_flag_names_when_component_disabled() -> None:
     answers = Answers(
         project_name="my-app",
         target_dir=Path("/does/not/exist/my-app"),
-        include_skills=False,
-        include_mcp=False,
-        include_docs=False,
+        selection=ProjectSelection.empty(),
     )
 
     report = render_report(answers, PIN, [Path("CLAUDE.md")])

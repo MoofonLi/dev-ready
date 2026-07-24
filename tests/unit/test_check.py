@@ -8,6 +8,8 @@ import pytest
 
 from dev_ready.cli import main
 from dev_ready.manifest import load_default_manifest
+from dev_ready.prompts import ProjectSelection
+from project_factory import materialize_project_structure
 
 
 
@@ -16,18 +18,6 @@ def _create_minimal_valid_project(project_dir: Path, stamp_version: int = 2) -> 
     pin = manifest.upstream["base_template"]
     vendored_map = {v.repo: v.commit for v in manifest.vendored}
 
-    # Upstream required paths
-    (project_dir / "backend").mkdir(parents=True, exist_ok=True)
-    (project_dir / "frontend").mkdir(parents=True, exist_ok=True)
-    (project_dir / "compose.yml").write_text("services: {}\n", encoding="utf-8")
-    (project_dir / "compose.override.yml").write_text("services: {}\n", encoding="utf-8")
-    (project_dir / ".env").write_text("ENV=test\n", encoding="utf-8")
-    (project_dir / "LICENSE").write_text("MIT License\n", encoding="utf-8")
-
-    # Required overlay files
-    (project_dir / "CLAUDE.md").write_text("# Project\n", encoding="utf-8")
-    (project_dir / "README.md").write_text("# Readme\n", encoding="utf-8")
-
     # Default items setup
     skill_item = manifest.components["skills"][0]
     skill_pin = vendored_map.get(skill_item.vendored_repo, skill_item.pin) if skill_item.vendored_repo else skill_item.pin
@@ -35,12 +25,14 @@ def _create_minimal_valid_project(project_dir: Path, stamp_version: int = 2) -> 
     mcp_item = manifest.components["mcp"][0]
     mcp_pin = mcp_item.pin
 
-    # Create item paths
-    for item in (skill_item, mcp_item):
-        for item_path in item.paths:
-            dest = project_dir / item_path.dest
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text("content\n", encoding="utf-8")
+    selection = ProjectSelection.from_items(
+        manifest.components,
+        skills=frozenset({skill_item.id}),
+        mcp=frozenset({mcp_item.id}),
+        docs=False,
+        agents=False,
+    )
+    materialize_project_structure(project_dir, manifest.components, selection)
 
     # Create stamp
     if stamp_version == 1:

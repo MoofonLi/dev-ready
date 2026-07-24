@@ -9,70 +9,32 @@ from dev_ready.verify import FORBIDDEN_PATHS, REQUIRED_UPSTREAM_PATHS, verify_pr
 
 
 from dev_ready.manifest import load_default_manifest
-from dev_ready.prompts import Answers
+from dev_ready.prompts import Answers, ProjectSelection
+from project_factory import materialize_project_structure
 
 CATALOG = load_default_manifest().components
-_DIRECTORY_ENTRIES = {"backend", "frontend"}
 
 
-def _answers(tmp_path: Path, **overrides: object) -> Answers:
-    defaults: dict[str, object] = {
-        "project_name": "my-app",
-        "target_dir": tmp_path / "my-app",
-        "include_skills": True,
-        "include_mcp": True,
-        "include_docs": True,
-        "include_agents": True,
-        "skills_items": frozenset({"project-orientation"}),
-        "mcp_items": frozenset({"mcp-config"}),
-    }
-    defaults.update(overrides)
-    return Answers(**defaults)  # type: ignore[arg-type]
+def _answers(
+    tmp_path: Path,
+    *,
+    skills_items: frozenset[str] = frozenset({"project-orientation"}),
+    mcp_items: frozenset[str] = frozenset({"mcp-config"}),
+) -> Answers:
+    return Answers(
+        project_name="my-app",
+        target_dir=tmp_path / "my-app",
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            skills=skills_items,
+            mcp=mcp_items,
+        ),
+    )
 
 
 def _make_complete_project(root: Path, answers: Answers | None = None) -> None:
-    import json
-    for rel_path in REQUIRED_UPSTREAM_PATHS:
-        path = root / rel_path
-        if rel_path in _DIRECTORY_ENTRIES:
-            path.mkdir(parents=True, exist_ok=True)
-        else:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("stub", encoding="utf-8")
-
-    (root / ".dev-ready.json").write_text("{}", encoding="utf-8")
-
     ans = answers or _answers(root)
-    for component, selected in (("skills", ans.skills_items), ("mcp", ans.mcp_items)):
-        for item in CATALOG.get(component, ()):
-            if item.id in selected:
-                for item_path in item.paths:
-                    dest = root / item_path.dest
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    if item_path.dest.endswith(".json"):
-                        dest.write_text("{}", encoding="utf-8")
-                    else:
-                        dest.write_text("stub", encoding="utf-8")
-
-                if item.inject is not None:
-                    target_path = root / item.inject.target
-                    target_path.parent.mkdir(parents=True, exist_ok=True)
-                    try:
-                        data = json.loads(target_path.read_text(encoding="utf-8"))
-                    except (OSError, json.JSONDecodeError):
-                        data = {}
-
-                    if item.inject.kind == "mcp-server":
-                        servers = data.setdefault("mcpServers", {})
-                        servers[item.inject.server_name] = {"command": item.inject.command}
-                    elif item.inject.kind == "npm-dev-dependency":
-                        dev_deps = data.setdefault("devDependencies", {})
-                        dev_deps[item.inject.package] = item.pin
-                        scripts = data.setdefault("scripts", {})
-                        for s_name, s_cmd in item.inject.scripts:
-                            scripts[s_name] = s_cmd
-
-                    target_path.write_text(json.dumps(data), encoding="utf-8")
+    materialize_project_structure(root, CATALOG, ans.selection)
 
 
 def test_verify_passes_when_all_required_paths_present(tmp_path: Path) -> None:
@@ -200,7 +162,10 @@ def test_verify_selection_matrix_mixed_and_negative(tmp_path: Path) -> None:
 
     # Leaked code-memory server entry while code-memory is unselected -> raises
     mcp_json = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
-    mcp_json.setdefault("mcpServers", {})["codebase-memory"] = {"command": "uvx"}
+    mcp_json.setdefault("mcpServers", {})["codebase-memory"] = {
+        "command": "uvx",
+        "args": ["codebase-memory-mcp==0.9.0"],
+    }
     (tmp_path / ".mcp.json").write_text(json.dumps(mcp_json), encoding="utf-8")
     with pytest.raises(VerificationError, match="unselected mcp item 'code-memory' left inject effect"):
         verify_project(tmp_path, ans, CATALOG)

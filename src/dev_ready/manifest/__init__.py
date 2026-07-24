@@ -9,12 +9,11 @@ from dev_ready.manifest.loader import (
     load_manifest,
     parse_manifest,
 )
-from dev_ready.manifest.models import CatalogItem, Injection, ItemPath, Manifest, UpstreamPin, VendoredPin
+from dev_ready.manifest.models import CatalogItem, ItemPath, Manifest, UpstreamPin, VendoredPin
 
 __all__ = [
     "SUPPORTED_MANIFEST_VERSION",
     "CatalogItem",
-    "Injection",
     "ItemPath",
     "Manifest",
     "UpstreamPin",
