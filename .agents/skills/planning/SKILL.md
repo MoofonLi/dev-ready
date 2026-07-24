@@ -14,6 +14,12 @@ intentions. The Tech Lead writes it and never writes code (ADR-007).
 `docs/handoff/` is gitignored (ADR-011) — the plan is a working artifact, not a
 committed repo doc. The committed roadmap it draws from is `docs/version-plan.md`.
 
+Since ADR-013 (internal process v2), each phase is *executed* through the
+four-phase loop: Planning (grill-with-docs → to-spec, producing a committed spec
+in `docs/specs/<version>/`) → Dispatch (to-tickets) → Execution (implement) →
+Verification (review gates). The version plan cut here is the map those loops
+run over; its phase sections should name the FR each spec will cover.
+
 ## Inputs to read first
 
 1. `docs/version-plan.md` — the roadmap: which FRs belong to this version, the

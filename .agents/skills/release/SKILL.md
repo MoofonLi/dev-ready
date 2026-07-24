@@ -61,7 +61,15 @@ Write `docs/handoff/<version>/reports/phase-N-overview.md` (one per completed ph
 
 This file stays in the gitignored handoff tree - it is the CEO's record, not a repo doc. Show it to the user and get an explicit OK before moving on: this is the "confirm it's fine" gate.
 
-## Step 4 - Staged commits
+## Step 4 - Doc status sweep, then staged commits
+
+Before staging anything, sweep the doc status lines so they cannot rot (added 2026-07-24 after AGENTS.md was found still claiming "v0.3 in progress" at the v0.6.0 release):
+
+- `AGENTS.md` "Current phase" line — set to the version being released (and the next version in planning, if decided).
+- `docs/requirements.md` Future Roadmap — mark the released version DONE (vX.Y.Z).
+- `docs/version_overview/<version>-overview.md` exists and says Released.
+
+These belong in the `docs:` commit below.
 
 Group the working-tree changes into separate commits by Conventional Commit type, in this order (each commit should leave the tree in a working state):
 
