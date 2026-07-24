@@ -57,8 +57,8 @@ Agreed 2026-07-17. Full detail, rationale, and per-version grouping live in
 - FR-18 (v0.4, shipped). THIRD_PARTY_NOTICES ↔ manifest `vendored` sync check in CI.
 - FR-19 (v0.5, shipped). anthropics/skills Apache 2.0 example subset with NOTICE propagation (document-processing skills permanently excluded).
 - FR-20 (v0.5, shipped). Karpathy guardrails content in generated CLAUDE.md — MIT per the upstream README declaration (no standalone LICENSE file; pinned commit preserves the grant), with attribution in NOTICES.
-- FR-21 (v0.6). `dev-ready check`: read-only validation of an existing project against its stamp and the CLI's manifest.
-- FR-22 (v0.6). `dev-ready upgrade`: re-apply overlay-managed files only (per the stamp's item selection); never touches upstream application code; never silently overwrites user edits.
+- FR-21 (v0.6, shipped). `dev-ready check`: read-only validation of an existing project against its stamp and the CLI's manifest.
+- FR-22 (v0.6, shipped). `dev-ready upgrade`: re-apply overlay-managed whole files only (per the stamp's item selection); refuses pre-v3 stamps, never touches upstream application code, and never silently overwrites user edits.
 
 ## Non-functional Requirements
 
@@ -76,7 +76,6 @@ NFR-5. Cross-platform: macOS, Linux, Windows.
 
 - Web UI companion (deferred, see roadmap)
 - Support for base templates other than fastapi/full-stack-fastapi-template
-- Post-generation project upgrade/migration commands
 
 ## Future Roadmap
 
@@ -85,7 +84,7 @@ NFR-5. Cross-platform: macOS, Linux, Windows.
 3. v0.3: pinned tool integrations + selection — generation stamp (FR-11), codebase-memory MCP (FR-12), react-doctor (FR-13), item-level selection (FR-14). See [version-plan.md](version-plan.md). DONE (v0.3.0).
 4. v0.4: vendoring infrastructure + MIT wave (FR-15..FR-18). DONE (v0.4.0).
 5. v0.5: Apache wave + karpathy guardrails (FR-19, FR-20). DONE (v0.5.0).
-6. v0.6: lifecycle commands — `check` / `upgrade` (FR-21, FR-22).
+6. v0.6: lifecycle commands — `check` / `upgrade` (FR-21, FR-22). DONE (v0.6.0).
 7. Beyond: additional base templates; possible Web UI companion (decisions deferred).
 
 ## Pre-start Checklist (carried from planning)

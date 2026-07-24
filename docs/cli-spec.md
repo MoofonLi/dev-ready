@@ -21,7 +21,7 @@ Generate a new project.
 
 Unknown item ids in `--skills` or `--mcp` fail fast with an invalid-arguments error (exit 2) listing valid item ids. Conflicting flags (e.g. `--no-skills` with `--skills <id>`) exit 2.
 
-Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification; 6 stamp missing or invalid; 7 drift detected; 8 upgrade not supported (pre-v0.6 stamp); 9 upgrade failed (rolled back).
+Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification; 6 stamp missing or unparseable/invalid; 7 drift detected; 8 upgrade not supported (pre-v3 stamp); 9 upgrade failed (rolled back).
 
 ### `dev-ready check [PATH]`
 
@@ -49,7 +49,10 @@ The project stamp is now `stamp_version` 3 and records the project name and a ma
 
 Standard version and help output.
 
-## Interactive Prompt Flow (default path)
+## Interactive Prompt Flow (default `init` path)
+
+This flow applies only to `init`. `check` and `upgrade` are non-interactive by
+construction and dispatch directly to their respective operations.
 
 1. Project name (if not given as argument)
 2. Level-1 component selection (skills / MCP / docs / agents — multi-select, all on by default)

@@ -92,8 +92,9 @@ the CLI contract changes once, not twice).
 FR-11. **Generation stamp.** `generate` writes `.dev-ready.json` at the root of every
 generated project: dev-ready version, selected components *and selected items per
 component* (FR-14), upstream pin (repo + commit), and — from v0.4 on — vendored
-pins. Without this, projects generated before v0.6 can never be `check`ed or
-`upgrade`d. Schema is versioned (`stamp_version: 1`). verify treats its presence as
+pins. Projects generated before v0.3 have no stamp and cannot be `check`ed or
+`upgrade`d; version-1 and version-2 stamps remain checkable but cannot be
+upgraded. Schema is versioned (`stamp_version: 1`). verify treats its presence as
 a required path.
 
 FR-12. **Codebase-memory MCP item.** The `mcp` component gains a `code-memory` item:
@@ -194,15 +195,17 @@ v0.3 by decision, not deferral.)
 FR-21. **`dev-ready check`.** Reads `.dev-ready.json` (FR-11) from an existing
 project, compares against the running CLI's manifest: which dev-ready version
 generated it, which components and items, whether pins are behind, whether
-required/forbidden paths still hold. Read-only, exit codes mirror verify semantics.
+required/forbidden paths still hold. It is read-only and exits 0 when clean, 6
+for a missing or invalid stamp, and 7 when drift is detected.
 
 FR-22. **`dev-ready upgrade`.** Re-applies a newer overlay onto an existing project.
-Scope deliberately conservative: overlay-managed files only (skills, mcp config,
+Scope deliberately conservative: overlay-managed whole files only (skills,
 handoff templates, CLAUDE.md sections we own — per the stamp's item selection),
 never upstream application code — that path was closed when `.copier/` was pruned
 (ADR-005 amendment). Conflict rule: never overwrite user-modified files silently;
 report and skip. Requires FR-21's stamp reading plus a recorded file inventory
 (added to the stamp in this version).
+Shared injection targets are reported and left unchanged.
 
 Explicitly still out of scope after v0.6: additional base templates, Web UI
 companion — now planned in detail; see "Post-v0.6 roadmap" below.
@@ -365,3 +368,10 @@ it?" — the same test as the curation principle.
 | v0.7 | FR-23 workflow config, FR-24 generate skill | Cheap, self-contained; deepens the existing agents/skills story with no new external surface |
 | v0.8 | FR-25 CLI i18n, FR-26 multi-agent render targets | Widens the audience once content and catalog are stable |
 | v1.0 | FR-27 second template; Web UI decision revisited | Platform step; gated on real-user feedback and the D-5 hard gates |
+
+**2026-07-24 — v0.6 close-out re-confirmation (CEO-confirmed, Moofon):**
+At v0.6 close the proposed post-v0.6 sequencing is confirmed unchanged — v0.7 =
+FR-23 (workflow config) + FR-24 (generate skill); v0.8 = FR-25 (CLI i18n) +
+FR-26 (multi-agent render targets); v1.0 = FR-27 (second template) + Web UI
+decision. No amendment. Ratified by the CEO (Moofon) on 2026-07-24; the v0.6.0
+release commit may proceed.

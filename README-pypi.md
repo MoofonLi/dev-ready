@@ -74,9 +74,24 @@ uvx dev-ready init my-app \
   --no-agents               # skip the agent-team handoff scaffold
 ```
 
+```bash
+# Inspect a generated project against its stamp and the current CLI (read-only)
+uvx dev-ready check path/to/project
+uvx dev-ready check path/to/project --json  # machine-readable report
+
+# Re-apply managed overlay files to an existing project (never touches app code)
+uvx dev-ready upgrade path/to/project
+uvx dev-ready upgrade path/to/project --dry-run  # preview; writes nothing
+```
+
+`check` is read-only and offline. `upgrade` re-applies only overlay-managed
+whole files, skips and reports user-modified or shared files, and applies its
+planned writes all-or-nothing. Both commands default to the current directory
+when `PATH` is omitted.
+
 Then follow the printed next steps (typically `docker compose watch` inside the generated project).
 
-Exit codes: 0 success; 1 unexpected error or user abort; 2 argument error; 3 network/fetch failure; 4 target directory conflict; 5 structural verification failure.
+Exit codes: 0 success; 1 unexpected error or user abort; 2 argument error; 3 network/fetch failure; 4 target directory conflict; 5 structural verification failure; 6 stamp missing or invalid; 7 drift detected; 8 upgrade not supported (pre-v3 stamp; projects generated before v0.6); 9 upgrade failed (rolled back).
 
 ## How it works
 
