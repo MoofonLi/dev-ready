@@ -46,6 +46,25 @@ pip install dev-ready
 dev-ready init my-app
 ```
 
+### Install the agent skill
+
+Install the repository's cross-agent skill directly:
+
+```bash
+npx skills add MoofonLi/dev-ready --skill dev-ready
+```
+
+The source is [`skills/dev-ready/SKILL.md`](skills/dev-ready/SKILL.md). To
+inspect the repository's discoverable skills before installing, run
+`npx skills add MoofonLi/dev-ready --list`.
+
+Then ask your agent: "Scaffold a FastAPI project with dev-ready named my-app."
+The skill will inspect the destination, resolve component selections, run one
+non-interactive initialization command, and verify the generated stamp.
+
+For installation or generation problems, open an issue at
+<https://github.com/MoofonLi/dev-ready/issues>.
+
 ## Usage
 
 ```bash

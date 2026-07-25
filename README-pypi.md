@@ -13,13 +13,14 @@ The upstream template is pinned to a CI-verified commit (never an untested "late
 A generated project based on [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) (FastAPI, React, SQLModel, PostgreSQL, Docker Compose), plus an AI tooling overlay so it works well with coding agents out of the box:
 
 - `CLAUDE.md` — project instructions for Claude Code, including Karpathy-derived development guardrails (MIT, per the upstream README)
-- Claude Code skills — nine pre-configured skills selectable at generation time:
+- Claude Code skills — ten pre-configured skills selectable at generation time:
   - **project-orientation** (built-in) — codebase orientation helper
   - **react-doctor** (pinned devDependency) — frontend dependency health checks
   - **caveman** (vendored, MIT) — token-discipline communication mode
   - **tdd** (vendored, MIT) — test-driven development loop
   - **diagnosing-bugs** (vendored, MIT) — diagnosis loop for hard bugs
   - **code-review** (vendored, MIT) — review against coding standards and spec
+  - **spec-loop** (vendored, MIT) — an end-to-end planning, dispatch, execution, and review bundle
   - **security-audit** (vendored, MIT) — multi-phase security audit
   - **webapp-testing** (vendored, Apache-2.0) — browser-automation end-to-end testing
   - **frontend-design** (vendored, Apache-2.0) — frontend UI design methodology
@@ -53,6 +54,26 @@ Or install with pip (requires Python >= 3.12):
 pip install dev-ready
 dev-ready init my-app
 ```
+
+### Install the agent skill
+
+Install the repository's cross-agent skill directly:
+
+```bash
+npx skills add MoofonLi/dev-ready --skill dev-ready
+```
+
+The source is
+[`skills/dev-ready/SKILL.md`](https://github.com/MoofonLi/dev-ready/blob/main/skills/dev-ready/SKILL.md).
+To inspect the repository's discoverable skills before installing, run
+`npx skills add MoofonLi/dev-ready --list`.
+
+Then ask your agent: "Scaffold a FastAPI project with dev-ready named my-app."
+The skill will inspect the destination, resolve component selections, run one
+non-interactive initialization command, and verify the generated stamp.
+
+For installation or generation problems, open an issue at
+<https://github.com/MoofonLi/dev-ready/issues>.
 
 ## Usage
 
