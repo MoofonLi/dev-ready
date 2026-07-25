@@ -14,6 +14,12 @@ definitions, handoff sequence, review gates, and loop rules (ADR-007). Configure
 as data in generated projects from v0.7 (FR-23).
 _Avoid_: workflow, team workflow, agent workflow, multi-agent flow
 
+**Protocol Configuration**:
+The authoritative runtime description of a generated project's Handoff
+Protocol. Agent-facing prose refers to its stable role ids; editable titles and
+model assignments are read from the configuration rather than copied elsewhere.
+_Avoid_: rendered role table, workflow config
+
 **Spec Loop**:
 The micro, within-session development loop one agent follows for one task:
 grill → spec → tickets → TDD → review → architecture cleanup. Ships as a single
@@ -38,8 +44,22 @@ _Avoid_: skill entry, module, addon
 
 **Bundle**:
 A catalog item that materializes multiple related assets selected as one unit
-because they are only valuable together (e.g. `spec-loop`). Counts as one item
+because they are only valuable together (e.g. `spec-loop`). A bundle includes
+the dependency closure needed for those assets to work and counts as one item
 against the cap.
+
+### Lifecycle
+
+**Base Provenance**:
+The immutable identity of the upstream template snapshot from which a project
+was originally generated. An overlay-only upgrade never changes it.
+_Avoid_: current upstream pin, upgraded base
+
+**Overlay Currency**:
+How current a generated project's dev-ready-managed overlay is: the dev-ready
+version, selected catalog items and their pins, and managed-file inventory.
+It can advance without changing Base Provenance.
+_Avoid_: project version, upstream currency
 
 ### Internal process (ADR-013)
 

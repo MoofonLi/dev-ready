@@ -280,14 +280,16 @@ role definitions, handoff document templates, folder structure, and loop rules
 Concretely: generated projects carry the Handoff Protocol as config
 (`docs/handoffs/protocol.yaml` — renamed from the provisional `workflow.yaml`
 on 2026-07-24, ADR-012: "workflow" is reserved for GitHub Actions files)
-declaring roles as data —
+declaring seven stable roles as data —
 `{id, title, model, responsibilities, never_does}` — plus the handoff sequence
-and loop rules. Handoff templates and the CLAUDE.md agent-roles section render
-role names and models from this config, never from literals. Two design rules:
+and loop rules. The generated file is authoritative at runtime: Handoff
+templates and CLAUDE.md name stable role ids and point to it instead of copying
+editable titles or models. Two design rules:
 
-- **Roles decoupled from models**: roles are `planner` / `implementer` /
-  `reviewer`-style ids; the model is an editable field on the role. Swapping
-  next year's model is a one-line config edit, not a template rewrite.
+- **Roles decoupled from models**: ids are `ceo`, `tech_lead`,
+  `senior_engineer`, `junior_engineer`, `qa_reviewer`, `security_reviewer`, and
+  `sre_reviewer`; the model is a nullable editable field on the role. Swapping
+  next year's model is a one-line generated-config edit, not a template rewrite.
 - **Preset, not framework**: the current loop ships as the single default
   preset. A preset ecosystem (multiple built-in loops, community sharing,
   plugin mechanics) is explicitly deferred until real users ask for it —
@@ -302,9 +304,11 @@ skill that teaches a coding agent when and how to drive
 `uvx dev-ready init` with the right flags — so a user can tell their agent
 "start a new project with X and Y" and the agent composes the command itself.
 
-Distribution: in this repo, laid out to be installable via the Agent Skills
-ecosystem (skills.sh) and/or as a Claude Code plugin — **not** inside generated
-projects (a generated project has no reason to regenerate itself).
+Distribution: in this repo at `skills/dev-ready/SKILL.md`, a standard location
+directly discoverable/installable by the open Agent Skills CLI — **not** inside
+generated projects (a generated project has no reason to regenerate itself).
+The 2026-07-25 contract requires no Claude plugin metadata or registry
+submission; skills.sh discovery is fed by CLI installation telemetry.
 Precondition: the FR-14 flag contract is stable (v0.3 shipped). Cost: one
 SKILL.md plus docs — smallest FR on this list.
 
@@ -404,11 +408,15 @@ unchanged. Core decision record: ADR-012.
 ### v0.7 — Methodology + polish (FR-23, FR-28, FR-24, FR-29)
 
 FR-28. **Spec Loop bundle + methodology layering (ADR-012).** A single new
-catalog item `spec-loop` (a *bundle*, one selection unit) vendors the four
-missing steps of the within-session development loop from mattpocock/skills
-(grill, to-spec, to-tickets, improve-architecture; tdd/diagnosing-bugs/
-code-review are already catalog items — same repo, same pin). Catalog lands at
-10/10. Three sub-deliverables:
+catalog item `spec-loop` (a *bundle*, one explicit selection unit) vendors the
+complete pinned asset/dependency closure of the four advertised missing steps
+of the within-session development loop from mattpocock/skills (grill-with-docs,
+to-spec, to-tickets, improve-codebase-architecture). It requires and
+automatically resolves the existing tdd/diagnosing-bugs/code-review items,
+whose compatibility ids remain independently selectable. The bundle also
+supplies the role-neutral tracker/domain configuration expected by the upstream
+skills, switching to process-v2 paths when Handoff Protocol is selected.
+Catalog lands at 10/10. Three sub-deliverables:
 - **Four-phase integration section** in generated CLAUDE.md, rendered **only**
   when both `agents` and `spec-loop` are selected: Planning (Lead:
   grill/to-spec) → Dispatch (Senior: to-tickets + handoff) → Execution (Junior:
@@ -417,20 +425,25 @@ code-review are already catalog items — same repo, same pin). Catalog lands at
   no reference to the other side's skills.
 - **`architecture.md` template** in the `docs` component (system overview /
   module boundaries / dependency rules skeleton), maintained by the Tech Lead
-  role, linked from CLAUDE.md. No root `CONTEXT.md` in generated projects
-  (single-entry-point rule, ADR-012).
+  role, linked from CLAUDE.md. The generator does not pre-create a root
+  `CONTEXT.md` (single-entry-point rule, ADR-012); a selected domain-modeling
+  skill may later create a glossary lazily when the user resolves terms.
 - FR-23's config file is `docs/handoffs/protocol.yaml` (see D-1 as amended).
   FR-23 and FR-28 modify the same CLAUDE.md agent-roles surface and are
   designed together — this coupling is why FR-28 lives in v0.7.
+  Together they adopt the process-v2 artifact model in generated projects:
+  durable specs, per-ticket dispatch, one-ticket execution, and `03`–`06`
+  gates; active phase working files are ignored.
 
 FR-29. **Progress reporting for `init`.** Staged status lines on stderr
 (`[1/4] Fetching base template (commit <pin>)…` → `done (12.3s)`), covering
-fetch → overlay → verify → move. TTY gets a spinner; non-TTY degrades to plain
+fetch → overlay → verify → finalize. TTY gets a spinner; non-TTY degrades to plain
 lines. No fabricated percentages (git clone has no trustworthy progress
 fraction) and **zero new dependencies**: `cli` passes a progress callback into
 `generate()`; lower modules never touch the terminal (module-boundary table
-unchanged). Sequenced before FR-25 so the i18n message catalog is created over
-the final string set.
+unchanged). Finalize stages beside the target and uses a same-filesystem atomic
+rename, removing the existing cross-device partial-copy window. Sequenced before
+FR-25 so the i18n message catalog is created over the final string set.
 
 ### v0.7 entry condition — cross-version upgrade E2E
 
@@ -443,13 +456,21 @@ remains as the standing N-1 → N regression test thereafter. (This CI job
 installs from the network; it is CI tooling, not `src/dev_ready/`, so the
 fetch-only network boundary does not apply.)
 
+ADR-014 clarifies the lifecycle assertion: overlay-only upgrade preserves the
+stamp's immutable Base Provenance while advancing Overlay Currency. A newer
+manifest base pin is advisory because `upgrade` never materializes upstream
+application changes; it must not be written into the stamp as false provenance.
+
 ### v0.7 release rider — distribution + a decidable real-users gate
 
 The D-5 hard gate "real users on the FastAPI template" is now **defined**:
-≥ 3 external signals not originating from the maintainer (GitHub
-issues/discussions/PRs, or attributable user feedback), **or** organic PyPI
-download growth for 4 consecutive weeks after discounting CI noise. The v1.0
+signals from at least three independent external, non-maintainer identities
+(one identity counts once), **or** strictly increasing adjusted PyPI downloads
+across four complete UTC weeks with raw totals, known maintainer/CI invocations,
+and the conservative subtraction recorded. If CI noise cannot be bounded, the
+download branch cannot satisfy the gate. The v1.0
 go/no-go reads this checklist, not a feeling. To give the gate a chance to
 ever pass, the v0.7 release includes three distribution actions (~1 day, no
-new FR): list the FR-24 generate skill on skills.sh; one launch post
+new FR): prove the FR-24 skill installs from the public repository and seed
+skills.sh discovery telemetry; one launch post
 (Show HN / r/FastAPI / X); a clear "report an issue" entry point in the README.

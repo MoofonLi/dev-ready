@@ -54,6 +54,21 @@ jobs:
         run: |
           python3 scripts/check_notices_sync.py
 
+  # Permanent N-1 -> N lifecycle gate (FR-22 / ADR-014). The test owns all
+  # orchestration and assertions; this job only provides network access and
+  # invokes it separately from the offline unit suite.
+  upgrade-from-release:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - name: Sync dependencies
+        run: uv sync --dev
+      - name: Run N-1 lifecycle gate
+        run: uv run pytest -m network tests/e2e/test_upgrade_from_release.py -s
+
   # FR-5 lives here, not on the user's machine (docs/architecture.md,
   # Deployment Architecture): generate a real project against the
   # manifest-pinned commit, then build and boot it with Docker Compose and
