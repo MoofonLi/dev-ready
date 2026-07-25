@@ -23,6 +23,30 @@ Unknown item ids in `--skills` or `--mcp` fail fast with an invalid-arguments er
 
 Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification; 6 stamp missing or unparseable/invalid; 7 drift detected; 8 upgrade not supported (pre-v3 stamp); 9 upgrade failed (rolled back).
 
+#### Init progress output
+
+`init` reports exactly four generation stages on stderr, in this order: fetch,
+overlay, verify, and finalize. The fetch stage includes the manifest-pinned
+upstream commit. A completed or failed stage includes elapsed time rounded to
+two decimal places. Progress is observational: it does not change the final
+report on stdout, command behavior, or the exit-code mapping above.
+
+When stderr is a TTY, the active stage uses a standard-library spinner and the
+renderer clears it before printing the terminal status. When stderr is
+redirected or non-interactive, each stage emits stable plain lines without ANSI
+escapes, carriage returns, or other animation controls. For example:
+
+```text
+[1/4] Fetching base template (commit <manifest-pin>)…
+[1/4] Fetching base template done (1.23s)
+```
+
+Progress never prints percentages. A failed stage is identified once before
+the normal typed error message. Temporary-staging cleanup failures are rendered
+as separate `warning:` lines; they are not a fifth stage. Spinner cleanup runs
+on success, expected errors, unexpected exceptions, keyboard interruption, and
+termination represented by Python as process exit.
+
 ### `dev-ready check [PATH]`
 
 Inspect an existing generated project directory against its `.dev-ready.json` stamp and the running CLI manifest. Read-only operation.

@@ -7,13 +7,22 @@ Responsibilities (see docs/architecture.md, Module Boundary):
 
 import argparse
 import sys
+import threading
 from collections.abc import Mapping
 from pathlib import Path
+from typing import TextIO
 
 from dev_ready import __version__
 from dev_ready.check import check_project
 from dev_ready.errors import AbortedError, DevReadyError, InvalidArgumentsError
-from dev_ready.generate import generate
+from dev_ready.generate import (
+    CleanupWarningEvent,
+    GenerationEvent,
+    GenerationStage,
+    ProgressEvent,
+    ProgressStatus,
+    generate,
+)
 from dev_ready.manifest import CatalogItem, load_default_manifest
 from dev_ready.prompts import (
     Answers,
@@ -24,6 +33,113 @@ from dev_ready.prompts import (
 )
 from dev_ready.report import render_report
 from dev_ready.upgrade import upgrade_project
+
+_STAGE_POSITION = {
+    GenerationStage.FETCH: 1,
+    GenerationStage.OVERLAY: 2,
+    GenerationStage.VERIFY: 3,
+    GenerationStage.FINALIZE: 4,
+}
+
+
+class ProgressRenderer:
+    """Render generation progress at the terminal boundary."""
+
+    _FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
+
+    def __init__(
+        self,
+        stream: TextIO,
+        *,
+        is_tty: bool | None = None,
+        spinner_interval: float = 0.08,
+    ) -> None:
+        self._stream = stream
+        self._is_tty = stream.isatty() if is_tty is None else is_tty
+        self._spinner_interval = spinner_interval
+        self._closed = False
+        self._write_lock = threading.Lock()
+        self._spinner_stop: threading.Event | None = None
+        self._spinner_thread: threading.Thread | None = None
+        self._active_text = ""
+
+    def __call__(self, event: GenerationEvent) -> None:
+        if self._closed:
+            return
+        if isinstance(event, CleanupWarningEvent):
+            self._stop_spinner()
+            self._write(f"warning: failed to remove temp directory {event.path}\n")
+            return
+        position = _STAGE_POSITION[event.stage]
+        description = self._description(event)
+        if event.status is ProgressStatus.STARTED:
+            text = f"[{position}/4] {description}…"
+            if self._is_tty:
+                self._start_spinner(text)
+            else:
+                self._write(f"{text}\n")
+            return
+        self._stop_spinner()
+        outcome = "done" if event.status is ProgressStatus.COMPLETED else "failed"
+        elapsed = max(0.0, event.elapsed_seconds or 0.0)
+        self._write(f"[{position}/4] {description} {outcome} ({elapsed:.2f}s)\n")
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        self._stop_spinner()
+
+    def _start_spinner(self, text: str) -> None:
+        self._stop_spinner()
+        stop = threading.Event()
+        self._spinner_stop = stop
+        self._active_text = text
+        self._write(f"\r{self._FRAMES[0]} {text}")
+
+        def _animate() -> None:
+            frame_index = 1
+            while not stop.wait(self._spinner_interval):
+                self._write(f"\r{self._FRAMES[frame_index]} {text}")
+                frame_index = (frame_index + 1) % len(self._FRAMES)
+
+        thread = threading.Thread(target=_animate, name="dev-ready-progress", daemon=True)
+        self._spinner_thread = thread
+        thread.start()
+
+    def _stop_spinner(self) -> None:
+        stop = self._spinner_stop
+        thread = self._spinner_thread
+        active_text = self._active_text
+        self._spinner_stop = None
+        self._spinner_thread = None
+        self._active_text = ""
+        if stop is None:
+            return
+        stop.set()
+        if thread is not None:
+            thread.join(timeout=0.2)
+        self._write(f"\r{' ' * (len(active_text) + 2)}\r")
+
+    def _description(self, event: ProgressEvent) -> str:
+        if event.stage is GenerationStage.FETCH:
+            if event.status is ProgressStatus.STARTED:
+                return f"Fetching base template (commit {event.commit})"
+            return "Fetching base template"
+        return {
+            GenerationStage.OVERLAY: "Applying dev-ready overlay",
+            GenerationStage.VERIFY: "Verifying generated project",
+            GenerationStage.FINALIZE: "Finalizing project",
+        }[event.stage]
+
+    def _write(self, text: str) -> None:
+        try:
+            with self._write_lock:
+                self._stream.write(text)
+                self._stream.flush()
+        except Exception:
+            # Rendering is observational and must not affect generation.
+            pass
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -178,7 +294,17 @@ def _run_init(args: argparse.Namespace) -> int:
             print("aborted: nothing was written", file=sys.stderr)
             return 1
 
-    written = generate(answers, pin, manifest.components, vendored=manifest.vendored)
+    progress = ProgressRenderer(sys.stderr)
+    try:
+        written = generate(
+            answers,
+            pin,
+            manifest.components,
+            vendored=manifest.vendored,
+            progress=progress,
+        )
+    finally:
+        progress.close()
     print(render_report(answers, pin, written))
     return 0
 

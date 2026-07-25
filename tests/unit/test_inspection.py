@@ -61,3 +61,28 @@ def test_inspection_reports_malformed_effect_target_as_a_fact(tmp_path: Path) ->
         issue.category == "invalid inject target" and "JSON object" in issue.detail
         for issue in issues
     )
+
+
+def test_inspection_strips_template_suffix_from_catalog_assets(tmp_path: Path) -> None:
+    selection = ProjectSelection.from_items(
+        CATALOG,
+        skills=frozenset({"spec-loop"}),
+        docs=False,
+        agents=False,
+    )
+
+    # Fake generation of spec-loop asset without .tmpl suffix (rendered destination path)
+    asset_dir = tmp_path / "docs" / "agents"
+    asset_dir.mkdir(parents=True)
+    (asset_dir / "issue-tracker.md").write_text("tracker", encoding="utf-8")
+    (asset_dir / "triage-labels.md").write_text("labels", encoding="utf-8")
+    (asset_dir / "domain.md").write_text("domain", encoding="utf-8")
+
+    issues = inspect_project(
+        tmp_path,
+        CATALOG,
+        ProjectExpectation.generation(selection),
+    )
+
+    # Should not report missing asset issue-tracker.md.tmpl
+    assert not any("issue-tracker.md.tmpl" in issue.detail for issue in issues)

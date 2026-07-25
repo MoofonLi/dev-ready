@@ -1,6 +1,7 @@
 """Unit tests for dev_ready.cli."""
 
 import argparse
+import io
 import sys
 from pathlib import Path
 
@@ -8,7 +9,7 @@ import pytest
 
 import dev_ready.cli as cli_module
 from dev_ready import __version__
-from dev_ready.cli import build_answers, build_parser, main
+from dev_ready.cli import ProgressRenderer, build_answers, build_parser, main
 from dev_ready.errors import (
     AbortedError,
     FetchError,
@@ -17,10 +18,21 @@ from dev_ready.errors import (
     TargetDirectoryError,
     VerificationError,
 )
+from dev_ready.generate import (
+    CleanupWarningEvent,
+    GenerationStage,
+    ProgressEvent,
+    ProgressStatus,
+)
 from dev_ready.manifest import load_default_manifest
 from dev_ready.prompts import Answers
 
 CATALOG = load_default_manifest().components
+
+
+class _TTYBuffer(io.StringIO):
+    def isatty(self) -> bool:
+        return True
 
 
 def _init_args(**overrides) -> argparse.Namespace:
@@ -91,6 +103,159 @@ def test_init_success_exits_0_and_prints_summary(
     assert str(target_dir) in out
     assert "fastapi/full-stack-fastapi-template" in out
     assert "next steps" in out
+
+
+def test_init_renders_stable_non_tty_progress_on_stderr_only(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    def _fake_generate(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
+        progress = kwargs["progress"]
+        for index, stage in enumerate(GenerationStage, start=1):
+            progress(
+                ProgressEvent(
+                    stage=stage,
+                    status=ProgressStatus.STARTED,
+                    commit=pin.commit if stage is GenerationStage.FETCH else None,
+                )
+            )
+            progress(
+                ProgressEvent(
+                    stage=stage,
+                    status=ProgressStatus.COMPLETED,
+                    elapsed_seconds=index + 0.234,
+                    commit=pin.commit if stage is GenerationStage.FETCH else None,
+                )
+            )
+        return [Path("CLAUDE.md")]
+
+    monkeypatch.setattr(cli_module, "generate", _fake_generate)
+
+    assert main(["init", "my-app", "--yes", "--dir", str(tmp_path / "my-app")]) == 0
+    captured = capsys.readouterr()
+
+    assert "[1/4]" not in captured.out
+    assert captured.err.splitlines() == [
+        f"[1/4] Fetching base template (commit {cli_module.load_default_manifest().upstream['base_template'].commit})…",
+        "[1/4] Fetching base template done (1.23s)",
+        "[2/4] Applying dev-ready overlay…",
+        "[2/4] Applying dev-ready overlay done (2.23s)",
+        "[3/4] Verifying generated project…",
+        "[3/4] Verifying generated project done (3.23s)",
+        "[4/4] Finalizing project…",
+        "[4/4] Finalizing project done (4.23s)",
+    ]
+    assert "\x1b" not in captured.err
+    assert "\r" not in captured.err
+    assert "%" not in captured.err
+
+
+def test_tty_progress_animates_active_stage_and_closes_idempotently() -> None:
+    stream = _TTYBuffer()
+    renderer = ProgressRenderer(stream, is_tty=True, spinner_interval=60.0)
+
+    renderer(
+        ProgressEvent(
+            stage=GenerationStage.FETCH,
+            status=ProgressStatus.STARTED,
+            commit="abc123",
+        )
+    )
+    active_output = stream.getvalue()
+    renderer(
+        ProgressEvent(
+            stage=GenerationStage.FETCH,
+            status=ProgressStatus.COMPLETED,
+            elapsed_seconds=1.5,
+            commit="abc123",
+        )
+    )
+    renderer.close()
+    renderer.close()
+
+    output = stream.getvalue()
+    assert active_output.startswith("\r⠋ [1/4] Fetching base template (commit abc123)…")
+    assert "[1/4] Fetching base template done (1.50s)" in output
+    assert output.endswith("\n")
+
+
+def test_progress_renderer_renders_cleanup_warning_outside_stage_count(tmp_path: Path) -> None:
+    stream = io.StringIO()
+    renderer = ProgressRenderer(stream, is_tty=False)
+    staging = tmp_path / ".my-app.dev-ready-abcd"
+
+    renderer(CleanupWarningEvent(staging))
+
+    assert stream.getvalue() == f"warning: failed to remove temp directory {staging}\n"
+    assert "[" not in stream.getvalue()
+
+
+@pytest.mark.parametrize(
+    ("stage", "error", "expected_exit_code"),
+    [
+        (GenerationStage.FETCH, FetchError("network down"), 3),
+        (GenerationStage.OVERLAY, OverlayError("collision"), 1),
+        (GenerationStage.VERIFY, VerificationError("missing frontend"), 5),
+        (GenerationStage.FINALIZE, TargetDirectoryError("target race"), 4),
+    ],
+)
+def test_init_identifies_failed_stage_once_before_typed_error(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    stage: GenerationStage,
+    error: Exception,
+    expected_exit_code: int,
+) -> None:
+    def _failing_generate(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
+        progress = kwargs["progress"]
+        progress(ProgressEvent(stage=stage, status=ProgressStatus.STARTED, commit=pin.commit))
+        progress(
+            ProgressEvent(
+                stage=stage,
+                status=ProgressStatus.FAILED,
+                elapsed_seconds=2.5,
+                commit=pin.commit,
+            )
+        )
+        raise error
+
+    monkeypatch.setattr(cli_module, "generate", _failing_generate)
+
+    assert main(["init", "my-app", "--yes"]) == expected_exit_code
+    stderr = capsys.readouterr().err
+
+    assert stderr.count("failed (2.50s)") == 1
+    assert stderr.index("failed (2.50s)") < stderr.index("error:")
+
+
+@pytest.mark.parametrize("error", [RuntimeError("boom"), KeyboardInterrupt(), SystemExit(143)])
+def test_init_closes_progress_on_unexpected_interrupt_and_termination(
+    monkeypatch: pytest.MonkeyPatch, error: BaseException
+) -> None:
+    closed: list[ProgressRenderer] = []
+    original_close = ProgressRenderer.close
+
+    def _recording_close(renderer: ProgressRenderer) -> None:
+        closed.append(renderer)
+        original_close(renderer)
+
+    def _failing_generate(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
+        progress = kwargs["progress"]
+        progress(
+            ProgressEvent(
+                stage=GenerationStage.FETCH,
+                status=ProgressStatus.STARTED,
+                commit=pin.commit,
+            )
+        )
+        raise error
+
+    monkeypatch.setattr(ProgressRenderer, "close", _recording_close)
+    monkeypatch.setattr(cli_module, "generate", _failing_generate)
+
+    with pytest.raises(type(error)):
+        main(["init", "my-app", "--yes"])
+
+    assert len(closed) == 1
 
 
 def test_init_success_omits_disabled_components_from_summary(

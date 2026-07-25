@@ -10,6 +10,7 @@ from pathlib import Path
 
 from dev_ready.catalog_effects import CatalogEffectError
 from dev_ready.manifest import CatalogItem
+from dev_ready.overlay.rendering import TEMPLATE_SUFFIX
 from dev_ready.prompts import ProjectSelection
 
 REQUIRED_UPSTREAM_PATHS: tuple[str, ...] = (
@@ -216,7 +217,8 @@ def _resource_files(
 ) -> tuple[Path, ...]:
     files: list[Path] = []
     for entry in sorted(directory.iterdir(), key=lambda item: item.name):
-        relative = prefix / entry.name
+        name = entry.name.removesuffix(TEMPLATE_SUFFIX) if not entry.is_dir() else entry.name
+        relative = prefix / name
         if entry.is_dir():
             files.extend(_resource_files(entry, relative))
         elif entry.is_file():
