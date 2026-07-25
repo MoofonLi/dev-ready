@@ -21,7 +21,7 @@ dev-ready does not ship a copy of this template inside the wheel. At generation 
 - License: MIT
 - Pinned Commit: ed37663cc5fbef691ddfecd080dff42f7e7e350d
 - Source: https://github.com/mattpocock/skills
-- Subset: `skills/engineering/tdd`, `skills/engineering/diagnosing-bugs`, and `skills/engineering/code-review` vendored into `src/dev_ready/templates/claude/skills/`.
+- Subset: `skills/engineering/tdd`, `skills/engineering/diagnosing-bugs`, `skills/engineering/code-review`, `skills/engineering/grill-with-docs`, `skills/productivity/grilling`, `skills/engineering/domain-modeling`, `skills/engineering/to-spec`, `skills/engineering/to-tickets`, `skills/engineering/improve-codebase-architecture`, and `skills/engineering/codebase-design` vendored into `src/dev_ready/templates/claude/skills/`.
 
 ## cloudflare/security-audit-skill
 

@@ -65,6 +65,34 @@
         {
           "src": "skills/engineering/code-review",
           "dest": "src/dev_ready/templates/claude/skills/code-review"
+        },
+        {
+          "src": "skills/engineering/grill-with-docs",
+          "dest": "src/dev_ready/templates/claude/skills/grill-with-docs"
+        },
+        {
+          "src": "skills/productivity/grilling",
+          "dest": "src/dev_ready/templates/claude/skills/grilling"
+        },
+        {
+          "src": "skills/engineering/domain-modeling",
+          "dest": "src/dev_ready/templates/claude/skills/domain-modeling"
+        },
+        {
+          "src": "skills/engineering/to-spec",
+          "dest": "src/dev_ready/templates/claude/skills/to-spec"
+        },
+        {
+          "src": "skills/engineering/to-tickets",
+          "dest": "src/dev_ready/templates/claude/skills/to-tickets"
+        },
+        {
+          "src": "skills/engineering/improve-codebase-architecture",
+          "dest": "src/dev_ready/templates/claude/skills/improve-codebase-architecture"
+        },
+        {
+          "src": "skills/engineering/codebase-design",
+          "dest": "src/dev_ready/templates/claude/skills/codebase-design"
         }
       ]
     },
@@ -203,6 +231,52 @@
             {
               "src": "claude/skills/code-review",
               "dest": ".claude/skills/code-review"
+            }
+          ]
+        },
+        {
+          "id": "spec-loop",
+          "description": "Complete Spec Loop for grilling, durable specs, tracer-bullet tickets, TDD, review, diagnosis, and architecture improvement.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "mattpocock/skills",
+          "requires": [
+            "tdd",
+            "diagnosing-bugs",
+            "code-review"
+          ],
+          "paths": [
+            {
+              "src": "claude/skills/grill-with-docs",
+              "dest": ".claude/skills/grill-with-docs"
+            },
+            {
+              "src": "claude/skills/grilling",
+              "dest": ".claude/skills/grilling"
+            },
+            {
+              "src": "claude/skills/domain-modeling",
+              "dest": ".claude/skills/domain-modeling"
+            },
+            {
+              "src": "claude/skills/to-spec",
+              "dest": ".claude/skills/to-spec"
+            },
+            {
+              "src": "claude/skills/to-tickets",
+              "dest": ".claude/skills/to-tickets"
+            },
+            {
+              "src": "claude/skills/improve-codebase-architecture",
+              "dest": ".claude/skills/improve-codebase-architecture"
+            },
+            {
+              "src": "claude/skills/codebase-design",
+              "dest": ".claude/skills/codebase-design"
+            },
+            {
+              "src": "claude/spec-loop",
+              "dest": "docs/agents"
             }
           ]
         },

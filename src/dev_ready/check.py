@@ -21,6 +21,12 @@ def check_project(project_dir: Path, json_output: bool = False) -> str:
     manifest = load_default_manifest()
 
     drifts: list[str] = []
+    advisories: list[str] = []
+    if stamp.dev_ready_version != __version__:
+        drifts.append(
+            f"[overlay version drift] recorded dev-ready {stamp.dev_ready_version} "
+            f"differs from current {__version__}"
+        )
     vendored_map = {vendor.repo: vendor.commit for vendor in manifest.vendored}
     current_upstream = manifest.upstream.get("base_template")
     if current_upstream is None:
@@ -29,9 +35,11 @@ def check_project(project_dir: Path, json_output: bool = False) -> str:
         stamp.upstream.repo != current_upstream.repo
         or stamp.upstream.commit != current_upstream.commit
     ):
-        drifts.append(
-            f"[upstream pin drift] recorded {stamp.upstream.repo}@{stamp.upstream.commit[:7]} "
-            f"differs from current {current_upstream.repo}@{current_upstream.commit[:7]}"
+        advisories.append(
+            f"[base update advisory] project Base Provenance is "
+            f"{stamp.upstream.repo}@{stamp.upstream.commit[:7]}; current generation uses "
+            f"{current_upstream.repo}@{current_upstream.commit[:7]}. "
+            "Overlay upgrade does not replace upstream application content."
         )
 
     known_skills = frozenset(item.id for item in manifest.components.get("skills", ()))
@@ -95,6 +103,8 @@ def check_project(project_dir: Path, json_output: bool = False) -> str:
         "clean": not drifts,
         "drift_count": len(drifts),
         "drifts": drifts,
+        "advisory_count": len(advisories),
+        "advisories": advisories,
     }
 
     if json_output:
@@ -112,6 +122,10 @@ def check_project(project_dir: Path, json_output: bool = False) -> str:
             lines.extend(f"  - {drift}" for drift in drifts)
         else:
             lines.append("Status: CLEAN (0 drift detected)")
+        if advisories:
+            lines.append("")
+            lines.append(f"Advisories ({len(advisories)}):")
+            lines.extend(f"  - {advisory}" for advisory in advisories)
         report = "\n".join(lines) + "\n"
 
     if drifts:

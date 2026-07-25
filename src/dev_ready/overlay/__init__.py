@@ -16,13 +16,11 @@ from dev_ready import __version__
 from dev_ready.catalog_effects import CatalogEffectError
 from dev_ready.errors import OverlayError
 from dev_ready.manifest import CatalogItem, UpstreamPin, VendoredPin
+from dev_ready.overlay.rendering import TEMPLATE_SUFFIX as _TEMPLATE_SUFFIX
+from dev_ready.overlay.rendering import render_asset as _render_asset
 from dev_ready.prompts import Answers
 
 __all__ = ["apply_overlay", "build_overlay_content", "content_inventory", "render_stamp"]
-
-_TEMPLATE_SUFFIX = ".tmpl"
-_TEMPLATE_TOKEN = "{{project_name}}"
-
 
 def render_stamp(
     answers: Answers,
@@ -83,7 +81,7 @@ def build_overlay_content(
         path = dest_rel.as_posix()
         if path in content:
             raise OverlayError(f"overlay destination collision: {path}")
-        content[path] = _render_asset(source, dest_rel, answers.project_name)
+        content[path] = _render_asset(source, dest_rel, answers)
 
     def collect(source: Traversable, dest_rel: Path) -> None:
         if source.is_dir():
@@ -163,18 +161,3 @@ def apply_overlay(
         raise OverlayError(f"failed to write .dev-ready.json: {error}") from error
     written.append(Path(".dev-ready.json"))
     return written
-
-
-def _render_asset(source: Traversable, dest_rel: Path, project_name: str) -> bytes:
-    """Render one package asset without writing it."""
-    if not source.is_file():
-        raise OverlayError(f"overlay asset missing: {source}")
-    try:
-        if source.name.endswith(_TEMPLATE_SUFFIX):
-            rendered = source.read_text(encoding="utf-8").replace(_TEMPLATE_TOKEN, project_name)
-            if "{{" in rendered or "}}" in rendered:
-                raise OverlayError(f"unresolved template marker left in {dest_rel}")
-            return rendered.encode("utf-8")
-        return source.read_bytes()
-    except OSError as error:
-        raise OverlayError(f"failed to read overlay asset for {dest_rel}: {error}") from error

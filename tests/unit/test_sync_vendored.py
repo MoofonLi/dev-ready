@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from dev_ready.manifest.models import ItemPath, VendoredPin
+from dev_ready.manifest import load_default_manifest
 
 _SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "sync_vendored.py"
 _spec = importlib.util.spec_from_file_location("sync_vendored", _SCRIPT_PATH)
@@ -176,3 +177,33 @@ def test_sync_all_rejects_invalid_manifest(tmp_path: Path) -> None:
 
     with pytest.raises(ManifestError):
         sync_vendored.sync_all(manifest_path, tmp_path, tmp_path / ".sync-cache")
+
+
+def test_spec_loop_snapshot_contains_every_referenced_support_file() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    manifest = load_default_manifest()
+    pin = next(entry for entry in manifest.vendored if entry.repo == "mattpocock/skills")
+    spec_loop_paths = {
+        path.dest for path in pin.paths if path.dest not in {
+            "src/dev_ready/templates/claude/skills/tdd",
+            "src/dev_ready/templates/claude/skills/diagnosing-bugs",
+            "src/dev_ready/templates/claude/skills/code-review",
+        }
+    }
+
+    assert spec_loop_paths == {
+        "src/dev_ready/templates/claude/skills/grill-with-docs",
+        "src/dev_ready/templates/claude/skills/grilling",
+        "src/dev_ready/templates/claude/skills/domain-modeling",
+        "src/dev_ready/templates/claude/skills/to-spec",
+        "src/dev_ready/templates/claude/skills/to-tickets",
+        "src/dev_ready/templates/claude/skills/improve-codebase-architecture",
+        "src/dev_ready/templates/claude/skills/codebase-design",
+    }
+    for dest in spec_loop_paths:
+        assert (repo_root / dest / "SKILL.md").is_file()
+    assert (repo_root / "src/dev_ready/templates/claude/skills/domain-modeling/ADR-FORMAT.md").is_file()
+    assert (repo_root / "src/dev_ready/templates/claude/skills/domain-modeling/CONTEXT-FORMAT.md").is_file()
+    assert (repo_root / "src/dev_ready/templates/claude/skills/codebase-design/DEEPENING.md").is_file()
+    assert (repo_root / "src/dev_ready/templates/claude/skills/codebase-design/DESIGN-IT-TWICE.md").is_file()
+    assert (repo_root / "src/dev_ready/templates/claude/skills/improve-codebase-architecture/HTML-REPORT.md").is_file()

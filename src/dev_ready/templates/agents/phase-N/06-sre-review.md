@@ -1,15 +1,16 @@
-# Phase N — 06: SRE Review
+# Phase N - 06: Reliability Gate
 
-- Phase: <N — short name>
+- Protocol role id: `sre_reviewer`
+- Protocol authority: `../protocol.yaml`
 - Verdict: PENDING
 
 ## Operability
 
-<build, run, config, failure modes, rollback>
+<build, run, configuration, failure modes, and rollback>
 
 ## Findings
 
-<operability / release issues, most-severe first>
+<operability findings, most severe first>
 
 ## Verdict
 

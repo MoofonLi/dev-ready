@@ -81,7 +81,12 @@ class ProjectSelection:
     ) -> ProjectSelection:
         _validate_items("skills", skills, catalog)
         _validate_items("mcp", mcp, catalog)
-        return cls._create(skills=skills, mcp=mcp, docs=docs, agents=agents)
+        return cls._create(
+            skills=_resolve_requirements("skills", skills, catalog),
+            mcp=_resolve_requirements("mcp", mcp, catalog),
+            docs=docs,
+            agents=agents,
+        )
 
     @classmethod
     def all(cls, catalog: Mapping[str, tuple[CatalogItem, ...]]) -> ProjectSelection:
@@ -111,7 +116,8 @@ class ProjectSelection:
 
         all_skills = frozenset(item.id for item in catalog.get("skills", ()))
         all_mcp = frozenset(item.id for item in catalog.get("mcp", ()))
-        return cls._create(
+        return cls.from_items(
+            catalog,
             skills=_resolve_items("skills", skills, no_skills, all_skills),
             mcp=_resolve_items("mcp", mcp, no_mcp, all_mcp),
             docs=not no_docs,
@@ -172,6 +178,23 @@ def _validate_items(
         raise InvalidArgumentsError(
             f"unknown {name} item ids: {unknown!r}; valid ids: {sorted(valid)!r}"
         )
+
+
+def _resolve_requirements(
+    name: str,
+    selected: frozenset[str],
+    catalog: Mapping[str, tuple[CatalogItem, ...]],
+) -> frozenset[str]:
+    item_by_id = {item.id: item for item in catalog.get(name, ())}
+    resolved = set(selected)
+    pending = sorted(selected)
+    while pending:
+        item_id = pending.pop(0)
+        for required_id in item_by_id[item_id].requires:
+            if required_id not in resolved:
+                resolved.add(required_id)
+                pending.append(required_id)
+    return frozenset(resolved)
 
 
 @dataclass(frozen=True)

@@ -80,6 +80,109 @@ def test_parse_valid_manifest() -> None:
     assert mcp.paths[0].dest == ".mcp.json"
 
 
+def _add_required_skill(
+    data: dict[str, object],
+    *,
+    item_id: str,
+    requires: list[str] | None = None,
+) -> None:
+    components = data["components"]
+    assert isinstance(components, dict)
+    skills = components["skills"]
+    assert isinstance(skills, dict)
+    items = skills["items"]
+    assert isinstance(items, list)
+    item: dict[str, object] = {
+        "id": item_id,
+        "description": f"{item_id} skill",
+        "mode": "builtin",
+        "license": "MIT",
+        "paths": [{"src": f"claude/skills/{item_id}", "dest": f".claude/skills/{item_id}"}],
+    }
+    if requires is not None:
+        item["requires"] = requires
+    items.append(item)
+
+
+def test_catalog_item_requirements_are_parsed_in_manifest_order() -> None:
+    data = json.loads(json.dumps(VALID))
+    _add_required_skill(data, item_id="tdd")
+    _add_required_skill(data, item_id="spec-loop", requires=["tdd", "project-orientation"])
+
+    manifest = parse_manifest(json.dumps(data))
+
+    assert manifest.components["skills"][-1].requires == ("tdd", "project-orientation")
+
+
+@pytest.mark.parametrize(
+    ("requires", "match"),
+    [
+        (["missing"], "unknown item"),
+        (["spec-loop"], "cannot require itself"),
+    ],
+)
+def test_catalog_item_requirements_reject_invalid_references(
+    requires: list[str], match: str
+) -> None:
+    data = json.loads(json.dumps(VALID))
+    _add_required_skill(data, item_id="spec-loop", requires=requires)
+
+    with pytest.raises(ManifestError, match=match):
+        parse_manifest(json.dumps(data))
+
+
+def test_catalog_item_requirements_reject_cross_component_reference() -> None:
+    data = json.loads(json.dumps(VALID))
+    _add_required_skill(data, item_id="spec-loop", requires=["mcp-config"])
+
+    with pytest.raises(ManifestError, match="same component"):
+        parse_manifest(json.dumps(data))
+
+
+def test_catalog_item_requirements_reject_cycles() -> None:
+    data = json.loads(json.dumps(VALID))
+    _add_required_skill(data, item_id="grill", requires=["spec-loop"])
+    _add_required_skill(data, item_id="spec-loop", requires=["grill"])
+
+    with pytest.raises(ManifestError, match="dependency cycle.*grill.*spec-loop"):
+        parse_manifest(json.dumps(data))
+
+
+def test_default_manifest_contains_complete_spec_loop_bundle() -> None:
+    manifest = load_default_manifest()
+    skills = {item.id: item for item in manifest.components["skills"]}
+
+    assert len(skills) == 10
+    assert skills["spec-loop"].requires == (
+        "tdd",
+        "diagnosing-bugs",
+        "code-review",
+    )
+    assert skills["spec-loop"].vendored_repo == "mattpocock/skills"
+    assert {path.dest for path in skills["spec-loop"].paths} == {
+        ".claude/skills/grill-with-docs",
+        ".claude/skills/grilling",
+        ".claude/skills/domain-modeling",
+        ".claude/skills/to-spec",
+        ".claude/skills/to-tickets",
+        ".claude/skills/improve-codebase-architecture",
+        ".claude/skills/codebase-design",
+        "docs/agents",
+    }
+
+    mattpocock = next(pin for pin in manifest.vendored if pin.repo == "mattpocock/skills")
+    assert mattpocock.commit == "ed37663cc5fbef691ddfecd080dff42f7e7e350d"
+    assert {path.src for path in mattpocock.paths} >= {
+        "skills/engineering/grill-with-docs",
+        "skills/productivity/grilling",
+        "skills/engineering/domain-modeling",
+        "skills/engineering/to-spec",
+        "skills/engineering/to-tickets",
+        "skills/engineering/improve-codebase-architecture",
+        "skills/engineering/codebase-design",
+    }
+
+
 
 def test_verified_at_may_be_null() -> None:
     data = json.loads(json.dumps(VALID))

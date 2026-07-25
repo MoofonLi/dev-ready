@@ -1,6 +1,7 @@
 """Unit tests for dev_ready.verify (no network, filesystem confined to tmp_path)."""
 
 from pathlib import Path
+import shutil
 
 import pytest
 
@@ -9,10 +10,13 @@ from dev_ready.verify import FORBIDDEN_PATHS, REQUIRED_UPSTREAM_PATHS, verify_pr
 
 
 from dev_ready.manifest import load_default_manifest
+from dev_ready.overlay import apply_overlay
 from dev_ready.prompts import Answers, ProjectSelection
 from project_factory import materialize_project_structure
 
 CATALOG = load_default_manifest().components
+MANIFEST = load_default_manifest()
+PIN = MANIFEST.upstream["base_template"]
 
 
 def _answers(
@@ -109,7 +113,7 @@ def test_verify_raises_when_stamp_file_is_missing(tmp_path: Path) -> None:
 def test_verify_raises_when_selected_item_path_is_missing(tmp_path: Path) -> None:
     ans = _answers(tmp_path, skills_items=frozenset({"project-orientation"}))
     _make_complete_project(tmp_path, ans)
-    (tmp_path / ".claude" / "skills" / "project-orientation").unlink()
+    shutil.rmtree(tmp_path / ".claude" / "skills" / "project-orientation")
 
     with pytest.raises(VerificationError, match="selected skills item 'project-orientation' is missing"):
         verify_project(tmp_path, ans, CATALOG)
@@ -177,6 +181,49 @@ def test_verify_selection_matrix_mixed_and_negative(tmp_path: Path) -> None:
     # Missing react-doctor devDependency while selected -> raises
     (tmp_path / "frontend" / "package.json").write_text("{}", encoding="utf-8")
     with pytest.raises(VerificationError, match="selected skills item 'react-doctor' is missing its inject effect"):
+        verify_project(tmp_path, ans, CATALOG)
+
+
+def test_verify_rejects_missing_selected_spec_loop_configuration(tmp_path: Path) -> None:
+    ans = _answers(tmp_path, skills_items=frozenset({"spec-loop"}), mcp_items=frozenset())
+    _make_complete_project(tmp_path, ans)
+    shutil.rmtree(tmp_path / "docs" / "agents")
+
+    with pytest.raises(VerificationError, match="selected skills item 'spec-loop' is missing"):
+        verify_project(tmp_path, ans, CATALOG)
+
+
+def _make_generated_project(root: Path, answers: Answers) -> None:
+    for relative in REQUIRED_UPSTREAM_PATHS:
+        path = root / relative
+        if relative in {"backend", "frontend"}:
+            path.mkdir(parents=True, exist_ok=True)
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("upstream", encoding="utf-8")
+    apply_overlay(answers, root, CATALOG, PIN, MANIFEST.vendored)
+
+
+def test_verify_detects_a_missing_nested_spec_loop_asset(tmp_path: Path) -> None:
+    ans = _answers(tmp_path, skills_items=frozenset({"spec-loop"}), mcp_items=frozenset())
+    _make_generated_project(tmp_path, ans)
+    (tmp_path / ".claude" / "skills" / "domain-modeling" / "ADR-FORMAT.md").unlink()
+
+    with pytest.raises(
+        VerificationError,
+        match="selected skills item 'spec-loop'.*ADR-FORMAT.md.*missing",
+    ):
+        verify_project(tmp_path, ans, CATALOG)
+
+
+def test_verify_rejects_a_deselected_spec_loop_asset(tmp_path: Path) -> None:
+    ans = _answers(tmp_path, skills_items=frozenset(), mcp_items=frozenset())
+    _make_generated_project(tmp_path, ans)
+    leaked = tmp_path / ".claude" / "skills" / "to-spec"
+    leaked.mkdir(parents=True)
+    (leaked / "SKILL.md").write_text("leaked", encoding="utf-8")
+
+    with pytest.raises(VerificationError, match="unselected skills item 'spec-loop'"):
         verify_project(tmp_path, ans, CATALOG)
 
 

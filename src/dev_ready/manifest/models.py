@@ -63,6 +63,7 @@ class CatalogItem:
     pin: str | None = None
     effect: CatalogEffect | None = None
     vendored_repo: str | None = None
+    requires: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

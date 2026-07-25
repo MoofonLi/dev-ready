@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from dev_ready.errors import InvalidArgumentsError
-from dev_ready.manifest import load_default_manifest
+from dev_ready.manifest import CatalogItem, ItemPath, load_default_manifest
 from dev_ready.prompts import Answers, ProjectSelection
 
 
@@ -64,3 +64,63 @@ def test_answers_rejects_invalid_project_name_at_its_interface() -> None:
 def test_canonical_selection_rejects_unknown_catalog_items() -> None:
     with pytest.raises(InvalidArgumentsError, match="unknown skills item ids"):
         ProjectSelection.from_items(CATALOG, skills=frozenset({"ghost-skill"}))
+
+
+def _dependency_catalog() -> dict[str, tuple[CatalogItem, ...]]:
+    def item(item_id: str, *requires: str) -> CatalogItem:
+        return CatalogItem(
+            id=item_id,
+            description=item_id,
+            mode="builtin",
+            license="MIT",
+            paths=(ItemPath(src=item_id, dest=item_id),),
+            requires=requires,
+        )
+
+    return {
+        "skills": (
+            item("review"),
+            item("tdd", "review"),
+            item("spec-loop", "tdd"),
+            item("standalone"),
+        ),
+        "mcp": (),
+    }
+
+
+def test_selection_resolves_transitive_requirements() -> None:
+    selection = ProjectSelection.from_items(
+        _dependency_catalog(), skills=frozenset({"spec-loop"})
+    )
+
+    assert selection.skills == frozenset({"spec-loop", "tdd", "review"})
+
+
+def test_flag_selection_exposes_resolved_requirements() -> None:
+    selection = ProjectSelection.from_flags(
+        catalog=_dependency_catalog(),
+        skills="spec-loop",
+        mcp="none",
+        no_skills=False,
+        no_mcp=False,
+        no_docs=False,
+        no_agents=False,
+    )
+
+    assert selection is not None
+    assert selection.skills == frozenset({"spec-loop", "tdd", "review"})
+
+
+def test_explicit_none_has_an_empty_dependency_closure() -> None:
+    selection = ProjectSelection.from_flags(
+        catalog=_dependency_catalog(),
+        skills="none",
+        mcp="none",
+        no_skills=False,
+        no_mcp=False,
+        no_docs=False,
+        no_agents=False,
+    )
+
+    assert selection is not None
+    assert selection.skills == frozenset()

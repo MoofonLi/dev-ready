@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pytest
 
+import dev_ready.check as check_module
 from dev_ready.cli import main
+from dev_ready import __version__
 from dev_ready.manifest import load_default_manifest
 from dev_ready.prompts import ProjectSelection
 from project_factory import materialize_project_structure
@@ -38,7 +40,7 @@ def _create_minimal_valid_project(project_dir: Path, stamp_version: int = 2) -> 
     if stamp_version == 1:
         stamp_data = {
             "stamp_version": 1,
-            "dev_ready_version": "0.3.0",
+            "dev_ready_version": __version__,
             "components": {
                 "skills": {"included": True, "items": [skill_item.id]},
                 "mcp": {"included": True, "items": [mcp_item.id]},
@@ -50,7 +52,7 @@ def _create_minimal_valid_project(project_dir: Path, stamp_version: int = 2) -> 
     elif stamp_version == 2:
         stamp_data = {
             "stamp_version": 2,
-            "dev_ready_version": "0.5.0",
+            "dev_ready_version": __version__,
             "components": {
                 "skills": {"included": True, "items": [{"id": skill_item.id, "pin": skill_pin}]},
                 "mcp": {"included": True, "items": [{"id": mcp_item.id, "pin": mcp_pin}]},
@@ -62,7 +64,7 @@ def _create_minimal_valid_project(project_dir: Path, stamp_version: int = 2) -> 
     else:
         stamp_data = {
             "stamp_version": 3,
-            "dev_ready_version": "0.6.0",
+            "dev_ready_version": __version__,
             "project_name": "test-project",
             "components": {
                 "skills": {"included": True, "items": [{"id": skill_item.id, "pin": skill_pin}]},
@@ -148,7 +150,9 @@ def test_check_future_stamp_version(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert "unsupported stamp_version 4" in captured.err
 
 
-def test_check_upstream_pin_drift(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_check_newer_upstream_pin_is_a_non_blocking_advisory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     _create_minimal_valid_project(tmp_path, stamp_version=2)
     stamp_path = tmp_path / ".dev-ready.json"
     data = json.loads(stamp_path.read_text(encoding="utf-8"))
@@ -156,9 +160,37 @@ def test_check_upstream_pin_drift(tmp_path: Path, capsys: pytest.CaptureFixture[
     stamp_path.write_text(json.dumps(data), encoding="utf-8")
 
     exit_code = main(["check", str(tmp_path)])
-    assert exit_code == 7
+    assert exit_code == 0
     captured = capsys.readouterr()
-    assert "upstream pin drift" in captured.err
+    assert "base update advisory" in captured.out
+    assert "Status: CLEAN" in captured.out
+
+
+def test_check_json_separates_base_advisories_from_actionable_drift(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=3)
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["upstream"]["commit"] = "0" * 40
+    stamp_path.write_text(json.dumps(data), encoding="utf-8")
+
+    assert main(["check", str(tmp_path), "--json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["clean"] is True
+    assert report["drift_count"] == 0
+    assert report["advisory_count"] == 1
+    assert "base update advisory" in report["advisories"][0]
+
+
+def test_check_stale_dev_ready_version_is_overlay_currency_drift(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=3)
+    monkeypatch.setattr(check_module, "__version__", "0.7.0")
+
+    assert main(["check", str(tmp_path)]) == 7
+    assert "overlay version drift" in capsys.readouterr().err
 
 
 def test_check_item_pin_drift(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

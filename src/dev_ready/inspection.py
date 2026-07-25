@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from importlib import resources
+from importlib.resources.abc import Traversable
 from pathlib import Path
 
 from dev_ready.catalog_effects import CatalogEffectError
@@ -179,9 +181,47 @@ def _inspect_item_paths(
                 f"selected {name} item {item.id!r} is missing its path {item_path.dest!r}"
             )
             issues.append(ProjectIssue("missing item path", detail, verification))
+        elif expected:
+            source = resources.files("dev_ready").joinpath(
+                "templates", *item_path.src.split("/")
+            )
+            if source.is_dir():
+                if not target.is_dir():
+                    detail = (
+                        f"selected {name} item {item.id!r} path {item_path.dest!r} "
+                        "must be a directory"
+                    )
+                    issues.append(ProjectIssue("invalid item path", detail, detail))
+                    continue
+                for relative in _resource_files(source):
+                    expected_file = target.joinpath(*relative.parts)
+                    if not _is_safe(root, expected_file) or not expected_file.is_file():
+                        asset = (Path(item_path.dest) / relative).as_posix()
+                        detail = (
+                            f"selected {name} item {item.id!r} asset {asset!r} is missing"
+                        )
+                        issues.append(ProjectIssue("missing item asset", detail, detail))
+            elif source.is_file() and not target.is_file():
+                detail = (
+                    f"selected {name} item {item.id!r} asset {item_path.dest!r} is missing"
+                )
+                issues.append(ProjectIssue("missing item asset", detail, detail))
         elif not expected and present:
             detail = f"unselected {name} item {item.id!r} left path {item_path.dest!r} in the output"
             issues.append(ProjectIssue("unexpected item path", detail, detail))
+
+
+def _resource_files(
+    directory: Traversable, prefix: Path = Path()
+) -> tuple[Path, ...]:
+    files: list[Path] = []
+    for entry in sorted(directory.iterdir(), key=lambda item: item.name):
+        relative = prefix / entry.name
+        if entry.is_dir():
+            files.extend(_resource_files(entry, relative))
+        elif entry.is_file():
+            files.append(relative)
+    return tuple(files)
 
 
 def _inspect_item_effect(

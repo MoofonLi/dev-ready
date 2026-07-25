@@ -77,6 +77,7 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
 
     vendored = _parse_vendored(data, source)
     components = _parse_components(data, source, vendored)
+    _validate_catalog_requirements(components, source)
 
     overlay_version = data.get("overlay_version")
     if not isinstance(overlay_version, str) or not overlay_version:
@@ -351,11 +352,14 @@ def _parse_components(
                     raise ManifestError(
                         f"{source}: component '{comp_name}' item '{item_id}' field 'pin' must be a valid exact-semver string, got {pin!r}"
                     )
+
             else:
                 if pin is not None:
                     raise ManifestError(
                         f"{source}: component '{comp_name}' item '{item_id}' field 'pin' is only allowed for pinned-dependency items"
                     )
+
+            requires = _parse_requirements(comp_name, item_id, item_entry, source)
 
             try:
                 effect = parse_catalog_effect(
@@ -382,11 +386,90 @@ def _parse_components(
                     pin=pin,
                     effect=effect,
                     vendored_repo=vendored_repo_val if mode == "vendor" else None,
+                    requires=requires,
                 )
             )
 
         result[comp_name] = tuple(parsed_items)
     return result
+
+
+def _parse_requirements(
+    component: str, item_id: str, entry: dict[str, object], source: str
+) -> tuple[str, ...]:
+    raw = entry.get("requires")
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' field 'requires' must be a list"
+        )
+
+    requirements: list[str] = []
+    for required_id in raw:
+        if (
+            not isinstance(required_id, str)
+            or not required_id
+            or not _ITEM_ID_PATTERN.fullmatch(required_id)
+        ):
+            raise ManifestError(
+                f"{source}: component '{component}' item '{item_id}' requirement ids must match pattern, got {required_id!r}"
+            )
+        if required_id in requirements:
+            raise ManifestError(
+                f"{source}: component '{component}' item '{item_id}' has duplicate requirement {required_id!r}"
+            )
+        requirements.append(required_id)
+    return tuple(requirements)
+
+
+def _validate_catalog_requirements(
+    components: dict[str, tuple[CatalogItem, ...]], source: str
+) -> None:
+    all_components_by_id = {
+        item.id: component
+        for component, items in components.items()
+        for item in items
+    }
+
+    for component, items in components.items():
+        item_by_id = {item.id: item for item in items}
+        for item in items:
+            for required_id in item.requires:
+                if required_id == item.id:
+                    raise ManifestError(
+                        f"{source}: component '{component}' item '{item.id}' cannot require itself"
+                    )
+                if required_id not in item_by_id:
+                    other_component = all_components_by_id.get(required_id)
+                    if other_component is not None:
+                        raise ManifestError(
+                            f"{source}: component '{component}' item '{item.id}' requirement {required_id!r} must reference an item in the same component, not '{other_component}'"
+                        )
+                    raise ManifestError(
+                        f"{source}: component '{component}' item '{item.id}' requires unknown item {required_id!r}"
+                    )
+
+        visiting: list[str] = []
+        visited: set[str] = set()
+
+        def visit(item_id: str) -> None:
+            if item_id in visited:
+                return
+            if item_id in visiting:
+                cycle_start = visiting.index(item_id)
+                cycle = [*visiting[cycle_start:], item_id]
+                raise ManifestError(
+                    f"{source}: component '{component}' dependency cycle: {' -> '.join(cycle)}"
+                )
+            visiting.append(item_id)
+            for required_id in item_by_id[item_id].requires:
+                visit(required_id)
+            visiting.pop()
+            visited.add(item_id)
+
+        for item in items:
+            visit(item.id)
 
 
 def _parse_catalog_path(

@@ -42,6 +42,22 @@ def test_parse_notices_content_extracts_vendored_entries() -> None:
     assert "fastapi/full-stack-fastapi-template" not in result
 
 
+def test_mattpocock_notice_names_the_complete_spec_loop_subset() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    notices = (repo_root / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+
+    for skill_name in (
+        "grill-with-docs",
+        "grilling",
+        "domain-modeling",
+        "to-spec",
+        "to-tickets",
+        "improve-codebase-architecture",
+        "codebase-design",
+    ):
+        assert skill_name in notices
+
+
 def test_check_notices_sync_success_when_matching(tmp_path: Path) -> None:
     manifest_path = tmp_path / "manifest.json"
     notices_path = tmp_path / "THIRD_PARTY_NOTICES.md"
@@ -435,4 +451,3 @@ def test_parse_marks_only_attribution_only_sections(tmp_path: Path) -> None:
     result = check_notices_sync_mod.parse_notices_content(content)
     assert "attribution_only" not in result["owner/vendored-repo"]
     assert result["multica-ai/andrej-karpathy-skills"].get("attribution_only") == "true"
-

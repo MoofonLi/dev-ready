@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 import dev_ready.upgrade as upgrade_module
+import dev_ready.overlay as overlay_module
 from dev_ready.cli import main
 from dev_ready.errors import UpgradeError, UpgradeNotSupportedError
 from dev_ready.manifest import load_default_manifest
@@ -57,6 +58,25 @@ def _set_inventory_hash(project: Path, path: str, content: bytes) -> None:
     else:
         raise AssertionError(f"inventory has no {path}")
     stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _add_obsolete_managed_file(
+    project: Path,
+    path: str,
+    *,
+    recorded_content: bytes,
+    current_content: bytes | None = None,
+) -> Path:
+    target = project / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(current_content if current_content is not None else recorded_content)
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["inventory"].append(
+        {"path": path, "sha256": hashlib.sha256(recorded_content).hexdigest()}
+    )
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return target
 
 
 def test_fresh_project_is_a_byte_identical_noop(tmp_path: Path) -> None:
@@ -246,3 +266,115 @@ def test_upgrade_rewrites_v3_stamp_inventory(tmp_path: Path) -> None:
     assert stamp.stamp_version == 3
     inventory = {entry.path: entry.sha256 for entry in stamp.inventory}
     assert inventory["CLAUDE.md"] == hashlib.sha256((project / "CLAUDE.md").read_bytes()).hexdigest()
+
+
+def test_upgrade_preserves_recorded_base_provenance(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["upstream"] = {"repo": "original/base-template", "commit": "0" * 40}
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    upgrade_project(project)
+
+    upgraded = load_stamp(project)
+    assert upgraded.upstream.repo == "original/base-template"
+    assert upgraded.upstream.commit == "0" * 40
+
+
+def test_upgrade_advances_overlay_currency_without_adding_new_defaults(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _make_project(tmp_path)
+    monkeypatch.setattr(overlay_module, "__version__", "0.7.0")
+
+    upgrade_project(project)
+
+    upgraded = load_stamp(project)
+    assert upgraded.dev_ready_version == "0.7.0"
+    assert {item.id for item in upgraded.skills_items} == {"project-orientation"}
+    assert not (project / ".claude" / "skills" / "spec-loop").exists()
+
+
+def test_untouched_obsolete_managed_file_is_deleted(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    obsolete = _add_obsolete_managed_file(
+        project,
+        "docs/handoffs/phase-N/01-plan.md",
+        recorded_content=b"legacy plan",
+    )
+
+    report = upgrade_project(project)
+
+    assert not obsolete.exists()
+    assert "Deleted (obsolete) (1):" in report
+    assert "docs/handoffs/phase-N/01-plan.md" in report
+    assert "docs/handoffs/phase-N/01-plan.md" not in {
+        entry.path for entry in load_stamp(project).inventory
+    }
+
+
+def test_modified_obsolete_managed_file_is_preserved_and_reported(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    obsolete = _add_obsolete_managed_file(
+        project,
+        "docs/handoffs/phase-N/02-implementation.md",
+        recorded_content=b"legacy brief",
+        current_content=b"user notes",
+    )
+
+    report = upgrade_project(project)
+
+    assert obsolete.read_bytes() == b"user notes"
+    assert "Preserved (obsolete, user-modified) (1):" in report
+    assert "docs/handoffs/phase-N/02-implementation.md" in report
+
+
+def test_dry_run_reports_obsolete_deletion_without_mutating(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    _add_obsolete_managed_file(project, "obsolete.md", recorded_content=b"old")
+    before = _snapshot(project)
+
+    report = upgrade_project(project, dry_run=True)
+
+    assert _snapshot(project) == before
+    assert "would delete obsolete.md" in report
+
+
+def test_failure_after_obsolete_deletion_rolls_it_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _make_project(tmp_path)
+    obsolete = _add_obsolete_managed_file(
+        project, "docs/handoffs/phase-N/01-plan.md", recorded_content=b"legacy"
+    )
+    before = _snapshot(project)
+    original = upgrade_module._write_target
+    failed = False
+
+    def fail_write(path: Path, data: bytes) -> None:
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise OSError("injected failure after deletion")
+        original(path, data)
+
+    monkeypatch.setattr(upgrade_module, "_write_target", fail_write)
+    with pytest.raises(UpgradeError, match="rolled back"):
+        upgrade_project(project)
+
+    assert obsolete.read_bytes() == b"legacy"
+    assert _snapshot(project) == before
+
+
+def test_obsolete_deletion_is_idempotent(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    _add_obsolete_managed_file(project, "obsolete.md", recorded_content=b"old")
+    upgrade_project(project)
+    before = _snapshot(project)
+
+    report = upgrade_project(project, dry_run=True)
+
+    assert _snapshot(project) == before
+    assert "Deleted (obsolete) (0):" in report
+    assert "would delete" not in report

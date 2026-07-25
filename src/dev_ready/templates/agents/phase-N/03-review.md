@@ -1,15 +1,16 @@
-# Phase N — 03: Senior Engineer Review
+# Phase N - 03: Spec Review
 
-- Phase: <N — short name>
+- Protocol role id: `senior_engineer`
+- Protocol authority: `../protocol.yaml`
 - Verdict: PENDING
 
-## Reviewed
+## Spec reviewed
 
-<files / diffs reviewed>
+<durable spec path and implemented ticket set>
 
 ## Findings
 
-<logic and architecture findings, most-severe first; empty if none>
+<logic and architecture findings, most severe first; empty if none>
 
 ## Verdict
 

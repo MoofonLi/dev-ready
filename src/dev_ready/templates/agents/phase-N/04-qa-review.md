@@ -1,6 +1,7 @@
-# Phase N — 04: QA Review
+# Phase N - 04: Quality Gate
 
-- Phase: <N — short name>
+- Protocol role id: `qa_reviewer`
+- Protocol authority: `../protocol.yaml`
 - Verdict: PENDING
 
 ## Test coverage
@@ -9,7 +10,7 @@
 
 ## Findings
 
-<quality issues, most-severe first>
+<quality findings, most severe first>
 
 ## Verdict
 

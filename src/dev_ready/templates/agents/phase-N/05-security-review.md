@@ -1,15 +1,16 @@
-# Phase N — 05: Security Review
+# Phase N - 05: Security Gate
 
-- Phase: <N — short name>
+- Protocol role id: `security_reviewer`
+- Protocol authority: `../protocol.yaml`
 - Verdict: PENDING
 
 ## Surface reviewed
 
-<inputs, secrets, network, filesystem, dependencies>
+<inputs, secrets, network, filesystem, and dependencies>
 
 ## Findings
 
-<security issues, most-severe first>
+<security findings, most severe first>
 
 ## Verdict
 

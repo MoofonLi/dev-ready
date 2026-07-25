@@ -55,8 +55,9 @@ def _format_report(
         ("Skipped (user-modified)", "skipped_modified"),
         ("Skipped (shared, not auto-upgraded)", "skipped_shared"),
         ("Skipped (missing)", "skipped_missing"),
+        ("Deleted (obsolete)", "deleted"),
+        ("Preserved (obsolete, user-modified)", "preserved_obsolete_modified"),
         ("Conflict", "conflict"),
-        ("Obsolete", "obsolete"),
     )
     lines = [
         f"dev-ready upgrade report for {project_dir}",
@@ -68,13 +69,20 @@ def _format_report(
         entries = groups[key]
         lines.append(f"{heading} ({len(entries)}):")
         for path in entries:
-            action = f"{prefix}{path}" if key in {"upgraded", "added"} else path
+            if key == "deleted" and dry_run:
+                action = f"would delete {path}"
+            elif key in {"upgraded", "added"}:
+                action = f"{prefix}{path}"
+            else:
+                action = path
             lines.append(f"  - {action}")
     action_word = "would change" if dry_run else "changed"
     lines.append("")
     lines.append(
-        f"Summary: {len(groups['upgraded'])} upgraded, {len(groups['added'])} added; "
-        f"{action_word} {len(groups['upgraded']) + len(groups['added'])} overlay-managed files."
+        f"Summary: {len(groups['upgraded'])} upgraded, {len(groups['added'])} added, "
+        f"{len(groups['deleted'])} deleted; {action_word} "
+        f"{len(groups['upgraded']) + len(groups['added']) + len(groups['deleted'])} "
+        "overlay-managed files."
     )
     return "\n".join(lines) + "\n"
 
@@ -82,8 +90,8 @@ def _format_report(
 def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
     """Safely update only clean, whole-file overlay content in ``project_dir``.
 
-    The inventory is trusted only for its hashes and report strings: every path
-    considered for filesystem access is rebuilt from the current manifest.
+    Current overlay paths come from the manifest. Recorded paths are accessed
+    only for obsolete-file retirement after containment and symlink checks.
     """
     resolved = project_dir.resolve()
     stamp = load_stamp(project_dir)
@@ -94,7 +102,16 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         )
 
     manifest = load_default_manifest()
-    pin = manifest.upstream["base_template"]
+    manifest_pin = manifest.upstream["base_template"]
+    pin = type(manifest_pin)(
+        repo=stamp.upstream.repo,
+        ref=manifest_pin.ref,
+        commit=stamp.upstream.commit,
+        license=manifest_pin.license,
+        verified_at=manifest_pin.verified_at,
+        exclude=manifest_pin.exclude,
+        prune=manifest_pin.prune,
+    )
     known_skills = frozenset(item.id for item in manifest.components.get("skills", ()))
     known_mcp = frozenset(item.id for item in manifest.components.get("mcp", ()))
     answers = Answers(
@@ -117,11 +134,13 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         "skipped_modified": [],
         "skipped_shared": [],
         "skipped_missing": [],
+        "deleted": [],
+        "preserved_obsolete_modified": [],
         "conflict": [],
-        "obsolete": sorted(path for path in recorded if path not in new_content),
     }
     upgrades: list[tuple[Path, bytes]] = []
     adds: list[tuple[Path, bytes]] = []
+    deletions: list[Path] = []
 
     for path in sorted(new_content):
         target = resolved / path
@@ -155,6 +174,25 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
             groups["added"].append(path)
             adds.append((target, new_content[path]))
 
+    for path in sorted(recorded.keys() - new_content.keys()):
+        target = resolved / path
+        if not _is_within(resolved, target):
+            raise UpgradeError(f"recorded obsolete path escapes project directory: {path}")
+        if _has_symlink_component(resolved, target):
+            groups["conflict"].append(path)
+            continue
+        if not target.exists():
+            continue
+        if not target.is_file():
+            groups["conflict"].append(path)
+            continue
+        current_hash = hashlib.sha256(target.read_bytes()).hexdigest()
+        if current_hash != recorded[path]:
+            groups["preserved_obsolete_modified"].append(path)
+            continue
+        groups["deleted"].append(path)
+        deletions.append(target)
+
     # Some injection targets (for example frontend/package.json) are not
     # whole-file overlay content. They still merit an explicit report when the
     # selected item owns an injection there, because upgrade intentionally
@@ -180,12 +218,12 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         raise UpgradeError(f"failed to read .dev-ready.json during upgrade: {error}") from error
 
     report = _format_report(resolved, stamp.dev_ready_version, stamp.stamp_version, groups, dry_run)
-    has_writes = bool(upgrades or adds) or stamp_changed
+    has_writes = bool(upgrades or adds or deletions) or stamp_changed
     if dry_run or not has_writes:
         return report
 
     backup_root = Path(tempfile.mkdtemp(prefix="dev-ready-upgrade-"))
-    overwritten = [target for target, _ in upgrades] + [stamp_path]
+    overwritten = [target for target, _ in upgrades] + deletions + [stamp_path]
     backups: dict[Path, Path] = {}
     created_files: list[Path] = []
     created_dirs: list[Path] = []
@@ -195,6 +233,8 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
             shutil.copy2(target, backup)
             backups[target] = backup
 
+        for target in deletions:
+            target.unlink()
         for target, data in upgrades:
             _write_target(target, data)
         for target, data in adds:

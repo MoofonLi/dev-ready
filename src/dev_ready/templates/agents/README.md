@@ -1,47 +1,12 @@
-# Multi-Agent Handoff Protocol
+# Handoff Protocol
 
-This project was generated with the **agents** component. It sets up a fixed-role,
-document-driven workflow for AI-assisted development. Agents coordinate ONLY through
-the on-disk handoff documents in this directory — never through assumed chat context.
+`protocol.yaml` is the sole runtime authority for role configuration, responsibilities, prohibitions, handoff order, escalation, reporting, and commit authority. Always read it before acting in a protocol role. Prose in this scaffold uses stable role ids; editable titles and model assignments live only in the Protocol Configuration.
 
-## Roles
+## Process-v2 artifacts
 
-| Role | Does | Never does |
-|---|---|---|
-| CEO (you) | Sets goals, approves plans, commits/merges | — |
-| Tech Lead | Decisions, plans, writes handoff docs | Write or edit code |
-| Senior Engineer | Task breakdown for the junior, code + architecture review, fixes escalated hard bugs | Write code the junior can handle |
-| Junior Engineer | Implements tasks in the working tree, writes an execution report per phase | Run state-changing git; keep grinding on a hard bug |
-| QA / Security / SRE | Reviews quality, security, and operability per phase | — |
+- Accepted feature specs are durable under `docs/specs/`.
+- Dispatch publishes one tracer-bullet file per ticket under an active phase's `tickets/` directory. Each ticket declares blockers, a file footprint, and whether it is parallel-safe.
+- Execution works one frontier ticket at a time and records evidence in `reports/execution-report.md`. A hard blocker is recorded in `reports/problems.md` and escalated according to `protocol.yaml`.
+- Verification runs `03-review.md`, `04-qa-review.md`, `05-security-review.md`, and `06-sre-review.md` in order.
 
-Only the CEO runs state-changing git (commit / branch / push). Every other role edits
-the working tree only.
-
-## Per-phase files
-
-Work is organized into phases. Each phase lives in `phase-N/` and uses these files, in order:
-
-| File | Author | Purpose |
-|---|---|---|
-| `01-plan.md` | Senior Engineer | Ordered task breakdown with implementation details |
-| `02-implementation.md` | Junior Engineer | Implementation brief the junior executes |
-| `03-review.md` | Senior Engineer | Logic + architecture review of the implementation |
-| `04-qa-review.md` | QA | Quality review |
-| `05-security-review.md` | Security | Security review |
-| `06-sre-review.md` | SRE | Operability / release review |
-
-## `reports/` convention
-
-Each phase's Junior writes to `phase-N/reports/`:
-
-- `execution-report.md` — ALWAYS written: per-task status, test evidence, files changed.
-- `problems.md` — written ONLY when a hard bug was hit.
-
-## The Junior's stop-and-escalate rule
-
-A hard bug is: more than 2 failed fix attempts, a failure that cannot be localized to a
-cause, or anything that seems to require crossing a module boundary or changing a
-documented decision. On a hard bug the Junior STOPS, logs it in `phase-N/reports/problems.md`
-(where / what happened / suspected cause / what was tried), and moves to the next
-independent task — it does not keep grinding. The presence of `problems.md` blocks the
-phase on the Senior Engineer.
+Copy `phase-N/` to open an active `phase-<number>/`. Active numeric phase directories are ignored by this directory's `.gitignore`; the Protocol Configuration, this README, the reusable scaffold, and specs remain durable.

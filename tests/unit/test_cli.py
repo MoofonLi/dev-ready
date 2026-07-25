@@ -188,8 +188,9 @@ def test_build_answers_defaults() -> None:
             "project-orientation",
             "react-doctor",
             "caveman",
-            "security-audit",
-            "tdd",
+                "security-audit",
+                "spec-loop",
+                "tdd",
             "diagnosing-bugs",
             "code-review",
             "webapp-testing",
@@ -279,8 +280,9 @@ def test_skills_and_mcp_item_flag_variations() -> None:
             "project-orientation",
             "react-doctor",
             "caveman",
-            "security-audit",
-            "tdd",
+                "security-audit",
+                "spec-loop",
+                "tdd",
             "diagnosing-bugs",
             "code-review",
             "webapp-testing",
@@ -301,7 +303,7 @@ def test_unknown_item_id_exits_2(capsys) -> None:
     assert main(["init", "my-app", "--yes", "--skills", "bogus"]) == 2
     err = capsys.readouterr().err
     assert "unknown skills item ids: ['bogus']" in err
-    assert "valid ids: ['caveman', 'code-review', 'diagnosing-bugs', 'frontend-design', 'project-orientation', 'react-doctor', 'security-audit', 'tdd', 'webapp-testing']" in err
+    assert "valid ids: ['caveman', 'code-review', 'diagnosing-bugs', 'frontend-design', 'project-orientation', 'react-doctor', 'security-audit', 'spec-loop', 'tdd', 'webapp-testing']" in err
 
 
 def test_conflicting_flags_exits_2(capsys) -> None:
