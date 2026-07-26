@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-import dev_ready.check as check_module
 from dev_ready.cli import main
 from dev_ready import __version__
 from dev_ready.manifest import load_default_manifest
@@ -184,10 +183,13 @@ def test_check_json_separates_base_advisories_from_actionable_drift(
 
 
 def test_check_stale_dev_ready_version_is_overlay_currency_drift(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _create_minimal_valid_project(tmp_path, stamp_version=3)
-    monkeypatch.setattr(check_module, "__version__", "0.7.0")
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["dev_ready_version"] = "0.6.0"
+    stamp_path.write_text(json.dumps(data), encoding="utf-8")
 
     assert main(["check", str(tmp_path)]) == 7
     assert "overlay version drift" in capsys.readouterr().err
