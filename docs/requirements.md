@@ -1,12 +1,12 @@
 # Requirements — dev-ready
 
-Status: v0.7 implementation scope shipped (2026-07-26); the public v0.7.0
-release and distribution actions remain Phase 5 ticket 02. Historical scope and
-roadmap details are in docs/version-plan.md.
+Status: v0.8 released (2026-07-27). FR-26 is shipped in v0.8.0; documentation,
+review, release, and distribution verification are complete. Historical scope
+and roadmap details are in docs/version-plan.md.
 
 ## Problem Statement
 
-Starting a production-grade FastAPI project that is ready for AI-assisted development requires assembling many pieces by hand: the base template, Claude Code configuration (CLAUDE.md, skills), MCP server setup, and design documentation. dev-ready is a CLI, run via `uvx dev-ready`, that scaffolds all of this in one command.
+Starting a production-grade FastAPI project that is ready for AI-assisted development requires assembling many pieces by hand: the base template, Canonical Content (`AGENTS.md` and `.agents/skills/`), optional Agent Target discovery files, MCP server setup, and design documentation. dev-ready is a CLI, run via `uvx dev-ready`, that scaffolds all of this in one command.
 
 ## Functional Requirements
 
@@ -14,7 +14,7 @@ FR-1. The user can run `uvx dev-ready` (or `uvx dev-ready init <project-name>`) 
 
 FR-2. Generation uses a two-stage approach:
 - Stage 1: fetch the upstream base template (fastapi/full-stack-fastapi-template) at the exact commit pinned in `manifest.json`.
-- Stage 2: apply the dev-ready overlay on top: CLAUDE.md, Claude Code skills, MCP server configuration, and design-doc templates.
+- Stage 2: apply the dev-ready overlay on top: Canonical Content, selected Agent Target Pointer Stubs and configuration, MCP server configuration, and design-doc templates.
 
 FR-3. The CLI prompts interactively for project name, and which optional overlay components to include. A non-interactive mode (`--yes` with defaults, flags for each choice) must exist for CI and scripted use.
 
@@ -38,11 +38,11 @@ FR-7. Prune upstream repo-maintenance files. The generated project must not cont
 
 KEEP even though they look upstream-ish: `development.md`, `deployment.md` (genuinely useful to the user), `.pre-commit-config.yaml`, root `package.json`/`bun.lock` (bun workspace wiring), `.gitattributes`, `.agents/` and `.claude/` skill content not already excluded. (Amended 2026-07-17: `.copier/` and `.copier-answers.yml` were originally kept to enable `copier update`, but are now pruned by `generate` (`e096aaf`) — Copier metadata does not belong in an end-user project. The upgrade path is `dev-ready upgrade` (FR-22), not `copier update`. See the ADR-005 amendment.)
 
-FR-8. Project README. Because FR-7 prunes the upstream `README.md`, the overlay writes a project-specific `README.md` (templated with the project name, brief stack summary, and the same commands as CLAUDE.md). The overlay's no-overwrite rule is preserved: prune removes the upstream file first, so there is no collision.
+FR-8. Project README. Because FR-7 prunes the upstream `README.md`, the overlay writes a project-specific `README.md` (templated with the project name, brief stack summary, and the same commands as canonical `AGENTS.md`). The overlay's no-overwrite rule is preserved: prune removes the upstream file first, so there is no collision.
 
 FR-9. Leak guard in verify. `verify_project` gains a forbidden-paths check (at minimum `.git`, `copier.yml`, `copier.yaml`) so a future upstream or Copier behavior change that reintroduces the v0.1.3 `.git`/`copier.yml` leak fails generation loudly — in CI at bump time, before it ever reaches users.
 
-FR-10. Agent-team overlay (optional component, alongside skills/mcp/docs). Generated projects can include a multi-agent handoff scaffold: a `docs/handoffs/` directory with role and handoff templates (tech lead -> senior engineer -> junior engineer -> QA/Security/SRE, see ADR-007), and an agent-roles section in the generated CLAUDE.md. Selected like the other components (`--no-agents` flag, checkbox in the interactive flow).
+FR-10. Handoff Protocol overlay (optional component, alongside skills/mcp/docs). Generated projects can include a multi-agent handoff scaffold: a `docs/handoffs/` directory with role and handoff templates (tech lead -> senior engineer -> junior engineer -> QA/Security/SRE, see ADR-007), and an agent-roles section in canonical `AGENTS.md`. Selected like the other components (`--no-handoff`; the original `--no-agents` name is the deprecated alias described by FR-26).
 
 ## Functional Requirements — v0.3 and beyond
 
@@ -58,13 +58,13 @@ Agreed 2026-07-17. Full detail, rationale, and per-version grouping live in
 - FR-17 (v0.4, shipped). MIT-wave vendoring (curated subsets, each a catalog item): caveman, mattpocock/skills, cloudflare/security-audit-skill, awesome-design-md.
 - FR-18 (v0.4, shipped). THIRD_PARTY_NOTICES ↔ manifest `vendored` sync check in CI.
 - FR-19 (v0.5, shipped). anthropics/skills Apache 2.0 example subset with NOTICE propagation (document-processing skills permanently excluded).
-- FR-20 (v0.5, shipped). Karpathy guardrails content in generated CLAUDE.md — MIT per the upstream README declaration (no standalone LICENSE file; pinned commit preserves the grant), with attribution in NOTICES.
+- FR-20 (v0.5, shipped). Karpathy guardrails content in generated canonical `AGENTS.md` — MIT per the upstream README declaration (no standalone LICENSE file; pinned commit preserves the grant), with attribution in NOTICES.
 - FR-21 (v0.6, shipped). `dev-ready check`: read-only validation of an existing project against its stamp and the CLI's manifest.
 - FR-22 (v0.6, shipped). `dev-ready upgrade`: re-apply overlay-managed whole files only (per the stamp's item selection); refuses pre-v3 stamps, never touches upstream application code, and never silently overwrites user edits.
 - FR-23 (v0.7, shipped). Configurable Handoff Protocol: generated projects carry one default role topology in `docs/handoffs/protocol.yaml`. Seven stable role ids (`ceo`, `tech_lead`, `senior_engineer`, `junior_engineer`, `qa_reviewer`, `security_reviewer`, and `sre_reviewer`) own responsibilities, prohibitions, handoff order, and nullable/editable model assignments as data. The Protocol Configuration is authoritative at runtime; generated prose does not duplicate editable titles or models. With the Spec Loop it uses durable specs, per-ticket dispatch, one-ticket execution, and `03`–`06` gates; active numeric phase directories are ignored while the reusable scaffold and protocol remain durable. Multiple presets and plugin mechanics remain deferred.
 - FR-24 (v0.7, shipped). AI-invokable generation skill: the original `skills/dev-ready/SKILL.md` teaches agents to drive the stable `dev-ready init` machine interface safely. It is directly installable from this repository through the open Agent Skills ecosystem, remains outside the generated overlay and manifest catalog, and requires no Claude plugin metadata.
 - FR-25 — withdrawn 2026-07-26 before implementation; the number is permanently retired and never reused. CLI internationalization was specced for v0.8 and cut once the underlying need was identified as discovery rather than runtime comprehension. The rationale is recorded in roadmap candidate D-3 in [version-plan.md](version-plan.md); the language rule that survived it is [ADR-016](decisions/adr-016-language-boundary.md).
-- FR-26 (v0.8, specced). Multi-agent render targets (ADR-015): Canonical Content — skills at the open Agent Skills standard directory and rules at `AGENTS.md` — is always written, so standard-compliant harnesses need no declared target. Users additionally select Agent Targets (`--agents`) for agents using uniquely-named directories; each receives Pointer Stubs, never symlinks and never content copies. The agent map is manifest data. The `agents` component is renamed `handoff` (`--no-agents` deprecated one version), the stamp advances to version 4 recording Agent Targets, and `upgrade` migrates existing projects through the ADR-014 obsolete-file rules. Spec: [fr-26-agent-targets.md](specs/v0.8/fr-26-agent-targets.md).
+- FR-26 (v0.8, shipped). Multi-agent render targets (ADR-015): Canonical Content — skills at the open Agent Skills standard directory and rules at `AGENTS.md` — is always written, so standard-compliant harnesses need no declared target. Users additionally select Agent Targets (`--agents`) for agents using uniquely-named directories; each receives Pointer Stubs, never symlinks and never content copies. The agent map is manifest data. The `agents` component is renamed `handoff` (`--no-agents` deprecated one version), the stamp advances to version 4 recording Agent Targets, and `upgrade` migrates existing projects through the ADR-014 obsolete-file rules. Spec: [fr-26-agent-targets.md](specs/v0.8/fr-26-agent-targets.md).
 - FR-27 (v1.0, reserved). Post-v0.6 roadmap decision D-5 in [version-plan.md](version-plan.md); the full entry lands here when v1.0 development starts.
 - FR-28 (v0.7, shipped). Spec Loop bundle (ADR-012): one explicit catalog selection, `spec-loop`, materializes the complete pinned dependency closure of the four advertised missing steps from mattpocock/skills, automatically resolves the existing `tdd`, `diagnosing-bugs`, and `code-review` items, and supplies the role-neutral tracker/domain configuration those upstream skills expect. It conditionally layers the loop into the Handoff Protocol, brings the existing `architecture.md` template under the `docs` component contract, and fills the skills catalog to 10/10.
 - FR-29 (v0.7, shipped). Progress reporting for `init`: four typed stages on stderr (TTY spinner, plain non-TTY), no new dependencies, and an optional progress callback from `cli` into `generate()`. Finalization uses a same-filesystem atomic rename so a reported failure never exposes a partial target.
@@ -95,11 +95,11 @@ NFR-5. Cross-platform: macOS, Linux, Windows.
 5. v0.5: Apache wave + karpathy guardrails (FR-19, FR-20). DONE (v0.5.0).
 6. v0.6: lifecycle commands — `check` / `upgrade` (FR-21, FR-22). DONE (v0.6.0).
 7. v0.7: Handoff Protocol config (FR-23), Spec Loop bundle (FR-28), generate skill (FR-24), progress reporting (FR-29). DONE — v0.7.0 tagged and published to PyPI.
-8. v0.8: multi-agent render targets (FR-26). CLI i18n (FR-25) was withdrawn 2026-07-26 (D-3 rejected); Traditional Chinese is served by repository documentation instead. Implementation complete; release pending.
+8. v0.8: multi-agent render targets (FR-26). CLI i18n (FR-25) was withdrawn 2026-07-26 (D-3 rejected); Traditional Chinese is served by repository documentation instead. DONE — v0.8.0 tagged and published to PyPI.
 9. v1.0: second template — Next.js (FR-27, gated on the defined real-users checklist); Web UI decision revisited.
 
 ## Pre-start Checklist (carried from planning; closed out 2026-07-24)
 
-- [x] Package name availability on PyPI (`dev-ready`) — confirmed in practice: v0.1.4 through v0.6.0 published under this name.
+- [x] Package name availability on PyPI (`dev-ready`) — confirmed in practice: v0.1.4 through v0.7.0 published under this name.
 - [x] License verification for redistributing upstream snapshots — resolved by ADR-008 (integration modes), ADR-009 (manifest `vendored` provenance), and the THIRD_PARTY_NOTICES machinery (FR-18/FR-19).
 - [x] Confirm upstream health check endpoint used for post-generation verification — in continuous use by CI's generate-and-verify job (health-check poll, ADR-002).

@@ -5,15 +5,16 @@ This file is the single source of truth for agent rules; `CLAUDE.md` imports it 
 
 ## What this project is
 
-dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus an overlay of CLAUDE.md, Claude Code skills, MCP config, and design docs.
+dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus Canonical Content for coding agents, optional Agent Target Pointer Stubs, MCP config, and design docs.
 
-Current phase: v0.7 requirements implemented (FR-23, FR-28, FR-24, FR-29); v0.7.0 release and distribution verification are the remaining Phase 5 work. Roadmap in `docs/version-plan.md`; per-version plans in `docs/handoff/<version>/<version>-plan.md`. Domain glossary: `CONTEXT.md`.
+Current phase: v0.8 is released. FR-26 is implemented, `v0.8.0` is tagged and published to PyPI, and Phase 4 documentation, review, release, and distribution verification are complete. Roadmap in `docs/version-plan.md`; per-version plans in `docs/handoff/<version>/<version>-plan.md`. Domain glossary: `CONTEXT.md`.
 
-The v0.7 release surface is fixed: the skills catalog is 10/10; `spec-loop`
-resolves `tdd`, `diagnosing-bugs`, and `code-review`; generated Handoff Protocol
-behavior is authoritative in `docs/handoffs/protocol.yaml`; overlay upgrades
-preserve Base Provenance while advancing Overlay Currency; and `init` reports
-fetch, overlay, verify, and finalize progress before an atomic finalize.
+The v0.8 release surface is fixed: Canonical Content is always written to
+`.agents/skills/` and `AGENTS.md`; manifest-declared Agent Targets render Pointer
+Stubs selected by `--agents`; the Handoff Protocol component is named `handoff`
+with `--no-agents` retained as a deprecated alias for one version; stamp version
+4 records Agent Targets; and upgrades from v0.7 infer Claude Code, preserve
+edited obsolete files, and migrate untouched content transactionally.
 
 ## Read before writing code
 

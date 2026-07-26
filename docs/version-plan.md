@@ -1,10 +1,11 @@
-# Version Plan — dev-ready v0.3 → v0.7 (+ post-v0.7 roadmap)
+# Version Plan — dev-ready v0.3 → v0.8 (+ post-v0.8 roadmap)
 
 Status: Accepted (2026-07-17). Decided by CEO + Tech Lead as the final pre-agreed roadmap.
 Amended 2026-07-24 (afternoon): v0.7 scope expanded — see "2026-07-24 (PM) amendment" below.
 Close-out 2026-07-26: v0.7 is released — `v0.7.0` is tagged and published to PyPI. Distribution-rider evidence (skills.sh install proof, launch post URL, README issue entry point) is recorded separately against the v1.0 real-users gate.
 Amended 2026-07-26: v0.8 scope, ordering, and decisions settled — see "2026-07-26 amendment" below (ADR-015, ADR-016).
 Amended 2026-07-26 (later the same day): FR-25 (CLI i18n) withdrawn before implementation and D-3 rejected. v0.8 is FR-26 only — see "FR-25 — withdrawn" in the amendment.
+Close-out 2026-07-27: v0.8 is released. FR-26 is shipped in `v0.8.0`, which is tagged and published to PyPI; Phase 4 documentation, review, release, and distribution verification are complete. FR-25 remains withdrawn settled history.
 Numbering continues from requirements.md (FR-1..FR-10 shipped in v0.1/v0.2).
 
 ## End goal
@@ -403,8 +404,8 @@ it?" — the same test as the curation principle.
 
 | Version | Contents | Rationale |
 |---|---|---|
-| v0.7 (implementation DONE; v0.7.0 release pending) | FR-23 Handoff Protocol config, FR-28 Spec Loop, FR-24 generate skill, FR-29 progress reporting | Shipped implementation scope is complete: FR-23×FR-28 share the same CLAUDE.md surface; FR-29 landed before FR-25, which was subsequently withdrawn (D-3 rejected) |
-| v0.8 | FR-26 multi-agent render targets | FR-25 CLI i18n withdrawn 2026-07-26; Traditional Chinese is served by repository documentation instead |
+| v0.7 (DONE; v0.7.0 released) | FR-23 Handoff Protocol config, FR-28 Spec Loop, FR-24 generate skill, FR-29 progress reporting | FR-23×FR-28 share the generated rules surface; FR-29 landed before FR-25, which was subsequently withdrawn (D-3 rejected) |
+| v0.8 (DONE; v0.8.0 released) | FR-26 multi-agent render targets | Canonical Content, Agent Target Pointer Stubs, stamp v4, and the v0.7 migration are complete; FR-25 remains withdrawn and Traditional Chinese is served by repository documentation instead |
 | v1.0 | FR-27 second template (Next.js — selected 2026-07-24, see D-5); Web UI decision revisited | Platform step; gated on real-user feedback and the D-5 hard gates |
 
 **2026-07-24 — v0.6 close-out re-confirmation (CEO-confirmed, Moofon):**

@@ -24,7 +24,7 @@ Generate a new project.
 Unknown item ids in `--skills` or `--mcp`, and unknown target identifiers in `--agents`, fail fast with an invalid-arguments error (exit 2) listing valid identifiers. Conflicting flags (e.g. `--no-skills` with `--skills <id>`) exit 2.
 
 Selections are resolved before confirmation, rendering, reporting, verification,
-and stamping. In v0.7 the skills catalog contains 10/10 items. Selecting
+and stamping. The skills catalog contains 10/10 items. Selecting
 `spec-loop` automatically includes its required existing items: `tdd`,
 `diagnosing-bugs`, and `code-review`. The resolved set is shown to the user and
 recorded in `.dev-ready.json`; explicit `--skills none` remains empty.
