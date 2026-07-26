@@ -8,12 +8,14 @@ always carries the pin it was released and tested with.
 import json
 import re
 from importlib import resources
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from dev_ready.catalog_effects import CatalogEffectError, parse_catalog_effect
 from dev_ready.errors import ManifestError
 from dev_ready.manifest.models import (
+    AgentTarget,
     CatalogItem,
+    ComponentCatalog,
     ItemPath,
     Manifest,
     UpstreamPin,
@@ -75,6 +77,7 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
         raise ManifestError(f"{source}: 'upstream' must be a non-empty object")
     upstream = {name: _parse_pin(name, entry, source) for name, entry in upstream_raw.items()}
 
+    agent_targets = _parse_agent_targets(data, source)
     vendored = _parse_vendored(data, source)
     components = _parse_components(data, source, vendored)
     _validate_catalog_requirements(components, source)
@@ -87,9 +90,82 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
         manifest_version=version,
         upstream=upstream,
         overlay_version=overlay_version,
-        components=components,
+        components=ComponentCatalog(components, agent_targets),
+        agent_targets=agent_targets,
         vendored=vendored,
     )
+
+
+def _parse_agent_targets(data: dict, source: str) -> dict[str, AgentTarget]:
+    raw = data.get("agent_targets")
+    if not isinstance(raw, dict) or not raw:
+        raise ManifestError(f"{source}: 'agent_targets' must be a non-empty object")
+
+    targets: dict[str, AgentTarget] = {}
+    for target_id, entry in raw.items():
+        if (
+            not isinstance(target_id, str)
+            or not target_id
+            or not _ITEM_ID_PATTERN.fullmatch(target_id)
+        ):
+            raise ManifestError(
+                f"{source}: agent target id must match pattern, got {target_id!r}"
+            )
+        if not isinstance(entry, dict):
+            raise ManifestError(f"{source}: agent target {target_id!r} must be an object")
+
+        description = entry.get("description")
+        if not isinstance(description, str) or not description:
+            raise ManifestError(
+                f"{source}: agent target {target_id!r} field 'description' "
+                "must be a non-empty string"
+            )
+        skills_dir = _parse_agent_target_path(
+            target_id, "skills_dir", entry.get("skills_dir"), source, nullable=False
+        )
+        rules_file = _parse_agent_target_path(
+            target_id, "rules_file", entry.get("rules_file"), source, nullable=True
+        )
+        mcp_file = _parse_agent_target_path(
+            target_id, "mcp_file", entry.get("mcp_file"), source, nullable=True
+        )
+        assert skills_dir is not None
+        targets[target_id] = AgentTarget(
+            id=target_id,
+            description=description,
+            skills_dir=skills_dir,
+            rules_file=rules_file,
+            mcp_file=mcp_file,
+        )
+    return targets
+
+
+def _parse_agent_target_path(
+    target_id: str,
+    field: str,
+    value: object,
+    source: str,
+    *,
+    nullable: bool,
+) -> str | None:
+    if value is None and nullable:
+        return None
+    if not isinstance(value, str) or not value:
+        expected = "a relative path or null" if nullable else "a non-empty relative path"
+        raise ManifestError(
+            f"{source}: agent target {target_id!r} field {field!r} must be {expected}"
+        )
+    if (
+        value.startswith(("/", "\\"))
+        or bool(PureWindowsPath(value).drive)
+        or "\\" in value
+        or any(segment in {"", ".."} for segment in value.split("/"))
+    ):
+        raise ManifestError(
+            f"{source}: agent target {target_id!r} field {field!r} must be a relative path "
+            f"without '..', got {value!r}"
+        )
+    return value
 
 
 

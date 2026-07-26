@@ -113,9 +113,27 @@ def test_verify_raises_when_stamp_file_is_missing(tmp_path: Path) -> None:
 def test_verify_raises_when_selected_item_path_is_missing(tmp_path: Path) -> None:
     ans = _answers(tmp_path, skills_items=frozenset({"project-orientation"}))
     _make_complete_project(tmp_path, ans)
-    shutil.rmtree(tmp_path / ".claude" / "skills" / "project-orientation")
+    shutil.rmtree(tmp_path / ".agents" / "skills" / "project-orientation")
 
     with pytest.raises(VerificationError, match="selected skills item 'project-orientation' is missing"):
+        verify_project(tmp_path, ans, CATALOG)
+
+
+def test_verify_rejects_missing_selected_agent_target_stub(tmp_path: Path) -> None:
+    ans = _answers(tmp_path, skills_items=frozenset({"project-orientation"}))
+    _make_complete_project(tmp_path, ans)
+    (tmp_path / ".claude" / "skills" / "project-orientation" / "SKILL.md").unlink()
+
+    with pytest.raises(VerificationError, match="agent target 'claude'.*is missing"):
+        verify_project(tmp_path, ans, CATALOG)
+
+
+def test_verify_rejects_missing_canonical_rules(tmp_path: Path) -> None:
+    ans = _answers(tmp_path)
+    _make_complete_project(tmp_path, ans)
+    (tmp_path / "AGENTS.md").unlink()
+
+    with pytest.raises(VerificationError, match="required file 'AGENTS.md' is missing"):
         verify_project(tmp_path, ans, CATALOG)
 
 
@@ -207,7 +225,7 @@ def _make_generated_project(root: Path, answers: Answers) -> None:
 def test_verify_detects_a_missing_nested_spec_loop_asset(tmp_path: Path) -> None:
     ans = _answers(tmp_path, skills_items=frozenset({"spec-loop"}), mcp_items=frozenset())
     _make_generated_project(tmp_path, ans)
-    (tmp_path / ".claude" / "skills" / "domain-modeling" / "ADR-FORMAT.md").unlink()
+    (tmp_path / ".agents" / "skills" / "domain-modeling" / "ADR-FORMAT.md").unlink()
 
     with pytest.raises(
         VerificationError,
@@ -219,7 +237,7 @@ def test_verify_detects_a_missing_nested_spec_loop_asset(tmp_path: Path) -> None
 def test_verify_rejects_a_deselected_spec_loop_asset(tmp_path: Path) -> None:
     ans = _answers(tmp_path, skills_items=frozenset(), mcp_items=frozenset())
     _make_generated_project(tmp_path, ans)
-    leaked = tmp_path / ".claude" / "skills" / "to-spec"
+    leaked = tmp_path / ".agents" / "skills" / "to-spec"
     leaked.mkdir(parents=True)
     (leaked / "SKILL.md").write_text("leaked", encoding="utf-8")
 

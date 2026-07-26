@@ -13,6 +13,14 @@ from dev_ready.manifest import (
 
 VALID = {
     "manifest_version": 1,
+    "agent_targets": {
+        "claude": {
+            "description": "Claude Code native project configuration.",
+            "skills_dir": ".claude/skills",
+            "rules_file": "CLAUDE.md",
+            "mcp_file": ".mcp.json",
+        }
+    },
     "upstream": {
         "base_template": {
             "repo": "fastapi/full-stack-fastapi-template",
@@ -33,7 +41,7 @@ VALID = {
                     "paths": [
                         {
                             "src": "claude/skills/project-orientation",
-                            "dest": ".claude/skills/project-orientation",
+                            "dest": ".agents/skills/project-orientation",
                         }
                     ],
                 }
@@ -59,6 +67,10 @@ def test_parse_valid_manifest() -> None:
     manifest = parse_manifest(json.dumps(VALID))
     assert manifest.manifest_version == 1
     assert manifest.overlay_version == "0.1.0"
+    claude = manifest.agent_targets["claude"]
+    assert claude.skills_dir == ".claude/skills"
+    assert claude.rules_file == "CLAUDE.md"
+    assert claude.mcp_file == ".mcp.json"
     pin = manifest.upstream["base_template"]
     assert pin.repo == "fastapi/full-stack-fastapi-template"
     assert pin.commit == "4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2"
@@ -70,7 +82,7 @@ def test_parse_valid_manifest() -> None:
     assert skill.mode == "builtin"
     assert skill.license == "MIT"
     assert skill.paths[0].src == "claude/skills/project-orientation"
-    assert skill.paths[0].dest == ".claude/skills/project-orientation"
+    assert skill.paths[0].dest == ".agents/skills/project-orientation"
     assert len(manifest.components["mcp"]) == 1
     mcp = manifest.components["mcp"][0]
     assert mcp.id == "mcp-config"
@@ -78,6 +90,52 @@ def test_parse_valid_manifest() -> None:
     assert mcp.license == "MIT"
     assert mcp.paths[0].src == "mcp/mcp.json"
     assert mcp.paths[0].dest == ".mcp.json"
+
+
+def test_default_manifest_declares_verified_claude_and_windsurf_targets() -> None:
+    targets = load_default_manifest().agent_targets
+
+    assert set(targets) == {"claude", "windsurf"}
+    assert targets["claude"].skills_dir == ".claude/skills"
+    assert targets["claude"].rules_file == "CLAUDE.md"
+    assert targets["claude"].mcp_file == ".mcp.json"
+    assert targets["windsurf"].skills_dir == ".windsurf/skills"
+    assert targets["windsurf"].rules_file is None
+    assert targets["windsurf"].mcp_file is None
+
+
+@pytest.mark.parametrize("field", ["skills_dir", "rules_file", "mcp_file"])
+def test_agent_target_paths_must_stay_inside_project(field: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["agent_targets"]["claude"][field] = "../escape"
+
+    with pytest.raises(ManifestError, match="agent target 'claude'.*relative path"):
+        parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize("field", ["skills_dir", "rules_file", "mcp_file"])
+def test_agent_target_paths_reject_windows_drive_paths(field: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["agent_targets"]["claude"][field] = "C:/outside"
+
+    with pytest.raises(ManifestError, match="agent target 'claude'.*relative path"):
+        parse_manifest(json.dumps(data))
+
+
+def test_agent_target_record_must_be_an_object() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["agent_targets"]["claude"] = "invalid"
+
+    with pytest.raises(ManifestError, match="agent target 'claude' must be an object"):
+        parse_manifest(json.dumps(data))
+
+
+def test_manifest_requires_agent_target_policy() -> None:
+    data = json.loads(json.dumps(VALID))
+    data.pop("agent_targets")
+
+    with pytest.raises(ManifestError, match="'agent_targets' must be a non-empty object"):
+        parse_manifest(json.dumps(data))
 
 
 def _add_required_skill(
@@ -160,13 +218,13 @@ def test_default_manifest_contains_complete_spec_loop_bundle() -> None:
     )
     assert skills["spec-loop"].vendored_repo == "mattpocock/skills"
     assert {path.dest for path in skills["spec-loop"].paths} == {
-        ".claude/skills/grill-with-docs",
-        ".claude/skills/grilling",
-        ".claude/skills/domain-modeling",
-        ".claude/skills/to-spec",
-        ".claude/skills/to-tickets",
-        ".claude/skills/improve-codebase-architecture",
-        ".claude/skills/codebase-design",
+        ".agents/skills/grill-with-docs",
+        ".agents/skills/grilling",
+        ".agents/skills/domain-modeling",
+        ".agents/skills/to-spec",
+        ".agents/skills/to-tickets",
+        ".agents/skills/improve-codebase-architecture",
+        ".agents/skills/codebase-design",
         "docs/agents",
     }
 

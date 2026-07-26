@@ -83,8 +83,16 @@ def test_generate_happy_path_merges_upstream_and_overlay(
     assert "my-app" in readme
     assert "MoofonLi/dev-ready" in readme
     assert (target_dir / "backend" / "main.py").exists()
+    assert (target_dir / "AGENTS.md").is_file()
     assert (target_dir / "CLAUDE.md").exists()
+    canonical_skill = target_dir / ".agents" / "skills" / "project-orientation" / "SKILL.md"
+    claude_stub = target_dir / ".claude" / "skills" / "project-orientation" / "SKILL.md"
+    assert canonical_skill.is_file()
+    assert claude_stub.is_file()
+    assert canonical_skill.read_bytes() != claude_stub.read_bytes()
+    assert not any(path.is_symlink() for path in target_dir.rglob("*"))
     assert (target_dir / ".mcp.json").exists()
+    assert Path("AGENTS.md") in written
     assert Path("CLAUDE.md") in written
 
 

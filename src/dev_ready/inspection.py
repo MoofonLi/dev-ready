@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib import resources
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
 from dev_ready.catalog_effects import CatalogEffectError
-from dev_ready.manifest import CatalogItem
+from dev_ready.manifest import CatalogItem, ComponentCatalog
 from dev_ready.overlay.rendering import TEMPLATE_SUFFIX
 from dev_ready.prompts import ProjectSelection
 
@@ -32,7 +32,7 @@ FORBIDDEN_PATHS: tuple[str, ...] = (
     ".copier-answers.yml",
 )
 
-_CORE_OVERLAY_FILES = ("CLAUDE.md", "README.md")
+_CORE_OVERLAY_FILES = ("AGENTS.md", "README.md")
 
 
 @dataclass(frozen=True)
@@ -111,15 +111,15 @@ def inspect_project(
                 )
             )
 
-    if expectation.require_lifecycle_overlay:
-        for relative in _CORE_OVERLAY_FILES:
-            if not (root / relative).exists():
-                issues.append(
-                    ProjectIssue(
-                        "missing overlay file",
-                        f"required file {relative!r} is missing",
-                    )
+    for relative in _CORE_OVERLAY_FILES:
+        if not (root / relative).exists():
+            issues.append(
+                ProjectIssue(
+                    "missing overlay file",
+                    f"required file {relative!r} is missing",
                 )
+            )
+    if expectation.require_lifecycle_overlay:
         if expectation.selection.docs and not (root / "docs").exists():
             issues.append(
                 ProjectIssue(
@@ -127,11 +127,11 @@ def inspect_project(
                     "recorded 'docs' selection but 'docs/' directory is missing",
                 )
             )
-        if expectation.selection.agents and not (root / "docs" / "handoffs").exists():
+        if expectation.selection.handoff and not (root / "docs" / "handoffs").exists():
             issues.append(
                 ProjectIssue(
                     "missing overlay directory",
-                    "recorded 'agents' selection but 'docs/handoffs/' directory is missing",
+                    "recorded 'handoff' selection but 'docs/handoffs/' directory is missing",
                 )
             )
 
@@ -150,12 +150,99 @@ def inspect_project(
     for name in ("skills", "mcp"):
         selected = expectation.selection.items(name)
         for item in catalog.get(name, ()):
+            if name == "mcp" and isinstance(catalog, ComponentCatalog):
+                _inspect_target_mcp_item(
+                    root,
+                    item,
+                    catalog,
+                    expectation.selection,
+                    expectation.exact_catalog_selection,
+                    issues,
+                )
+                continue
             expected = item.id in selected
             if expected or expectation.exact_catalog_selection:
                 _inspect_item_paths(root, name, item, expected, issues)
                 _inspect_item_effect(root, name, item, expected, issues)
 
+    if isinstance(catalog, ComponentCatalog):
+        _inspect_agent_target_artifacts(root, catalog, expectation.selection, issues)
+
     return tuple(issues)
+
+
+def _inspect_target_mcp_item(
+    root: Path,
+    item: CatalogItem,
+    catalog: ComponentCatalog,
+    selection: ProjectSelection,
+    exact_catalog_selection: bool,
+    issues: list[ProjectIssue],
+) -> None:
+    for target_id, target in catalog.agent_targets.items():
+        if target.mcp_file is None:
+            continue
+        expected = item.id in selection.mcp and target_id in selection.agent_targets
+        if not expected and not exact_catalog_selection:
+            continue
+        retargeted = replace(
+            item,
+            paths=tuple(replace(path, dest=target.mcp_file) for path in item.paths),
+            effect=(
+                replace(item.effect, target=target.mcp_file)
+                if item.effect is not None
+                else None
+            ),
+        )
+        _inspect_item_paths(root, "mcp", retargeted, expected, issues)
+        _inspect_item_effect(root, "mcp", retargeted, expected, issues)
+
+
+def _inspect_agent_target_artifacts(
+    root: Path,
+    catalog: ComponentCatalog,
+    selection: ProjectSelection,
+    issues: list[ProjectIssue],
+) -> None:
+    skill_names = {
+        Path(item_path.dest).parts[2]
+        for item in catalog.get("skills", ())
+        if item.id in selection.skills
+        for item_path in item.paths
+        if len(Path(item_path.dest).parts) >= 3
+        and Path(item_path.dest).parts[:2] == (".agents", "skills")
+    }
+    for target_id, target in catalog.agent_targets.items():
+        if target_id not in selection.agent_targets:
+            continue
+        expected_paths: list[Path] = []
+        if target.rules_file is not None:
+            expected_paths.append(Path(target.rules_file))
+        if selection.mcp and target.mcp_file is not None:
+            expected_paths.append(Path(target.mcp_file))
+        expected_paths.extend(
+            Path(target.skills_dir) / skill_name / "SKILL.md"
+            for skill_name in sorted(skill_names)
+        )
+        for relative in expected_paths:
+            path_text = relative.as_posix()
+            artifact = root / relative
+            if not _is_safe(root, artifact):
+                issues.append(_unsafe_path(path_text))
+            elif artifact.is_symlink():
+                issues.append(
+                    ProjectIssue(
+                        "invalid agent target artifact",
+                        f"agent target {target.id!r} artifact {path_text!r} must not be a symbolic link",
+                    )
+                )
+            elif not artifact.is_file():
+                issues.append(
+                    ProjectIssue(
+                        "missing agent target artifact",
+                        f"agent target {target.id!r} artifact {path_text!r} is missing",
+                    )
+                )
 
 
 def _inspect_item_paths(
@@ -176,6 +263,14 @@ def _inspect_item_paths(
             )
             continue
         present = target.exists()
+        if present and target.is_symlink():
+            issues.append(
+                ProjectIssue(
+                    "invalid item path",
+                    f"selected {name} item {item.id!r} path {item_path.dest!r} must not be a symbolic link",
+                )
+            )
+            continue
         if expected and not present:
             detail = f"selected {name} item {item.id!r} path {item_path.dest!r} is missing"
             verification = (

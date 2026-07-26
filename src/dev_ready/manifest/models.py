@@ -1,5 +1,6 @@
 """Data models for the upstream pin manifest."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from dev_ready.catalog_effects import CatalogEffect
@@ -67,13 +68,37 @@ class CatalogItem:
 
 
 @dataclass(frozen=True)
+class AgentTarget:
+    """One native Agent Target layout declared by the manifest."""
+
+    id: str
+    description: str
+    skills_dir: str
+    rules_file: str | None
+    mcp_file: str | None
+
+
+class ComponentCatalog(dict[str, tuple[CatalogItem, ...]]):
+    """Catalog component mapping carrying the independent Agent Target axis."""
+
+    def __init__(
+        self,
+        components: Mapping[str, tuple[CatalogItem, ...]],
+        agent_targets: Mapping[str, AgentTarget],
+    ) -> None:
+        super().__init__(components)
+        self.agent_targets = dict(agent_targets)
+
+
+@dataclass(frozen=True)
 class Manifest:
     """Validated content of manifest.json."""
 
     manifest_version: int
     upstream: dict[str, UpstreamPin]
     overlay_version: str
-    components: dict[str, tuple[CatalogItem, ...]]
+    components: ComponentCatalog
+    agent_targets: dict[str, AgentTarget]
     vendored: tuple[VendoredPin, ...] = ()
 
 

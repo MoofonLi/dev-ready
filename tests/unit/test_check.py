@@ -31,7 +31,7 @@ def _create_minimal_valid_project(project_dir: Path, stamp_version: int = 2) -> 
         skills=frozenset({skill_item.id}),
         mcp=frozenset({mcp_item.id}),
         docs=False,
-        agents=False,
+        handoff=False,
     )
     materialize_project_structure(project_dir, manifest.components, selection)
 
@@ -61,19 +61,22 @@ def _create_minimal_valid_project(project_dir: Path, stamp_version: int = 2) -> 
             "upstream": {"repo": pin.repo, "commit": pin.commit},
         }
     else:
+        component_key = "handoff" if stamp_version >= 4 else "agents"
         stamp_data = {
-            "stamp_version": 3,
+            "stamp_version": stamp_version,
             "dev_ready_version": __version__,
             "project_name": "test-project",
             "components": {
                 "skills": {"included": True, "items": [{"id": skill_item.id, "pin": skill_pin}]},
                 "mcp": {"included": True, "items": [{"id": mcp_item.id, "pin": mcp_pin}]},
                 "docs": {"included": False},
-                "agents": {"included": False},
+                component_key: {"included": False},
             },
             "upstream": {"repo": pin.repo, "commit": pin.commit},
             "inventory": [],
         }
+        if stamp_version >= 4:
+            stamp_data["agent_targets"] = sorted(selection.agent_targets)
 
     (project_dir / ".dev-ready.json").write_text(json.dumps(stamp_data, indent=2) + "\n", encoding="utf-8")
 
@@ -109,6 +112,46 @@ def test_check_fresh_v3_project(tmp_path: Path, capsys: pytest.CaptureFixture[st
     assert "Status: CLEAN" in capsys.readouterr().out
 
 
+def test_check_fresh_v4_project_uses_handoff_component(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=4)
+    assert main(["check", str(tmp_path)]) == 0
+    assert "Status: CLEAN" in capsys.readouterr().out
+
+
+def test_check_reports_missing_selected_agent_target_artifact(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=4)
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["agent_targets"] = ["windsurf"]
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    missing = tmp_path / ".windsurf/skills/project-orientation/SKILL.md"
+    missing.unlink()
+
+    assert main(["check", str(tmp_path)]) == 7
+    error = capsys.readouterr().err
+    assert "missing agent target artifact" in error
+    assert ".windsurf/skills/project-orientation/SKILL.md" in error
+
+
+def test_check_reports_removed_recorded_agent_target(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=4)
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["agent_targets"] = ["retired-agent"]
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    assert main(["check", str(tmp_path)]) == 7
+    error = capsys.readouterr().err
+    assert "removed agent target" in error
+    assert "retired-agent" in error
+
+
 def test_check_json_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     _create_minimal_valid_project(tmp_path, stamp_version=2)
     exit_code = main(["check", str(tmp_path), "--json"])
@@ -140,13 +183,26 @@ def test_check_future_stamp_version(tmp_path: Path, capsys: pytest.CaptureFixtur
     _create_minimal_valid_project(tmp_path, stamp_version=2)
     stamp_path = tmp_path / ".dev-ready.json"
     data = json.loads(stamp_path.read_text(encoding="utf-8"))
-    data["stamp_version"] = 4
+    data["stamp_version"] = 5
     stamp_path.write_text(json.dumps(data), encoding="utf-8")
 
     exit_code = main(["check", str(tmp_path)])
     assert exit_code == 6
     captured = capsys.readouterr()
-    assert "unsupported stamp_version 4" in captured.err
+    assert "unsupported stamp_version 5" in captured.err
+
+
+def test_v4_stamp_requires_agent_target_state(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=4)
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data.pop("agent_targets", None)
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    assert main(["check", str(tmp_path)]) == 6
+    assert "agent_targets" in capsys.readouterr().err
 
 
 def test_check_newer_upstream_pin_is_a_non_blocking_advisory(

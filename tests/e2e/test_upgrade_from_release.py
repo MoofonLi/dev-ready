@@ -15,7 +15,7 @@ import pytest
 
 pytestmark = pytest.mark.network
 
-_RELEASED_VERSION = "0.6.0"
+_RELEASED_VERSION = "0.7.0"
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PROBE_PREFIX = "__DEV_READY_PROBE__="
 _PROBE_AND_RUN = f"""
@@ -200,6 +200,11 @@ def _selection_arguments(stamp: dict[str, Any]) -> list[str]:
         selected = components.get(component)
         if not isinstance(selected, dict) or not selected.get("included"):
             arguments.append(f"--no-{component}")
+    agent_targets = stamp.get("agent_targets", ["claude"])
+    assert isinstance(agent_targets, list) and all(
+        isinstance(target_id, str) for target_id in agent_targets
+    ), "released stamp has invalid Agent Target selection"
+    arguments.extend(("--agents", ",".join(agent_targets) or "none"))
     return arguments
 
 
@@ -278,6 +283,14 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert (target / ".dev-ready.json").is_file(), "old generation did not write its stamp"
     assert (target / "backend").is_dir(), "old generation omitted the backend application"
     assert (target / "frontend").is_dir(), "old generation omitted the frontend application"
+    assert not (target / "AGENTS.md").exists(), "released project already has canonical rules"
+    assert not (target / ".agents/skills/project-orientation/SKILL.md").exists(), (
+        "released project already has dev-ready canonical skills"
+    )
+    assert (target / "CLAUDE.md").is_file(), "released project omitted Claude rules"
+    assert (target / ".claude/skills/project-orientation/SKILL.md").is_file(), (
+        "released project omitted its Claude skill content"
+    )
 
     before_upgrade = _snapshot(target)
     old_stamp = _load_stamp(target, "old generation")
@@ -328,6 +341,8 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
             "mcp pin drift",
             "removed catalog item",
             "missing required path",
+            "missing overlay file",
+            "missing item path",
         )
         unexpected_drifts = [
             drift
@@ -339,12 +354,21 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
             "pre-upgrade check reported non-overlay drift: " + repr(unexpected_drifts)
         )
 
-    _checkout_stage(
+    dry_run, _ = _checkout_stage(
         "dry-run upgrade",
         ["upgrade", str(target), "--dry-run"],
         cwd=tmp_path,
     )
     assert _snapshot(target) == before_upgrade, "dry-run upgrade mutated generated project bytes"
+    for planned_path in (
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".agents/skills/project-orientation/SKILL.md",
+        ".claude/skills/project-orientation/SKILL.md",
+    ):
+        assert planned_path in dry_run.stdout, (
+            f"dry-run omitted migration action for {planned_path}"
+        )
 
     _, checkout_probe = _checkout_stage(
         "real upgrade",
@@ -353,6 +377,27 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     )
     after_upgrade = _snapshot(target)
     new_stamp = _load_stamp(target, "real upgrade")
+
+    canonical_skill = target / ".agents/skills/project-orientation/SKILL.md"
+    claude_stub = target / ".claude/skills/project-orientation/SKILL.md"
+    assert (target / "AGENTS.md").is_file(), "migration omitted canonical rules"
+    assert (target / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n", (
+        "migration did not replace clean Claude rules with the canonical pointer"
+    )
+    assert canonical_skill.is_file(), "migration omitted canonical skill content"
+    assert claude_stub.is_file(), "migration omitted the Claude Pointer Stub"
+    assert canonical_skill.read_bytes() != claude_stub.read_bytes(), (
+        "migration duplicated canonical skill bytes into the Claude target"
+    )
+    assert not (target / ".windsurf").exists(), (
+        "migration added a target that could not have been selected by the released version"
+    )
+    for path in target.rglob("*"):
+        assert not path.is_symlink(), f"migration produced a symbolic link: {path}"
+    assert new_stamp.get("stamp_version") == 4, "migration did not advance the stamp"
+    assert new_stamp.get("agent_targets") == ["claude"], (
+        "migration did not record the inferred Claude Agent Target"
+    )
 
     old_managed_files = _inventory_paths(old_stamp, "old generation")
     new_managed_files = _inventory_paths(new_stamp, "real upgrade")

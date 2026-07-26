@@ -20,7 +20,7 @@ def test_flag_and_prompt_adapters_share_one_canonical_selection() -> None:
         no_skills=False,
         no_mcp=False,
         no_docs=True,
-        no_agents=False,
+        no_handoff=False,
     )
 
     assert selection is not None
@@ -34,7 +34,7 @@ def test_flag_and_prompt_adapters_share_one_canonical_selection() -> None:
     assert answers.includes("skills") is True
     assert answers.includes("mcp") is False
     assert answers.includes("docs") is False
-    assert answers.includes("agents") is True
+    assert answers.includes("handoff") is True
 
 
 def test_no_selection_flags_leave_selection_unresolved() -> None:
@@ -46,7 +46,7 @@ def test_no_selection_flags_leave_selection_unresolved() -> None:
             no_skills=False,
             no_mcp=False,
             no_docs=False,
-            no_agents=False,
+            no_handoff=False,
         )
         is None
     )
@@ -104,7 +104,7 @@ def test_flag_selection_exposes_resolved_requirements() -> None:
         no_skills=False,
         no_mcp=False,
         no_docs=False,
-        no_agents=False,
+        no_handoff=False,
     )
 
     assert selection is not None
@@ -119,8 +119,51 @@ def test_explicit_none_has_an_empty_dependency_closure() -> None:
         no_skills=False,
         no_mcp=False,
         no_docs=False,
-        no_agents=False,
+        no_handoff=False,
     )
 
     assert selection is not None
     assert selection.skills == frozenset()
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("claude,windsurf", frozenset({"claude", "windsurf"})),
+        ("all", frozenset({"claude", "windsurf"})),
+        ("none", frozenset()),
+    ],
+)
+def test_agent_target_flag_selection(raw: str, expected: frozenset[str]) -> None:
+    selection = ProjectSelection.from_flags(
+        catalog=CATALOG,
+        skills=None,
+        mcp=None,
+        agents=raw,
+        no_skills=False,
+        no_mcp=False,
+        no_docs=False,
+        no_handoff=False,
+    )
+
+    assert selection is not None
+    assert selection.agent_targets == expected
+
+
+def test_unknown_agent_target_lists_valid_ids() -> None:
+    with pytest.raises(InvalidArgumentsError) as excinfo:
+        ProjectSelection.from_flags(
+            catalog=CATALOG,
+            skills=None,
+            mcp=None,
+            agents="claud",
+            no_skills=False,
+            no_mcp=False,
+            no_docs=False,
+            no_handoff=False,
+        )
+
+    message = str(excinfo.value)
+    assert "unknown agent target ids" in message
+    assert "claude" in message
+    assert "windsurf" in message

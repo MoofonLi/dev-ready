@@ -150,6 +150,7 @@ def test_sync_all_empty_vendored_returns_zero(tmp_path: Path) -> None:
     manifest_path.write_text(
         """{
   "manifest_version": 1,
+  "agent_targets": {"claude": {"description": "Claude Code.", "skills_dir": ".claude/skills", "rules_file": "CLAUDE.md", "mcp_file": ".mcp.json"}},
   "upstream": {
     "base_template": {
       "repo": "fastapi/full-stack-fastapi-template",

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ import dev_ready.upgrade as upgrade_module
 import dev_ready.overlay as overlay_module
 from dev_ready.cli import main
 from dev_ready.errors import UpgradeError, UpgradeNotSupportedError
+from dev_ready.inspection import REQUIRED_UPSTREAM_PATHS
 from dev_ready.manifest import load_default_manifest
 from dev_ready.overlay import apply_overlay
 from dev_ready.prompts import Answers, ProjectSelection
@@ -41,7 +43,7 @@ def _make_project(tmp_path: Path, *, code_memory: bool = False) -> Path:
             skills=frozenset({"project-orientation"}),
             mcp=mcp_items,
             docs=False,
-            agents=False,
+            handoff=False,
         ),
     )
     apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
@@ -77,6 +79,44 @@ def _add_obsolete_managed_file(
     )
     stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return target
+
+
+def _make_pre_agent_target_project(tmp_path: Path) -> Path:
+    """Rewrite a current fixture into the v3 Claude-only layout."""
+    project = _make_project(tmp_path)
+    for relative in REQUIRED_UPSTREAM_PATHS:
+        path = project / relative
+        if relative in {"backend", "frontend"}:
+            path.mkdir(parents=True, exist_ok=True)
+        else:
+            path.write_text("upstream", encoding="utf-8")
+    canonical_skill = project / ".agents/skills/project-orientation/SKILL.md"
+    legacy_skill = project / ".claude/skills/project-orientation/SKILL.md"
+    legacy_skill.write_bytes(canonical_skill.read_bytes())
+    legacy_rules = (project / "AGENTS.md").read_bytes()
+    (project / "CLAUDE.md").write_bytes(legacy_rules)
+    shutil.rmtree(project / ".agents")
+    shutil.rmtree(project / ".windsurf")
+    (project / "AGENTS.md").unlink()
+
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["stamp_version"] = 3
+    data.pop("agent_targets")
+    data["components"]["agents"] = data["components"].pop("handoff")
+    retired_prefixes = (".agents/", ".windsurf/")
+    data["inventory"] = [
+        entry
+        for entry in data["inventory"]
+        if entry["path"] not in {"AGENTS.md", "CLAUDE.md"}
+        and not entry["path"].startswith(retired_prefixes)
+    ]
+    for path in ("CLAUDE.md", ".claude/skills/project-orientation/SKILL.md"):
+        data["inventory"].append(
+            {"path": path, "sha256": hashlib.sha256((project / path).read_bytes()).hexdigest()}
+        )
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return project
 
 
 def test_fresh_project_is_a_byte_identical_noop(tmp_path: Path) -> None:
@@ -256,6 +296,20 @@ def test_removed_catalog_item_in_stamp_does_not_block_upgrade(tmp_path: Path) ->
     assert "removed-skill" not in rewritten_ids
 
 
+def test_upgrade_refuses_to_discard_removed_agent_target(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["agent_targets"] = ["retired-agent"]
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    before = _snapshot(project)
+
+    with pytest.raises(UpgradeError, match="removed Agent Target.*retired-agent"):
+        upgrade_project(project)
+
+    assert _snapshot(project) == before
+
+
 def test_upgrade_rewrites_v3_stamp_inventory(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
     old = b"OLD"
@@ -263,7 +317,7 @@ def test_upgrade_rewrites_v3_stamp_inventory(tmp_path: Path) -> None:
     _set_inventory_hash(project, "CLAUDE.md", old)
     upgrade_project(project)
     stamp = load_stamp(project)
-    assert stamp.stamp_version == 3
+    assert stamp.stamp_version == 4
     inventory = {entry.path: entry.sha256 for entry in stamp.inventory}
     assert inventory["CLAUDE.md"] == hashlib.sha256((project / "CLAUDE.md").read_bytes()).hexdigest()
 
@@ -378,3 +432,92 @@ def test_obsolete_deletion_is_idempotent(tmp_path: Path) -> None:
     assert _snapshot(project) == before
     assert "Deleted (obsolete) (0):" in report
     assert "would delete" not in report
+
+
+def test_pre_target_stamp_migrates_to_canonical_claude_layout(tmp_path: Path) -> None:
+    project = _make_pre_agent_target_project(tmp_path)
+    old_stamp = load_stamp(project)
+    old_provenance = old_stamp.upstream
+
+    report = upgrade_project(project)
+
+    canonical = project / ".agents/skills/project-orientation/SKILL.md"
+    stub = project / ".claude/skills/project-orientation/SKILL.md"
+    assert (project / "AGENTS.md").is_file()
+    assert (project / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n"
+    assert canonical.is_file()
+    assert stub.is_file()
+    assert canonical.read_bytes() != stub.read_bytes()
+    assert not canonical.is_symlink()
+    assert not stub.is_symlink()
+    assert not (project / ".windsurf").exists()
+    migrated = load_stamp(project)
+    assert migrated.agent_targets == ("claude",)
+    assert migrated.upstream == old_provenance
+    assert main(["check", str(project)]) == 0
+    assert "AGENTS.md" in report
+
+    before_repeat = _snapshot(project)
+    repeat = upgrade_project(project)
+    assert _snapshot(project) == before_repeat
+    assert "Summary: 0 upgraded, 0 added, 0 deleted" in repeat
+
+
+def test_migration_preserves_edited_skill_and_reports_divergence(tmp_path: Path) -> None:
+    project = _make_pre_agent_target_project(tmp_path)
+    legacy_skill = project / ".claude/skills/project-orientation/SKILL.md"
+    legacy_skill.write_bytes(b"user-edited skill")
+
+    report = upgrade_project(project)
+
+    assert legacy_skill.read_bytes() == b"user-edited skill"
+    assert (project / ".agents/skills/project-orientation/SKILL.md").is_file()
+    assert "Skipped (user-modified)" in report
+    assert "Divergence" in report
+    assert ".claude/skills/project-orientation/SKILL.md" in report
+
+
+def test_migration_preserves_edited_rules_and_reports_reconciliation(tmp_path: Path) -> None:
+    project = _make_pre_agent_target_project(tmp_path)
+    (project / "CLAUDE.md").write_bytes(b"user-edited rules")
+
+    report = upgrade_project(project)
+
+    assert (project / "CLAUDE.md").read_bytes() == b"user-edited rules"
+    assert (project / "AGENTS.md").is_file()
+    assert "CLAUDE.md" in report
+    assert "reference AGENTS.md manually" in report
+
+
+def test_migration_dry_run_reports_full_plan_without_mutation(tmp_path: Path) -> None:
+    project = _make_pre_agent_target_project(tmp_path)
+    before = _snapshot(project)
+
+    report = upgrade_project(project, dry_run=True)
+
+    assert _snapshot(project) == before
+    assert "would AGENTS.md" in report
+    assert "would .agents/skills/project-orientation/SKILL.md" in report
+    assert "would CLAUDE.md" in report
+
+
+def test_migration_failure_rolls_back_added_and_replaced_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _make_pre_agent_target_project(tmp_path)
+    before = _snapshot(project)
+    original = upgrade_module._write_target
+    calls = 0
+
+    def fail_third(path: Path, data: bytes) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            raise OSError("injected migration failure")
+        original(path, data)
+
+    monkeypatch.setattr(upgrade_module, "_write_target", fail_third)
+    with pytest.raises(UpgradeError, match="rolled back"):
+        upgrade_project(project)
+
+    assert _snapshot(project) == before

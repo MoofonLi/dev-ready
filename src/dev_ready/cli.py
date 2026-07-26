@@ -178,6 +178,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Item selection for the mcp component: comma-separated ids, or 'all' / 'none'.",
     )
     init_parser.add_argument(
+        "--agents",
+        default=None,
+        help="Agent Target selection: comma-separated ids, or 'all' / 'none'.",
+    )
+    init_parser.add_argument(
         "--no-skills", action="store_true", help="Skip Claude Code skills overlay"
     )
     init_parser.add_argument(
@@ -187,7 +192,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-docs", action="store_true", help="Skip design-doc templates overlay"
     )
     init_parser.add_argument(
-        "--no-agents", action="store_true", help="Exclude the agent-team handoff scaffold (docs/handoffs/)."
+        "--no-handoff",
+        action="store_true",
+        help="Exclude the Handoff Protocol scaffold (docs/handoffs/).",
+    )
+    init_parser.add_argument(
+        "--no-agents",
+        action="store_true",
+        help="Deprecated alias for --no-handoff.",
     )
 
     check_parser = subparsers.add_parser(
@@ -244,7 +256,8 @@ def build_answers(
         no_skills=args.no_skills,
         no_mcp=args.no_mcp,
         no_docs=args.no_docs,
-        no_agents=args.no_agents,
+        no_handoff=args.no_handoff or args.no_agents,
+        agents=args.agents,
     ) or ProjectSelection.all(catalog)
 
     target_dir = args.target_dir if args.target_dir is not None else Path.cwd() / name
@@ -270,7 +283,8 @@ def _build_partial_answers(
         no_skills=args.no_skills,
         no_mcp=args.no_mcp,
         no_docs=args.no_docs,
-        no_agents=args.no_agents,
+        no_handoff=args.no_handoff or args.no_agents,
+        agents=args.agents,
     )
 
     return PartialAnswers(
@@ -284,6 +298,9 @@ def _build_partial_answers(
 def _run_init(args: argparse.Namespace) -> int:
     manifest = load_default_manifest()
     pin = manifest.upstream["base_template"]
+
+    if args.no_agents:
+        print("warning: --no-agents is deprecated; use --no-handoff.", file=sys.stderr)
 
     if args.yes:
         answers = build_answers(args, manifest.components)
@@ -305,7 +322,7 @@ def _run_init(args: argparse.Namespace) -> int:
         )
     finally:
         progress.close()
-    print(render_report(answers, pin, written))
+    print(render_report(answers, pin, written, manifest.components))
     return 0
 
 

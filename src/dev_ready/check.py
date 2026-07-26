@@ -44,12 +44,19 @@ def check_project(project_dir: Path, json_output: bool = False) -> str:
 
     known_skills = frozenset(item.id for item in manifest.components.get("skills", ()))
     known_mcp = frozenset(item.id for item in manifest.components.get("mcp", ()))
+    removed_agent_targets = sorted(set(stamp.agent_targets) - set(manifest.agent_targets))
+    drifts.extend(
+        f"[removed agent target] recorded Agent Target {target_id!r} "
+        "is no longer present in CLI manifest"
+        for target_id in removed_agent_targets
+    )
     selection = ProjectSelection.from_items(
         manifest.components,
         skills=frozenset(item.id for item in stamp.skills_items) & known_skills,
         mcp=frozenset(item.id for item in stamp.mcp_items) & known_mcp,
+        agent_targets=frozenset(stamp.agent_targets) & frozenset(manifest.agent_targets),
         docs=stamp.docs_included,
-        agents=stamp.agents_included,
+        handoff=stamp.handoff_included,
     )
     structural_issues = inspect_project(
         resolved_dir,

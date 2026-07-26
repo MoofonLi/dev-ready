@@ -10,7 +10,7 @@ TEMPLATE_SUFFIX = ".tmpl"
 
 
 def _handoff_guidance(answers: Answers) -> str:
-    if not answers.includes("agents"):
+    if not answers.includes("handoff"):
         return ""
     return """## Handoff Protocol
 
@@ -28,7 +28,7 @@ Tracker and domain conventions are in `docs/agents/issue-tracker.md`, `docs/agen
 
 
 def _methodology_mapping(answers: Answers) -> str:
-    if not answers.includes("agents") or "spec-loop" not in answers.items("skills"):
+    if not answers.includes("handoff") or "spec-loop" not in answers.items("skills"):
         return ""
     return """## Process-v2 role mapping
 
@@ -51,7 +51,7 @@ def _documentation_values(answers: Answers) -> tuple[str, str, str]:
     guidance = """## Architecture documentation
 
 Read `docs/architecture.md` before structural changes; it records the system overview, module boundaries, and dependency rules."""
-    if answers.includes("agents"):
+    if answers.includes("handoff"):
         guidance += " The Protocol Configuration assigns its maintenance to `tech_lead`."
         ownership = (
             "The `tech_lead` role maintains this document under "
@@ -64,7 +64,7 @@ Read `docs/architecture.md` before structural changes; it records the system ove
 
 
 def _issue_tracker_configuration(answers: Answers) -> str:
-    if answers.includes("agents"):
+    if answers.includes("handoff"):
         return """# Issue tracker: Handoff Protocol files
 
 Read `docs/handoffs/protocol.yaml` before publishing planning or dispatch artifacts.

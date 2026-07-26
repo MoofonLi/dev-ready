@@ -9,7 +9,7 @@ import json
 
 from dev_ready import __version__
 from dev_ready.errors import InvalidArgumentsError, OverlayError
-from dev_ready.manifest import UpstreamPin, load_default_manifest
+from dev_ready.manifest import AgentTarget, ComponentCatalog, UpstreamPin, load_default_manifest
 from dev_ready.overlay import apply_overlay, render_stamp
 from dev_ready.prompts import Answers, ProjectSelection
 
@@ -29,9 +29,10 @@ def _answers(
     include_skills: bool = True,
     include_mcp: bool = True,
     include_docs: bool = True,
-    include_agents: bool = True,
+    include_handoff: bool = True,
     skills_items: frozenset[str] = frozenset({"project-orientation"}),
     mcp_items: frozenset[str] = frozenset({"mcp-config"}),
+    agent_targets: frozenset[str] | None = None,
 ) -> Answers:
     return Answers(
         project_name=project_name,
@@ -40,8 +41,9 @@ def _answers(
             CATALOG,
             skills=skills_items if include_skills else frozenset(),
             mcp=mcp_items if include_mcp else frozenset(),
+            agent_targets=agent_targets,
             docs=include_docs,
-            agents=include_agents,
+            handoff=include_handoff,
         ),
     )
 
@@ -55,9 +57,12 @@ def test_happy_path_writes_every_component_with_substitution(tmp_path: Path) -> 
 
 
 
+    assert (project_dir / "AGENTS.md").exists()
     assert (project_dir / "CLAUDE.md").exists()
     assert (project_dir / "README.md").exists()
+    assert (project_dir / ".agents" / "skills" / "project-orientation" / "SKILL.md").exists()
     assert (project_dir / ".claude" / "skills" / "project-orientation" / "SKILL.md").exists()
+    assert (project_dir / ".windsurf" / "skills" / "project-orientation" / "SKILL.md").exists()
     assert (project_dir / ".mcp.json").exists()
     assert (project_dir / "docs" / "architecture.md").exists()
     assert (project_dir / "docs" / "requirements.md").exists()
@@ -83,10 +88,12 @@ def test_happy_path_writes_every_component_with_substitution(tmp_path: Path) -> 
         assert not str(path).endswith(".tmpl")
 
     claude_md = (project_dir / "CLAUDE.md").read_text(encoding="utf-8")
-    assert "my-app" in claude_md
-    assert "{{" not in claude_md
-    assert "docs/handoffs/README.md" in claude_md
-    assert "docs/handoffs/protocol.yaml" in claude_md
+    assert claude_md == "@AGENTS.md\n"
+    agents_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
+    assert "my-app" in agents_md
+    assert "{{" not in agents_md
+    assert "docs/handoffs/README.md" in agents_md
+    assert "docs/handoffs/protocol.yaml" in agents_md
 
     architecture = (project_dir / "docs" / "architecture.md").read_text(encoding="utf-8")
     assert "my-app" in architecture
@@ -94,6 +101,9 @@ def test_happy_path_writes_every_component_with_substitution(tmp_path: Path) -> 
 
     handoffs_readme = (project_dir / "docs" / "handoffs" / "README.md").read_text(encoding="utf-8")
     assert "{{" not in handoffs_readme
+    readme = (project_dir / "README.md").read_text(encoding="utf-8")
+    assert "`AGENTS.md`" in readme
+    assert "`CLAUDE.md` — guidance" not in readme
 
 
 def test_apply_overlay_stamp_inventory_hashes_rendered_non_inject_files(tmp_path: Path) -> None:
@@ -103,8 +113,73 @@ def test_apply_overlay_stamp_inventory_hashes_rendered_non_inject_files(tmp_path
 
     stamp = json.loads((project_dir / ".dev-ready.json").read_text(encoding="utf-8"))
     inventory = {entry["path"]: entry["sha256"] for entry in stamp["inventory"]}
-    for path in ("CLAUDE.md", ".claude/skills/project-orientation/SKILL.md"):
+    for path in (
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".agents/skills/project-orientation/SKILL.md",
+        ".claude/skills/project-orientation/SKILL.md",
+    ):
         assert inventory[path] == hashlib.sha256((project_dir / path).read_bytes()).hexdigest()
+
+
+def test_claude_pointer_stub_names_and_describes_canonical_skill(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    apply_overlay(_answers(tmp_path), project_dir, CATALOG, PIN)
+
+    canonical = project_dir / ".agents" / "skills" / "project-orientation" / "SKILL.md"
+    stub = project_dir / ".claude" / "skills" / "project-orientation" / "SKILL.md"
+    stub_text = stub.read_text(encoding="utf-8")
+    assert "name: project-orientation" in stub_text
+    assert "description: Orient in this project's structure" in stub_text
+    assert ".agents/skills/project-orientation/SKILL.md" in stub_text
+    assert stub.read_bytes() != canonical.read_bytes()
+    assert not canonical.is_symlink()
+    assert not stub.is_symlink()
+
+
+def test_windsurf_only_writes_windsurf_stubs_and_no_project_mcp(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    apply_overlay(
+        _answers(tmp_path, agent_targets=frozenset({"windsurf"})),
+        project_dir,
+        CATALOG,
+        PIN,
+    )
+
+    assert (project_dir / "AGENTS.md").is_file()
+    assert (project_dir / ".agents/skills/project-orientation/SKILL.md").is_file()
+    assert (project_dir / ".windsurf/skills/project-orientation/SKILL.md").is_file()
+    assert not (project_dir / ".claude").exists()
+    assert not (project_dir / "CLAUDE.md").exists()
+    assert not (project_dir / ".mcp.json").exists()
+    canonical = (project_dir / ".agents/skills/project-orientation/SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert "AGENTS.md" in canonical
+    assert "read `CLAUDE.md`" not in canonical
+
+
+def test_no_agent_targets_still_writes_only_canonical_content(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    apply_overlay(
+        _answers(tmp_path, agent_targets=frozenset()),
+        project_dir,
+        CATALOG,
+        PIN,
+    )
+
+    assert (project_dir / "AGENTS.md").is_file()
+    assert (project_dir / ".agents/skills/project-orientation/SKILL.md").is_file()
+    assert not (project_dir / ".claude").exists()
+    assert not (project_dir / ".windsurf").exists()
+    assert not (project_dir / "CLAUDE.md").exists()
+    assert not (project_dir / ".mcp.json").exists()
 
 
 @pytest.mark.parametrize(
@@ -129,7 +204,7 @@ def test_apply_overlay_stamp_inventory_hashes_rendered_non_inject_files(tmp_path
             [Path(".mcp.json"), Path(".claude") / "skills" / "project-orientation" / "SKILL.md"],
         ),
         (
-            "include_agents",
+            "include_handoff",
             Path("docs") / "handoffs" / "README.md",
             [
                 Path(".mcp.json"),
@@ -158,35 +233,42 @@ def test_claude_md_always_present_even_with_all_components_disabled(tmp_path: Pa
     project_dir.mkdir()
 
     written = apply_overlay(
-        _answers(tmp_path, include_skills=False, include_mcp=False, include_docs=False, include_agents=False),
+        _answers(tmp_path, include_skills=False, include_mcp=False, include_docs=False, include_handoff=False),
         project_dir,
         CATALOG,
         PIN,
     )
 
-    assert written == [Path("CLAUDE.md"), Path("README.md"), Path(".dev-ready.json")]
+    assert written == [
+        Path("AGENTS.md"),
+        Path("CLAUDE.md"),
+        Path("README.md"),
+        Path(".dev-ready.json"),
+    ]
+    assert (project_dir / "AGENTS.md").exists()
     assert (project_dir / "CLAUDE.md").exists()
     assert (project_dir / "README.md").exists()
     assert (project_dir / ".dev-ready.json").exists()
     assert not (project_dir / ".claude").exists()
+    assert not (project_dir / ".agents" / "skills").exists()
     assert not (project_dir / ".mcp.json").exists()
     assert not (project_dir / "docs").exists()
 
 
-def test_coexistence_docs_and_agents(tmp_path: Path) -> None:
+def test_coexistence_docs_and_handoff(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
 
-    apply_overlay(_answers(tmp_path, include_docs=True, include_agents=True), project_dir, CATALOG, PIN)
+    apply_overlay(_answers(tmp_path, include_docs=True, include_handoff=True), project_dir, CATALOG, PIN)
     assert (project_dir / "docs" / "architecture.md").exists()
     assert (project_dir / "docs" / "handoffs" / "README.md").exists()
 
 
-def test_docs_without_agents(tmp_path: Path) -> None:
+def test_docs_without_handoff(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
 
-    apply_overlay(_answers(tmp_path, include_docs=True, include_agents=False), project_dir, CATALOG, PIN)
+    apply_overlay(_answers(tmp_path, include_docs=True, include_handoff=False), project_dir, CATALOG, PIN)
     assert (project_dir / "docs" / "architecture.md").exists()
     assert not (project_dir / "docs" / "handoffs").exists()
 
@@ -194,7 +276,7 @@ def test_docs_without_agents(tmp_path: Path) -> None:
 def test_protocol_configuration_is_the_single_role_authority(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
-    apply_overlay(_answers(tmp_path, include_agents=True), project_dir, CATALOG, PIN)
+    apply_overlay(_answers(tmp_path, include_handoff=True), project_dir, CATALOG, PIN)
 
     handoffs = project_dir / "docs" / "handoffs"
     protocol = (handoffs / "protocol.yaml").read_text(encoding="utf-8")
@@ -230,7 +312,7 @@ def test_handoff_gitignore_keeps_only_active_numeric_phases_ephemeral(
 ) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
-    apply_overlay(_answers(tmp_path, include_agents=True), project_dir, CATALOG, PIN)
+    apply_overlay(_answers(tmp_path, include_handoff=True), project_dir, CATALOG, PIN)
 
     handoffs = project_dir / "docs" / "handoffs"
     assert (handoffs / ".gitignore").read_text(encoding="utf-8") == "/phase-[0-9]*/\n"
@@ -240,12 +322,12 @@ def test_handoff_gitignore_keeps_only_active_numeric_phases_ephemeral(
     assert (project_dir / "docs" / "requirements.md").is_file()
 
 
-@pytest.mark.parametrize("include_agents", [False, True])
+@pytest.mark.parametrize("include_handoff", [False, True])
 @pytest.mark.parametrize("include_spec_loop", [False, True])
 @pytest.mark.parametrize("include_docs", [False, True])
 def test_methodology_and_documentation_axes_render_independently(
     tmp_path: Path,
-    include_agents: bool,
+    include_handoff: bool,
     include_spec_loop: bool,
     include_docs: bool,
 ) -> None:
@@ -256,32 +338,34 @@ def test_methodology_and_documentation_axes_render_independently(
         skills_items=frozenset({"spec-loop"}) if include_spec_loop else frozenset(),
         include_mcp=False,
         include_docs=include_docs,
-        include_agents=include_agents,
+        include_handoff=include_handoff,
     )
 
     apply_overlay(answers, project_dir, CATALOG, PIN)
 
     claude_md = (project_dir / "CLAUDE.md").read_text(encoding="utf-8")
-    assert ((project_dir / "docs" / "handoffs" / "protocol.yaml").is_file()) is include_agents
+    assert claude_md == "@AGENTS.md\n"
+    agents_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
+    assert ((project_dir / "docs" / "handoffs" / "protocol.yaml").is_file()) is include_handoff
     assert ((project_dir / ".claude" / "skills" / "to-spec" / "SKILL.md").is_file()) is include_spec_loop
     assert ((project_dir / "docs" / "agents" / "issue-tracker.md").is_file()) is include_spec_loop
     assert ((project_dir / "docs" / "architecture.md").is_file()) is include_docs
-    assert ("## Handoff Protocol" in claude_md) is include_agents
-    assert ("## Spec Loop" in claude_md) is include_spec_loop
-    assert ("docs/architecture.md" in claude_md) is include_docs
-    assert ("## Process-v2 role mapping" in claude_md) is (
-        include_agents and include_spec_loop
+    assert ("## Handoff Protocol" in agents_md) is include_handoff
+    assert ("## Spec Loop" in agents_md) is include_spec_loop
+    assert ("docs/architecture.md" in agents_md) is include_docs
+    assert ("## Process-v2 role mapping" in agents_md) is (
+        include_handoff and include_spec_loop
     )
 
     if include_spec_loop:
         tracker = (project_dir / "docs" / "agents" / "issue-tracker.md").read_text(
             encoding="utf-8"
         )
-        assert ("docs/specs/" in tracker) is include_agents
-        assert ("docs/handoffs/phase-<number>/tickets/" in tracker) is include_agents
-        assert (".scratch/" in tracker) is (not include_agents)
+        assert ("docs/specs/" in tracker) is include_handoff
+        assert ("docs/handoffs/phase-<number>/tickets/" in tracker) is include_handoff
+        assert (".scratch/" in tracker) is (not include_handoff)
 
-    if include_agents:
+    if include_handoff:
         protocol = (project_dir / "docs" / "handoffs" / "protocol.yaml").read_text(
             encoding="utf-8"
         )
@@ -293,9 +377,9 @@ def test_methodology_and_documentation_axes_render_independently(
         )
         for heading in ("## System Overview", "## Module Boundary", "## Dependency Rules"):
             assert heading in architecture
-        assert ("`tech_lead`" in architecture) is include_agents
+        assert ("`tech_lead`" in architecture) is include_handoff
 
-    assert "{{" not in claude_md
+    assert "{{" not in agents_md
 
 
 def test_readme_is_about_the_project_not_the_template(tmp_path: Path) -> None:
@@ -397,7 +481,7 @@ def test_render_stamp_structure(tmp_path: Path) -> None:
     ans = _answers(tmp_path, skills_items=frozenset({"project-orientation", "react-doctor"}), mcp_items=frozenset({"code-memory"}))
     stamp_text = render_stamp(ans, PIN, CATALOG)
     data = json.loads(stamp_text)
-    assert data["stamp_version"] == 3
+    assert data["stamp_version"] == 4
     assert data["project_name"] == "my-app"
     assert data["inventory"] == []
     assert data["dev_ready_version"] == __version__
@@ -409,7 +493,9 @@ def test_render_stamp_structure(tmp_path: Path) -> None:
     assert data["components"]["mcp"]["included"] is True
     assert data["components"]["mcp"]["items"] == [{"id": "code-memory", "pin": "0.9.0"}]
     assert data["components"]["docs"]["included"] is True
-    assert data["components"]["agents"]["included"] is True
+    assert data["components"]["handoff"]["included"] is True
+    assert data["agent_targets"] == ["claude", "windsurf"]
+    assert "agents" not in data["components"]
     assert data["upstream"]["repo"] == PIN.repo
     assert data["upstream"]["commit"] == PIN.commit
     assert "ref" not in data["upstream"]
@@ -468,7 +554,7 @@ def test_react_doctor_skill_copy(tmp_path: Path) -> None:
         CATALOG,
         PIN,
     )
-    skill_path = project_dir / ".claude" / "skills" / "react-doctor" / "SKILL.md"
+    skill_path = project_dir / ".agents" / "skills" / "react-doctor" / "SKILL.md"
     assert skill_path.exists()
     content = skill_path.read_text(encoding="utf-8")
     assert "react-doctor" in content
@@ -538,7 +624,7 @@ def test_render_stamp_records_vendored_pins(tmp_path: Path) -> None:
     answers = _answers(tmp_path, skills_items=frozenset({"caveman", "project-orientation"}))
     raw = render_stamp(answers, PIN, manifest.components, manifest.vendored)
     data = json.loads(raw)
-    assert data["stamp_version"] == 3
+    assert data["stamp_version"] == 4
     items = data["components"]["skills"]["items"]
     caveman_item = next(i for i in items if i["id"] == "caveman")
     po_item = next(i for i in items if i["id"] == "project-orientation")
@@ -639,12 +725,12 @@ def test_anthropics_skills_selection_and_license_propagation(tmp_path: Path) -> 
     written = apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
 
     expected_files = [
-        ".claude/skills/webapp-testing/SKILL.md",
-        ".claude/skills/webapp-testing/LICENSE.txt",
-        ".claude/skills/webapp-testing/scripts/with_server.py",
-        ".claude/skills/webapp-testing/examples/console_logging.py",
-        ".claude/skills/frontend-design/SKILL.md",
-        ".claude/skills/frontend-design/LICENSE.txt",
+        ".agents/skills/webapp-testing/SKILL.md",
+        ".agents/skills/webapp-testing/LICENSE.txt",
+        ".agents/skills/webapp-testing/scripts/with_server.py",
+        ".agents/skills/webapp-testing/examples/console_logging.py",
+        ".agents/skills/frontend-design/SKILL.md",
+        ".agents/skills/frontend-design/LICENSE.txt",
     ]
 
     for rel_path in expected_files:
@@ -672,7 +758,7 @@ def test_render_stamp_records_anthropics_pin(tmp_path: Path) -> None:
     answers = _answers(tmp_path, skills_items=frozenset({"webapp-testing"}))
     raw = render_stamp(answers, PIN, manifest.components, manifest.vendored)
     data = json.loads(raw)
-    assert data["stamp_version"] == 3
+    assert data["stamp_version"] == 4
     items = data["components"]["skills"]["items"]
     webapp_item = next(i for i in items if i["id"] == "webapp-testing")
     assert webapp_item["pin"] == "1f630fdf9259cec4a14913127dfd7c3b69ef72eb"
@@ -683,7 +769,7 @@ def test_claude_md_contains_karpathy_guardrails(tmp_path: Path) -> None:
     project_dir.mkdir()
     apply_overlay(_answers(tmp_path), project_dir, CATALOG, PIN)
 
-    claude_md = (project_dir / "CLAUDE.md").read_text(encoding="utf-8")
+    claude_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
     # Attribution (Security-reviewed wording): MIT + README basis + upstream repo.
     assert "multica-ai/andrej-karpathy-skills" in claude_md
     assert "(MIT, per its README)" in claude_md
@@ -702,7 +788,7 @@ def test_standalone_spec_loop_is_complete_and_role_neutral(tmp_path: Path) -> No
         skills_items=frozenset({"spec-loop"}),
         include_mcp=False,
         include_docs=False,
-        include_agents=False,
+        include_handoff=False,
     )
 
     apply_overlay(answers, project_dir, CATALOG, PIN)
@@ -719,12 +805,13 @@ def test_standalone_spec_loop_is_complete_and_role_neutral(tmp_path: Path) -> No
         "diagnosing-bugs",
         "code-review",
     ):
+        assert (project_dir / ".agents" / "skills" / skill_name / "SKILL.md").is_file()
         assert (project_dir / ".claude" / "skills" / skill_name / "SKILL.md").is_file()
     assert (project_dir / "docs" / "agents" / "issue-tracker.md").is_file()
     assert (project_dir / "docs" / "agents" / "domain.md").is_file()
     assert not (project_dir / "CONTEXT.md").exists()
 
-    claude_md = (project_dir / "CLAUDE.md").read_text(encoding="utf-8")
+    claude_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
     assert "## Spec Loop" in claude_md
     assert "docs/agents/issue-tracker.md" in claude_md
     assert "Handoff Protocol" not in claude_md
@@ -742,13 +829,13 @@ def test_deselected_spec_loop_emits_no_bundle_configuration_or_guidance(
         include_skills=False,
         include_mcp=False,
         include_docs=False,
-        include_agents=False,
+        include_handoff=False,
     )
 
     apply_overlay(answers, project_dir, CATALOG, PIN)
 
     assert not (project_dir / "docs").exists()
-    claude_md = (project_dir / "CLAUDE.md").read_text(encoding="utf-8")
+    claude_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
     assert "Spec Loop" not in claude_md
     assert "Handoff Protocol" not in claude_md
 
@@ -763,7 +850,7 @@ def test_spec_loop_stamp_records_the_resolved_selection_and_complete_inventory(
         skills_items=frozenset({"spec-loop"}),
         include_mcp=False,
         include_docs=False,
-        include_agents=False,
+        include_handoff=False,
     )
 
     apply_overlay(answers, project_dir, CATALOG, PIN, load_default_manifest().vendored)
@@ -776,9 +863,43 @@ def test_spec_loop_stamp_records_the_resolved_selection_and_complete_inventory(
         "code-review",
     }
     inventory_paths = {entry["path"] for entry in stamp["inventory"]}
-    assert ".claude/skills/domain-modeling/ADR-FORMAT.md" in inventory_paths
+    assert ".agents/skills/domain-modeling/ADR-FORMAT.md" in inventory_paths
     assert "docs/agents/issue-tracker.md" in inventory_paths
     assert not (project_dir / "CONTEXT.md").exists()
+
+
+def test_manifest_only_project_mcp_path_retargets_catalog_effects(tmp_path: Path) -> None:
+    custom_catalog = ComponentCatalog(
+        CATALOG,
+        {
+            "custom": AgentTarget(
+                id="custom",
+                description="Custom project-local MCP target.",
+                skills_dir=".custom/skills",
+                rules_file=None,
+                mcp_file=".custom/mcp.json",
+            )
+        },
+    )
+    answers = Answers(
+        project_name="my-app",
+        target_dir=tmp_path / "project",
+        selection=ProjectSelection.from_items(
+            custom_catalog,
+            mcp=frozenset({"mcp-config", "code-memory"}),
+            agent_targets=frozenset({"custom"}),
+            docs=False,
+            handoff=False,
+        ),
+    )
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    apply_overlay(answers, project_dir, custom_catalog, PIN)
+
+    config = json.loads((project_dir / ".custom/mcp.json").read_text(encoding="utf-8"))
+    assert "codebase-memory" in config["mcpServers"]
+    assert not (project_dir / ".mcp.json").exists()
 
 
 

@@ -42,9 +42,11 @@ def _init_args(**overrides) -> argparse.Namespace:
         "target_dir": None,
         "skills": None,
         "mcp": None,
+        "agents": None,
         "no_skills": False,
         "no_mcp": False,
         "no_docs": False,
+        "no_handoff": False,
         "no_agents": False,
     }
     defaults.update(overrides)
@@ -274,7 +276,7 @@ def test_init_success_omits_disabled_components_from_summary(
                 "--no-skills",
                 "--no-mcp",
                 "--no-docs",
-                "--no-agents",
+                "--no-handoff",
             ]
         )
         == 0
@@ -283,7 +285,7 @@ def test_init_success_omits_disabled_components_from_summary(
     assert "skills" not in out
     assert "mcp" not in out
     assert "docs" not in out
-    assert "agents" not in out
+    assert "handoff" not in out
 
 
 @pytest.mark.parametrize(
@@ -338,7 +340,7 @@ def test_init_flags_reach_generate_via_answers(
     assert answers.include_skills is False
     assert answers.include_mcp is False
     assert answers.include_docs is True
-    assert answers.include_agents is True
+    assert answers.include_handoff is True
     assert answers.assume_yes is True
 
 
@@ -364,13 +366,13 @@ def test_build_answers_defaults() -> None:
     )
     assert answers.mcp_items == frozenset({"mcp-config", "code-memory"})
     assert answers.include_docs is True
-    assert answers.include_agents is True
+    assert answers.include_handoff is True
     assert answers.assume_yes is False
 
 
 def test_build_answers_respects_flags(tmp_path) -> None:
     answers = build_answers(
-        _init_args(yes=True, target_dir=tmp_path / "out", no_skills=True, no_mcp=True, no_agents=True),
+        _init_args(yes=True, target_dir=tmp_path / "out", no_skills=True, no_mcp=True, no_handoff=True),
         CATALOG,
     )
     assert answers.target_dir == tmp_path / "out"
@@ -379,7 +381,7 @@ def test_build_answers_respects_flags(tmp_path) -> None:
     assert answers.skills_items == frozenset()
     assert answers.mcp_items == frozenset()
     assert answers.include_docs is True
-    assert answers.include_agents is False
+    assert answers.include_handoff is False
     assert answers.assume_yes is True
 
 
@@ -395,8 +397,10 @@ def test_parser_accepts_all_documented_flags() -> None:
             "project-orientation",
             "--mcp",
             "none",
+            "--agents",
+            "claude,windsurf",
             "--no-docs",
-            "--no-agents",
+            "--no-handoff",
         ]
     )
     assert args.command == "init"
@@ -404,8 +408,97 @@ def test_parser_accepts_all_documented_flags() -> None:
     assert args.target_dir == Path("x")
     assert args.skills == "project-orientation"
     assert args.mcp == "none"
+    assert args.agents == "claude,windsurf"
     assert args.no_docs is True
-    assert args.no_agents is True
+    assert args.no_handoff is True
+
+
+def test_deprecated_no_agents_alias_warns_and_disables_handoff(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    captured: dict[str, Answers] = {}
+
+    def _capture(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
+        captured["answers"] = answers
+        return []
+
+    monkeypatch.setattr(cli_module, "generate", _capture)
+
+    assert main(["init", "my-app", "--yes", "--dir", str(tmp_path / "out"), "--no-agents"]) == 0
+    assert captured["answers"].include_handoff is False
+    stderr = capsys.readouterr().err
+    assert "deprecated" in stderr
+    assert "--no-handoff" in stderr
+
+
+def test_agents_flag_reaches_generation_as_resolved_target_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Answers] = {}
+
+    def _capture(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
+        captured["answers"] = answers
+        return []
+
+    monkeypatch.setattr(cli_module, "generate", _capture)
+
+    assert main(
+        [
+            "init",
+            "my-app",
+            "--yes",
+            "--dir",
+            str(tmp_path / "out"),
+            "--agents",
+            "windsurf",
+        ]
+    ) == 0
+    assert captured["answers"].agent_targets == frozenset({"windsurf"})
+
+
+def test_unknown_agents_flag_fails_before_generation(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    called = False
+
+    def _capture(*args, **kwargs) -> list[Path]:
+        nonlocal called
+        called = True
+        return []
+
+    monkeypatch.setattr(cli_module, "generate", _capture)
+
+    assert main(["init", "my-app", "--yes", "--agents", "claud"]) == 2
+    assert called is False
+    error = capsys.readouterr().err
+    assert "unknown agent target ids" in error
+    assert "claude" in error
+    assert "windsurf" in error
+
+
+def test_no_handoff_and_deprecated_alias_are_accepted_together(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Answers] = {}
+
+    def _capture(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
+        captured["answers"] = answers
+        return []
+
+    monkeypatch.setattr(cli_module, "generate", _capture)
+
+    assert main(
+        [
+            "init",
+            "my-app",
+            "--yes",
+            "--dir",
+            str(tmp_path / "out"),
+            "--no-handoff",
+            "--no-agents",
+        ]
+    ) == 0
+    assert captured["answers"].include_handoff is False
 
 
 def test_upgrade_parser_accepts_path_and_dry_run() -> None:

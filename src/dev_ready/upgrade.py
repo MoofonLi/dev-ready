@@ -57,6 +57,7 @@ def _format_report(
         ("Skipped (missing)", "skipped_missing"),
         ("Deleted (obsolete)", "deleted"),
         ("Preserved (obsolete, user-modified)", "preserved_obsolete_modified"),
+        ("Divergence", "divergence"),
         ("Conflict", "conflict"),
     )
     lines = [
@@ -114,6 +115,12 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
     )
     known_skills = frozenset(item.id for item in manifest.components.get("skills", ()))
     known_mcp = frozenset(item.id for item in manifest.components.get("mcp", ()))
+    removed_agent_targets = sorted(set(stamp.agent_targets) - set(manifest.agent_targets))
+    if removed_agent_targets:
+        raise UpgradeError(
+            "cannot upgrade a project that records a removed Agent Target: "
+            + ", ".join(repr(target_id) for target_id in removed_agent_targets)
+        )
     answers = Answers(
         project_name=stamp.project_name,
         target_dir=resolved,
@@ -121,12 +128,32 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
             manifest.components,
             skills=frozenset(item.id for item in stamp.skills_items) & known_skills,
             mcp=frozenset(item.id for item in stamp.mcp_items) & known_mcp,
+            agent_targets=frozenset(stamp.agent_targets)
+            & frozenset(manifest.agent_targets),
             docs=stamp.docs_included,
-            agents=stamp.agents_included,
+            handoff=stamp.handoff_included,
         ),
     )
     new_content = build_overlay_content(answers, manifest.components)
     shared_targets = classify_shared_targets(manifest.components, answers.selection)
+    shared_all = set(shared_targets.all)
+    shared_selected = set(shared_targets.selected)
+    for item in manifest.components.get("mcp", ()):
+        if item.effect is None:
+            continue
+        shared_all.discard(item.effect.target)
+        shared_selected.discard(item.effect.target)
+        shared_all.update(
+            target.mcp_file
+            for target in manifest.agent_targets.values()
+            if target.mcp_file is not None
+        )
+        if item.id in answers.mcp_items:
+            shared_selected.update(
+                target.mcp_file
+                for target_id, target in manifest.agent_targets.items()
+                if target_id in answers.agent_targets and target.mcp_file is not None
+            )
     recorded = {entry.path: entry.sha256 for entry in stamp.inventory}
     groups: dict[str, list[str]] = {
         "upgraded": [],
@@ -136,6 +163,7 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         "skipped_missing": [],
         "deleted": [],
         "preserved_obsolete_modified": [],
+        "divergence": [],
         "conflict": [],
     }
     upgrades: list[tuple[Path, bytes]] = []
@@ -149,7 +177,7 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         if _has_symlink_component(resolved, target):
             groups["conflict"].append(path)
             continue
-        if path in shared_targets.all:
+        if path in shared_all:
             groups["skipped_shared"].append(path)
             continue
         if path in recorded:
@@ -162,6 +190,17 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
             current = target.read_bytes()
             if hashlib.sha256(current).hexdigest() != recorded[path]:
                 groups["skipped_modified"].append(path)
+                if stamp.stamp_version < 4 and path.startswith(".claude/skills/"):
+                    canonical_path = path.removeprefix(".claude/")
+                    groups["divergence"].append(
+                        f"{path}: preserved; canonical content was added at "
+                        f".agents/{canonical_path}; reconcile the two files manually"
+                    )
+                elif stamp.stamp_version < 4 and path == "CLAUDE.md":
+                    groups["divergence"].append(
+                        "CLAUDE.md: preserved; reference AGENTS.md manually to adopt "
+                        "the canonical project rules"
+                    )
             elif current == new_content[path]:
                 # It is present and current, so it belongs in no action group.
                 continue
@@ -199,7 +238,7 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
     # never touches them.
     already_reported_shared = set(groups["skipped_shared"])
     groups["skipped_shared"].extend(
-        sorted(shared_targets.selected - already_reported_shared - set(new_content))
+        sorted(shared_selected - already_reported_shared - set(new_content))
     )
 
     new_stamp = render_stamp(

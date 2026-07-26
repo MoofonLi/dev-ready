@@ -1,5 +1,19 @@
 {
   "manifest_version": 1,
+  "agent_targets": {
+    "claude": {
+      "description": "Claude Code native project configuration.",
+      "skills_dir": ".claude/skills",
+      "rules_file": "CLAUDE.md",
+      "mcp_file": ".mcp.json"
+    },
+    "windsurf": {
+      "description": "Windsurf native project skill discovery.",
+      "skills_dir": ".windsurf/skills",
+      "rules_file": null,
+      "mcp_file": null
+    }
+  },
   "upstream": {
     "base_template": {
       "repo": "fastapi/full-stack-fastapi-template",
@@ -149,7 +163,7 @@
           "paths": [
             {
               "src": "claude/skills/project-orientation",
-              "dest": ".claude/skills/project-orientation"
+              "dest": ".agents/skills/project-orientation"
             }
           ]
         },
@@ -160,7 +174,7 @@
           "license": "MIT",
           "pin": "0.8.1",
           "paths": [
-            { "src": "claude/skills/react-doctor", "dest": ".claude/skills/react-doctor" }
+            { "src": "claude/skills/react-doctor", "dest": ".agents/skills/react-doctor" }
           ],
           "inject": {
             "kind": "npm-dev-dependency",
@@ -178,7 +192,7 @@
           "paths": [
             {
               "src": "claude/skills/caveman",
-              "dest": ".claude/skills/caveman"
+              "dest": ".agents/skills/caveman"
             }
           ]
         },
@@ -191,7 +205,7 @@
           "paths": [
             {
               "src": "claude/skills/security-audit",
-              "dest": ".claude/skills/security-audit"
+              "dest": ".agents/skills/security-audit"
             }
           ]
         },
@@ -204,7 +218,7 @@
           "paths": [
             {
               "src": "claude/skills/tdd",
-              "dest": ".claude/skills/tdd"
+              "dest": ".agents/skills/tdd"
             }
           ]
         },
@@ -217,7 +231,7 @@
           "paths": [
             {
               "src": "claude/skills/diagnosing-bugs",
-              "dest": ".claude/skills/diagnosing-bugs"
+              "dest": ".agents/skills/diagnosing-bugs"
             }
           ]
         },
@@ -230,7 +244,7 @@
           "paths": [
             {
               "src": "claude/skills/code-review",
-              "dest": ".claude/skills/code-review"
+              "dest": ".agents/skills/code-review"
             }
           ]
         },
@@ -248,31 +262,31 @@
           "paths": [
             {
               "src": "claude/skills/grill-with-docs",
-              "dest": ".claude/skills/grill-with-docs"
+              "dest": ".agents/skills/grill-with-docs"
             },
             {
               "src": "claude/skills/grilling",
-              "dest": ".claude/skills/grilling"
+              "dest": ".agents/skills/grilling"
             },
             {
               "src": "claude/skills/domain-modeling",
-              "dest": ".claude/skills/domain-modeling"
+              "dest": ".agents/skills/domain-modeling"
             },
             {
               "src": "claude/skills/to-spec",
-              "dest": ".claude/skills/to-spec"
+              "dest": ".agents/skills/to-spec"
             },
             {
               "src": "claude/skills/to-tickets",
-              "dest": ".claude/skills/to-tickets"
+              "dest": ".agents/skills/to-tickets"
             },
             {
               "src": "claude/skills/improve-codebase-architecture",
-              "dest": ".claude/skills/improve-codebase-architecture"
+              "dest": ".agents/skills/improve-codebase-architecture"
             },
             {
               "src": "claude/skills/codebase-design",
-              "dest": ".claude/skills/codebase-design"
+              "dest": ".agents/skills/codebase-design"
             },
             {
               "src": "claude/spec-loop",
@@ -289,7 +303,7 @@
           "paths": [
             {
               "src": "claude/skills/webapp-testing",
-              "dest": ".claude/skills/webapp-testing"
+              "dest": ".agents/skills/webapp-testing"
             }
           ]
         },
@@ -302,7 +316,7 @@
           "paths": [
             {
               "src": "claude/skills/frontend-design",
-              "dest": ".claude/skills/frontend-design"
+              "dest": ".agents/skills/frontend-design"
             }
           ]
         }

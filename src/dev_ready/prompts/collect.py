@@ -17,7 +17,7 @@ from dev_ready.prompts.asker import Asker
 
 __all__ = ["collect_answers", "confirm_generation"]
 
-_COMPONENT_CHOICES = ("skills", "mcp", "docs", "agents")
+_COMPONENT_CHOICES = ("skills", "mcp", "docs", "handoff")
 
 
 def _is_interactive() -> bool:
@@ -54,7 +54,7 @@ def collect_answers(
     if needs_components and asker is None and not _is_interactive():
         raise InvalidArgumentsError(
             "component selection requires an interactive terminal — pass "
-            "--no-skills/--no-mcp/--no-docs/--no-agents explicitly, or use --yes"
+            "--no-skills/--no-mcp/--no-docs/--no-handoff explicitly, or use --yes"
         )
 
     resolved_asker = asker
@@ -68,7 +68,7 @@ def collect_answers(
 
     if needs_components:
         assert resolved_asker is not None
-        skills_on, mcp_on, include_docs, include_agents = _prompt_components(resolved_asker)
+        skills_on, mcp_on, include_docs, include_handoff = _prompt_components(resolved_asker)
         if catalog is not None:
             if skills_on and "skills" in catalog and catalog["skills"]:
                 skills_items = _prompt_items(
@@ -89,12 +89,14 @@ def collect_answers(
             mcp_items = frozenset()
         if catalog is None and (skills_on or mcp_on):
             raise InvalidArgumentsError("catalog is required to validate selected items")
+        agent_targets = _prompt_agent_targets(resolved_asker, catalog or {})
         selection = ProjectSelection.from_items(
             catalog or {},
             skills=skills_items if skills_on else frozenset(),
             mcp=mcp_items if mcp_on else frozenset(),
+            agent_targets=agent_targets,
             docs=include_docs,
-            agents=include_agents,
+            handoff=include_handoff,
         )
     else:
         assert partial.selection is not None
@@ -147,10 +149,11 @@ def _render_confirmation_summary(answers: Answers, pin: UpstreamPin) -> str:
         comp_parts.append(f"mcp ({mcp_str})")
     if answers.includes("docs"):
         comp_parts.append("docs")
-    if answers.includes("agents"):
-        comp_parts.append("agents")
+    if answers.includes("handoff"):
+        comp_parts.append("handoff")
 
     components_line = ", ".join(comp_parts) if comp_parts else "(none)"
+    targets_line = ", ".join(sorted(answers.agent_targets)) or "(none)"
     return "\n".join(
         [
             "Ready to generate:",
@@ -158,6 +161,7 @@ def _render_confirmation_summary(answers: Answers, pin: UpstreamPin) -> str:
             f"  target dir:   {answers.target_dir}",
             f"  upstream:     {pin.repo}@{pin.commit[:12]}",
             f"  components:   {components_line}",
+            f"  agent targets: {targets_line}",
         ]
     )
 
@@ -195,7 +199,7 @@ def _prompt_components(asker: Asker) -> tuple[bool, bool, bool, bool]:
         "skills" in selected_set,
         "mcp" in selected_set,
         "docs" in selected_set,
-        "agents" in selected_set,
+        "handoff" in selected_set,
     )
 
 
@@ -207,3 +211,23 @@ def _prompt_items(asker: Asker, component: str, item_ids: Sequence[str]) -> froz
     if selected is None:
         raise AbortedError(f"{component} item selection cancelled")
     return frozenset(selected)
+
+
+def _prompt_agent_targets(
+    asker: Asker,
+    catalog: Mapping[str, tuple[CatalogItem, ...]],
+) -> frozenset[str]:
+    targets = getattr(catalog, "agent_targets", {})
+    if not targets:
+        return frozenset()
+    labels = {
+        f"{target_id}: {target.description}": target_id
+        for target_id, target in targets.items()
+    }
+    try:
+        selected = asker.checkbox("Select Agent Targets:", tuple(labels))
+    except KeyboardInterrupt:
+        selected = None
+    if selected is None:
+        raise AbortedError("Agent Target selection cancelled")
+    return frozenset(labels[label] for label in selected)

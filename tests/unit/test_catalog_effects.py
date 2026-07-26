@@ -172,7 +172,7 @@ def test_shared_target_classification_stays_behind_effect_seam() -> None:
         manifest.components,
         mcp=frozenset({"mcp-config", "code-memory"}),
         docs=False,
-        agents=False,
+        handoff=False,
     )
 
     targets = classify_shared_targets(manifest.components, selection)
