@@ -16,11 +16,20 @@ No half-finished output, no untested "latest": the upstream template is pinned t
 
 A generated project based on [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) (FastAPI, React, SQLModel, PostgreSQL, Docker Compose), plus an AI tooling overlay so it works well with coding agents out of the box:
 
-- `CLAUDE.md` — project instructions for Claude Code
-- Claude Code skills (e.g. project orientation)
-- MCP server configuration (`mcp.json`)
-- Design-doc templates (`architecture.md`, `requirements.md`)
-- Agent-team handoff scaffold (`docs/handoffs/` — a document-driven multi-agent workflow: Tech Lead → Senior → Junior → QA/Security/SRE)
+- `CLAUDE.md` — project instructions and Karpathy-derived development guardrails
+- A 10/10 skills catalog with item-level selection. The `spec-loop` bundle adds
+  planning, durable specs, tracer-bullet tickets, TDD, review, diagnosis, and
+  architecture improvement; selecting it automatically resolves `tdd`,
+  `diagnosing-bugs`, and `code-review`.
+- MCP server configuration (`.mcp.json`), including the selectable pinned
+  codebase-memory server
+- Design-doc templates (`docs/architecture.md`, `docs/requirements.md`)
+- A configurable Handoff Protocol under `docs/handoffs/`. Its Protocol
+  Configuration, `protocol.yaml`, is the single runtime authority for seven
+  stable roles, editable titles/model assignments, handoff order, escalation,
+  review gates, and commit authority.
+- A `.dev-ready.json` generation stamp recording Base Provenance, selected
+  components/items and pins, and the managed overlay inventory
 
 Every generated project also gets its own `README.md` (the upstream template's repo README and other repo-maintenance files — `CONTRIBUTING.md`, release notes, deploy workflows, screenshots — are pruned, so nothing template-repo-specific leaks into your project).
 
@@ -76,14 +85,33 @@ uvx dev-ready init my-app --yes
 
 # Options
 uvx dev-ready init my-app \
-  --dir path/to/target \  # default: ./my-app
-  --no-skills \           # skip the Claude Code skills overlay
-  --no-mcp \              # skip the MCP configuration overlay
-  --no-docs \             # skip the design-doc templates
-  --no-agents             # skip the agent-team handoff scaffold
+  --dir path/to/target \
+  --skills spec-loop,security-audit \
+  --mcp code-memory \
+  --no-docs \
+  --no-agents
 ```
 
-Then follow the printed next steps (typically `docker compose watch` inside the generated project).
+Use `all`, `none`, or comma-separated ids with `--skills` and `--mcp`.
+`--no-skills` and `--no-mcp` are aliases for `none`. During generation, stderr
+shows fetch → overlay → verify → finalize progress (a spinner on TTYs and stable
+plain lines when redirected); stdout retains the final report.
+
+```bash
+# Inspect a generated project against its stamp (read-only and offline)
+uvx dev-ready check path/to/project
+uvx dev-ready check path/to/project --json
+
+# Preview or apply an overlay-only, transactional upgrade
+uvx dev-ready upgrade path/to/project --dry-run
+uvx dev-ready upgrade path/to/project
+```
+
+`upgrade` preserves the project's immutable Base Provenance and upstream
+application content while advancing Overlay Currency. It updates only
+unmodified overlay-managed whole files, removes untouched obsolete managed
+files, preserves user-modified files, and rolls back the complete plan on
+failure.
 
 ### Exit codes
 
@@ -95,6 +123,10 @@ Then follow the printed next steps (typically `docker compose watch` inside the 
 | 3 | Network / fetch failure |
 | 4 | Target directory conflict |
 | 5 | Generated output failed structural verification |
+| 6 | Stamp missing or invalid |
+| 7 | Drift detected by `check` |
+| 8 | Upgrade unsupported for a pre-v3 stamp |
+| 9 | Upgrade failed and was rolled back |
 
 Full CLI contract: [docs/cli-spec.md](docs/cli-spec.md).
 
@@ -104,7 +136,9 @@ Full CLI contract: [docs/cli-spec.md](docs/cli-spec.md).
 2. **Fetch** — run [Copier](https://copier.readthedocs.io/) against the upstream template at the commit pinned in `src/dev_ready/manifest.json` (a lockfile shipped inside the wheel), into a staging directory. Your project name and freshly generated secrets are written into the project's `.env` — no upstream `changethis` placeholders.
 3. **Overlay** — apply the AI tooling files with template-variable substitution, still in staging.
 4. **Verify** — structural checks against required paths (backend, frontend, compose files, ...).
-5. **Finalize** — move staging into the target. This is the only step that touches the target.
+5. **Finalize** — revalidate the destination and commit staging with one
+   same-filesystem atomic directory rename. A failed generation exposes no
+   partial target.
 
 The pin is kept current by a weekly GitHub Actions job that opens a bump PR; CI validates every PR by actually generating a project, building it with Docker Compose, and polling the health-check endpoint. A released CLI therefore always carries a pin it was tested with. Design details and ADRs: [docs/architecture.md](docs/architecture.md).
 
@@ -120,13 +154,18 @@ uv run ruff check .                # lint
 
 Releases are tag-driven (`vX.Y.Z`) and published to PyPI via trusted publishing — see [docs/releasing.md](docs/releasing.md).
 
-This repo is developed with a multi-agent workflow (Architect → Engineer → QA / Security / SRE review); agent instructions live in [CLAUDE.md](CLAUDE.md) and reviewer roles in `.bob/`.
+This repo is developed with the document-driven Handoff Protocol and Spec Loop
+defined in [AGENTS.md](AGENTS.md): durable specs, ticket dispatch, one-ticket
+test-first execution, Senior review, and independent QA, Security, and SRE
+gates.
 
 ## Roadmap
 
-- `dev-ready check` — validate an existing project against the manifest
-- `dev-ready upgrade` — re-apply a newer overlay to an existing project
-- Additional base templates and curated third-party skill content
+v0.8 keeps CLI internationalization and multi-agent render targets deferred.
+v1.0's second template (Next.js) is gated on attributable external-user
+evidence or four strictly increasing adjusted complete UTC weeks of PyPI
+downloads. See [the v0.7 overview](docs/version_overview/v0.7-overview.md) for
+the decidable gate and evidence fields.
 
 ## License
 

@@ -1,6 +1,6 @@
 # CLI Specification — dev-ready
 
-Status: Draft v0.1. This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
+Status: Current through v0.7. This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
 
 ## Commands
 
@@ -20,6 +20,12 @@ Generate a new project.
 | `--no-agents` | bool | false | Skip the agent-team handoff scaffold overlay (`docs/handoffs/`) |
 
 Unknown item ids in `--skills` or `--mcp` fail fast with an invalid-arguments error (exit 2) listing valid item ids. Conflicting flags (e.g. `--no-skills` with `--skills <id>`) exit 2.
+
+Selections are resolved before confirmation, rendering, reporting, verification,
+and stamping. In v0.7 the skills catalog contains 10/10 items. Selecting
+`spec-loop` automatically includes its required existing items: `tdd`,
+`diagnosing-bugs`, and `code-review`. The resolved set is shown to the user and
+recorded in `.dev-ready.json`; explicit `--skills none` remains empty.
 
 Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification; 6 stamp missing or unparseable/invalid; 7 drift detected; 8 upgrade not supported (pre-v3 stamp); 9 upgrade failed (rolled back).
 
@@ -47,6 +53,11 @@ as separate `warning:` lines; they are not a fifth stage. Spinner cleanup runs
 on success, expected errors, unexpected exceptions, keyboard interruption, and
 termination represented by Python as process exit.
 
+Staging is created beside the target and finalize commits it with one
+same-filesystem atomic rename after revalidating the destination. There is no
+cross-filesystem copy fallback: a finalize failure leaves no partial target and
+restores an initially empty target directory.
+
 ### `dev-ready check [PATH]`
 
 Inspect an existing generated project directory against its `.dev-ready.json` stamp and the running CLI manifest. Read-only operation.
@@ -67,7 +78,7 @@ Re-apply only overlay-managed whole-file content to an existing generated projec
 | `PATH` | path | `.` | Target project directory to upgrade |
 | `--dry-run` | bool | false | Report planned changes without modifying the project |
 
-The project stamp is now `stamp_version` 3 and records the project name and a managed-file inventory. Version 1 and 2 stamps remain checkable but cannot be upgraded. Exit codes: 0 success; 6 invalid or missing stamp; 8 pre-v3 stamp cannot be upgraded; 9 upgrade failure after rollback.
+The project stamp is now `stamp_version` 3 and records the project name and a managed-file inventory. Version 1 and 2 stamps remain checkable but cannot be upgraded. Across an overlay-only upgrade, the stamped upstream repository and commit are immutable Base Provenance; the dev-ready version, selected-item pins, and managed-file inventory are Overlay Currency and advance to the running CLI. A newer manifest base pin is a non-blocking advisory because `upgrade` does not rewrite upstream application content. Untouched obsolete managed files may be deleted transactionally; modified obsolete files are preserved and reported. Exit codes: 0 success; 6 invalid or missing stamp; 8 pre-v3 stamp cannot be upgraded; 9 upgrade failure after rollback.
 
 ### `dev-ready --version` / `dev-ready --help`
 

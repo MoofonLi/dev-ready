@@ -1,6 +1,8 @@
 # Requirements — dev-ready
 
-Status: Draft v0.1 (2026-07-13); v0.2 scope added (2026-07-16); v0.3+ scope agreed (2026-07-17, see docs/version-plan.md)
+Status: v0.7 implementation scope shipped (2026-07-26); the public v0.7.0
+release and distribution actions remain Phase 5 ticket 02. Historical scope and
+roadmap details are in docs/version-plan.md.
 
 ## Problem Statement
 
@@ -59,11 +61,11 @@ Agreed 2026-07-17. Full detail, rationale, and per-version grouping live in
 - FR-20 (v0.5, shipped). Karpathy guardrails content in generated CLAUDE.md — MIT per the upstream README declaration (no standalone LICENSE file; pinned commit preserves the grant), with attribution in NOTICES.
 - FR-21 (v0.6, shipped). `dev-ready check`: read-only validation of an existing project against its stamp and the CLI's manifest.
 - FR-22 (v0.6, shipped). `dev-ready upgrade`: re-apply overlay-managed whole files only (per the stamp's item selection); refuses pre-v3 stamps, never touches upstream application code, and never silently overwrites user edits.
-- FR-23 (v0.7, planned). Configurable Handoff Protocol: generated projects carry one default role topology in `docs/handoffs/protocol.yaml`. Seven stable role ids (`ceo`, `tech_lead`, `senior_engineer`, `junior_engineer`, `qa_reviewer`, `security_reviewer`, and `sre_reviewer`) own responsibilities, prohibitions, handoff order, and nullable/editable model assignments as data. The Protocol Configuration is authoritative at runtime; generated prose must not duplicate editable titles or models. With the Spec Loop it uses durable specs, per-ticket dispatch, one-ticket execution, and `03`–`06` gates; active numeric phase directories are ignored while the reusable scaffold and protocol remain durable. Multiple presets and plugin mechanics remain deferred.
-- FR-24 (v0.7, planned). AI-invokable generation skill: an original `skills/dev-ready/SKILL.md` teaches agents to drive the stable `dev-ready init` machine interface safely. It is installable directly from this repository through the open Agent Skills ecosystem, remains outside the generated overlay and manifest catalog, and requires no Claude plugin metadata unless the ecosystem contract changes.
+- FR-23 (v0.7, shipped). Configurable Handoff Protocol: generated projects carry one default role topology in `docs/handoffs/protocol.yaml`. Seven stable role ids (`ceo`, `tech_lead`, `senior_engineer`, `junior_engineer`, `qa_reviewer`, `security_reviewer`, and `sre_reviewer`) own responsibilities, prohibitions, handoff order, and nullable/editable model assignments as data. The Protocol Configuration is authoritative at runtime; generated prose does not duplicate editable titles or models. With the Spec Loop it uses durable specs, per-ticket dispatch, one-ticket execution, and `03`–`06` gates; active numeric phase directories are ignored while the reusable scaffold and protocol remain durable. Multiple presets and plugin mechanics remain deferred.
+- FR-24 (v0.7, shipped). AI-invokable generation skill: the original `skills/dev-ready/SKILL.md` teaches agents to drive the stable `dev-ready init` machine interface safely. It is directly installable from this repository through the open Agent Skills ecosystem, remains outside the generated overlay and manifest catalog, and requires no Claude plugin metadata.
 - FR-25..FR-27 (v0.8+, reserved). Post-v0.6 roadmap decisions D-3..D-5 in [version-plan.md](version-plan.md); full entries land here when each version's development starts.
-- FR-28 (v0.7, planned). Spec Loop bundle (ADR-012): one explicit catalog selection, `spec-loop`, materializes the complete pinned dependency closure of the four advertised missing steps from mattpocock/skills, requires the existing `tdd`, `diagnosing-bugs`, and `code-review` items, and supplies the role-neutral tracker/domain configuration those upstream skills expect. It conditionally layers the loop into the Handoff Protocol and brings the existing `architecture.md` template under the `docs` component contract.
-- FR-29 (v0.7, planned). Progress reporting for `init`: four typed stages on stderr (TTY spinner, plain non-TTY), no new dependencies, and an optional progress callback from `cli` into `generate()`. Finalization uses a same-filesystem atomic rename so a reported failure never exposes a partial target.
+- FR-28 (v0.7, shipped). Spec Loop bundle (ADR-012): one explicit catalog selection, `spec-loop`, materializes the complete pinned dependency closure of the four advertised missing steps from mattpocock/skills, automatically resolves the existing `tdd`, `diagnosing-bugs`, and `code-review` items, and supplies the role-neutral tracker/domain configuration those upstream skills expect. It conditionally layers the loop into the Handoff Protocol, brings the existing `architecture.md` template under the `docs` component contract, and fills the skills catalog to 10/10.
+- FR-29 (v0.7, shipped). Progress reporting for `init`: four typed stages on stderr (TTY spinner, plain non-TTY), no new dependencies, and an optional progress callback from `cli` into `generate()`. Finalization uses a same-filesystem atomic rename so a reported failure never exposes a partial target.
 
 ## Non-functional Requirements
 
@@ -90,7 +92,7 @@ NFR-5. Cross-platform: macOS, Linux, Windows.
 4. v0.4: vendoring infrastructure + MIT wave (FR-15..FR-18). DONE (v0.4.0).
 5. v0.5: Apache wave + karpathy guardrails (FR-19, FR-20). DONE (v0.5.0).
 6. v0.6: lifecycle commands — `check` / `upgrade` (FR-21, FR-22). DONE (v0.6.0).
-7. v0.7: Handoff Protocol config (FR-23), Spec Loop bundle (FR-28), generate skill (FR-24), progress reporting (FR-29). See the 2026-07-24 (PM) amendment in [version-plan.md](version-plan.md).
+7. v0.7: Handoff Protocol config (FR-23), Spec Loop bundle (FR-28), generate skill (FR-24), progress reporting (FR-29). DONE (v0.7.0 implementation scope; public release pending).
 8. v0.8: CLI i18n (FR-25), multi-agent render targets (FR-26).
 9. v1.0: second template — Next.js (FR-27, gated on the defined real-users checklist); Web UI decision revisited.
 

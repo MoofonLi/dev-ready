@@ -7,7 +7,13 @@ This file is the single source of truth for agent rules; `CLAUDE.md` imports it 
 
 dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus an overlay of CLAUDE.md, Claude Code skills, MCP config, and design docs.
 
-Current phase: v0.6.0 released (2026-07-24); v0.7 in planning (FR-23, FR-28, FR-24, FR-29 — see the 2026-07-24 PM amendment in `docs/version-plan.md`). Roadmap in `docs/version-plan.md`; per-version plans in `docs/handoff/<version>/<version>-plan.md`. Domain glossary: `CONTEXT.md`.
+Current phase: v0.7 requirements implemented (FR-23, FR-28, FR-24, FR-29); v0.7.0 release and distribution verification are the remaining Phase 5 work. Roadmap in `docs/version-plan.md`; per-version plans in `docs/handoff/<version>/<version>-plan.md`. Domain glossary: `CONTEXT.md`.
+
+The v0.7 release surface is fixed: the skills catalog is 10/10; `spec-loop`
+resolves `tdd`, `diagnosing-bugs`, and `code-review`; generated Handoff Protocol
+behavior is authoritative in `docs/handoffs/protocol.yaml`; overlay upgrades
+preserve Base Provenance while advancing Overlay Currency; and `init` reports
+fetch, overlay, verify, and finalize progress before an atomic finalize.
 
 ## Read before writing code
 

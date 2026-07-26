@@ -1,7 +1,8 @@
-# Version Plan — dev-ready v0.3 → v0.6 (+ post-v0.6 roadmap)
+# Version Plan — dev-ready v0.3 → v0.7 (+ post-v0.7 roadmap)
 
 Status: Accepted (2026-07-17). Decided by CEO + Tech Lead as the final pre-agreed roadmap.
 Amended 2026-07-24 (afternoon): v0.7 scope expanded — see "2026-07-24 (PM) amendment" below.
+Close-out 2026-07-26: v0.7 requirements are shipped and the v0.7.0 release record is prepared; public release and distribution evidence remain Phase 5 ticket 02.
 Numbering continues from requirements.md (FR-1..FR-10 shipped in v0.1/v0.2).
 
 ## End goal
@@ -386,7 +387,7 @@ it?" — the same test as the curation principle.
 
 | Version | Contents | Rationale |
 |---|---|---|
-| v0.7 | FR-23 Handoff Protocol config, FR-28 Spec Loop, FR-24 generate skill, FR-29 progress reporting | See the 2026-07-24 (PM) amendment: FR-23×FR-28 share the same CLAUDE.md surface (design once); FR-29 lands before FR-25 so the i18n catalog is built over the final string set |
+| v0.7 (implementation DONE; v0.7.0 release pending) | FR-23 Handoff Protocol config, FR-28 Spec Loop, FR-24 generate skill, FR-29 progress reporting | Shipped implementation scope is complete: FR-23×FR-28 share the same CLAUDE.md surface; FR-29 landed before FR-25 so the i18n catalog can target the final string set |
 | v0.8 | FR-25 CLI i18n, FR-26 multi-agent render targets | Widens the audience once content and catalog are stable |
 | v1.0 | FR-27 second template (Next.js — selected 2026-07-24, see D-5); Web UI decision revisited | Platform step; gated on real-user feedback and the D-5 hard gates |
 
