@@ -36,7 +36,20 @@ if third-party) → removed from this file.
 
 ## Deferred product decisions (CEO: must keep, record and preserve)
 
-### D-1. CLI language selection (i18n)
+### D-1. CLI language selection (i18n) — REJECTED (2026-07-26)
+
+**Status: Rejected.** Scheduled into v0.8 as FR-25, specced, then withdrawn
+before any implementation. FR-25's number is permanently retired. The full
+rationale lives in D-3 of [version-plan.md](version-plan.md); the language rule
+that survived is [ADR-016](decisions/adr-016-language-boundary.md).
+
+The tech-lead note recorded below as "overruled" — that two locales of every
+prompt and catalog description is a recurring cost against a solo-maintainer
+budget — is the objection that ultimately carried. It is left exactly as
+written rather than rewritten in hindsight.
+
+Everything below is the original record, kept as history. It is no longer a
+plan for anything.
 
 - Decision: `init` will offer a UI-language choice (zh-TW / en) for prompts
   and item descriptions.
@@ -83,7 +96,7 @@ if third-party) → removed from this file.
 ## Init flow (agreed shape, v0.3 baseline + preserved decisions)
 
 1. `uvx dev-ready init my-app`
-2. [D-1, deferred] choose CLI language
+2. ~~[D-1] choose CLI language~~ — D-1 rejected 2026-07-26; there is no language step
 3. Project questions:
    - [D-2, deferred] template choice (fastapi-react | nextjs); fixed to
      fastapi-react until D-2 lands
@@ -103,8 +116,10 @@ if third-party) → removed from this file.
    - dev/quality (multi): react-doctor, security-audit [v0.4], caveman
      [v0.4], ...
 6. Generate (with step-based status/spinner feedback, D-3) → verify → stamp
-   (`.dev-ready.json` records language, template, items, pins)
+   (`.dev-ready.json` records template, items, pins — never a language, D-1
+   rejected)
 
 Catalog schema additions implied (fold into FR-14 while the CLI contract is
 open): item `category`, per-category `exclusive: bool`, and later
-`templates: [...]` applicability (D-2) and localized descriptions (D-1).
+`templates: [...]` applicability (D-2). Localized descriptions are not coming —
+D-1 rejected.

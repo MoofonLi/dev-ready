@@ -46,6 +46,8 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | [ADR-012](decisions/adr-012-spec-loop-bundle-and-methodology-layering.md) | Spec Loop as a single bundled catalog item, layered with the Handoff Protocol (v0.7) | Accepted (2026-07-24) |
 | [ADR-013](decisions/adr-013-internal-process-v2-spec-loop-adoption.md) | Internal process v2 — the Spec Loop layered into the Handoff Protocol (amends ADR-007/011) | Accepted (2026-07-24) |
 | [ADR-014](decisions/adr-014-truthful-overlay-lifecycle-state.md) | Separate immutable Base Provenance from Overlay Currency | Accepted (2026-07-25) |
+| [ADR-015](decisions/adr-015-agent-targets-canonical-content-pointer-stubs.md) | Agent Targets render as Pointer Stubs over one Canonical Content copy (v0.8) | Accepted (2026-07-26) |
+| [ADR-016](decisions/adr-016-language-boundary.md) | Language boundary — English everywhere dev-ready speaks or generates; Chinese only in outward-facing repository docs (v0.8) | Accepted (2026-07-26) |
 
 ## Module Boundary
 

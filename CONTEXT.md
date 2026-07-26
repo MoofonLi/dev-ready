@@ -35,7 +35,9 @@ Reserved exclusively for GitHub Actions workflow files (`ci.yml`, `release.yml`,
 
 **Component**:
 One of the four top-level overlay groups a user selects: skills, mcp, docs,
-agents (FR-3/FR-14).
+handoff (FR-3/FR-14). The `handoff` component was named `agents` through v0.7;
+it always meant the Handoff Protocol scaffold, never a coding agent.
+_Avoid_: agents (as a component name)
 
 **Catalog Item**:
 An individually selectable unit inside a component, declared as data in the
@@ -47,6 +49,27 @@ A catalog item that materializes multiple related assets selected as one unit
 because they are only valuable together (e.g. `spec-loop`). A bundle includes
 the dependency closure needed for those assets to work and counts as one item
 against the cap.
+
+### Agent targets
+
+**Agent Target**:
+A coding agent whose native configuration layout a generated project renders
+into, selected per project and independently of catalog items. Never written as
+a bare "target" — in this project that word means the output directory.
+_Avoid_: target, render target, harness, IDE, editor
+
+**Canonical Content**:
+The single authoritative copy of an overlay-managed skill or rule set in a
+generated project, written at the open-standard location regardless of which
+Agent Targets are selected. Every Agent Target reaches the same bytes.
+_Avoid_: master copy, source-of-truth copy, primary
+
+**Pointer Stub**:
+A small file at an Agent Target's native path that identifies an item and
+directs the agent to its [[Canonical Content]]. A stub is neither a symlink nor
+a second copy of the content — generated projects must remain portable to
+filesystems and platforms where symlinks are unavailable.
+_Avoid_: shim, alias, symlink, mirror, proxy
 
 ### Lifecycle
 
@@ -60,6 +83,16 @@ How current a generated project's dev-ready-managed overlay is: the dev-ready
 version, selected catalog items and their pins, and managed-file inventory.
 It can advance without changing Base Provenance.
 _Avoid_: project version, upstream currency
+
+### Written language
+
+**Language Boundary**:
+The rule fixing what language each surface is written in (ADR-016). Everything
+dev-ready emits and everything it generates is English — generated content's
+consumer is a model, and English is what models parse most reliably. Chinese
+exists only in repository documentation addressed to external readers, today
+`README.zh-TW.md`. dev-ready has no localized runtime and records no language.
+_Avoid_: localization, i18n, localized surface, translation policy
 
 ### Internal process (ADR-013)
 

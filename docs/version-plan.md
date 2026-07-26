@@ -2,7 +2,9 @@
 
 Status: Accepted (2026-07-17). Decided by CEO + Tech Lead as the final pre-agreed roadmap.
 Amended 2026-07-24 (afternoon): v0.7 scope expanded — see "2026-07-24 (PM) amendment" below.
-Close-out 2026-07-26: v0.7 requirements are shipped and the v0.7.0 release record is prepared; public release and distribution evidence remain Phase 5 ticket 02.
+Close-out 2026-07-26: v0.7 is released — `v0.7.0` is tagged and published to PyPI. Distribution-rider evidence (skills.sh install proof, launch post URL, README issue entry point) is recorded separately against the v1.0 real-users gate.
+Amended 2026-07-26: v0.8 scope, ordering, and decisions settled — see "2026-07-26 amendment" below (ADR-015, ADR-016).
+Amended 2026-07-26 (later the same day): FR-25 (CLI i18n) withdrawn before implementation and D-3 rejected. v0.8 is FR-26 only — see "FR-25 — withdrawn" in the amendment.
 Numbering continues from requirements.md (FR-1..FR-10 shipped in v0.1/v0.2).
 
 ## End goal
@@ -313,20 +315,34 @@ submission; skills.sh discovery is fed by CLI installation telemetry.
 Precondition: the FR-14 flag contract is stable (v0.3 shipped). Cost: one
 SKILL.md plus docs — smallest FR on this list.
 
-### D-3. CLI internationalization — English + Traditional Chinese (FR-25)
+### D-3. CLI internationalization — English + Traditional Chinese (FR-25) — REJECTED (2026-07-26)
 
-Scope decided precisely: i18n covers the **CLI surface only** — interactive
-prompts, progress/result messages, errors, `--help` text. Generated project
-content (CLAUDE.md, skills, design docs, handoff templates) stays English
-permanently: its consumer is the agent, and English is what models parse most
-reliably. This scope line is the decision; revisiting it requires a new ADR.
+**Status: Rejected.** Specced, then withdrawn before any implementation began.
+FR-25's number is permanently retired. The scope line D-3 established —
+generated project content stays English permanently because its consumer is a
+model — survives the rejection and is now recorded in ADR-016.
 
-Mechanics: default language English; `zh-TW` selected via `--lang`, then
-`DEV_READY_LANG`, then locale detection (precedence in that order). Messages
-live in a catalog (single lookup layer, no scattered literals), so adding a
-locale later is a data change. Accepted cost: every user-facing string is
-maintained twice; a new FR's messages must land in both locales in the same PR
-(CI check compares catalog keys across locales).
+Rejected because the need was misidentified. The pain is **discovery, not
+runtime comprehension**: a Traditional Chinese speaker who cannot tell what
+dev-ready is from its README never reaches a prompt or an error message in the
+first place. Three facts made the cost indefensible once that was clear:
+
+- **No demand evidence.** The v1.0 real-users gate is still open — dev-ready has
+  no attributable external users — so this was localization for a hypothesis.
+- **The runtime surface is small.** `init` is run once per project by a
+  developer who reads English code all day. The number of sentences a user
+  actually reads is far smaller than the 88 raise sites the refactor touched.
+- **The cost was entirely front-loaded.** ~88 raise sites plus restructuring
+  `check`/`upgrade` return types had to land before a single translated word.
+
+Addressed instead at the documentation level: a focused `README.zh-TW.md`
+(ADR-016). Reopening this needs **new evidence** — an external, non-maintainer
+user asking for a localized CLI — not another round of the same reasoning.
+
+One defect FR-25 would have fixed in passing remains open: `check` builds one
+list of English sentences and serves it as both the human report and the
+`--json` payload. That is a machine-interface problem rather than an i18n one
+and can be raised on its own merits.
 
 ### D-4. Multi-coding-agent output targets (FR-26)
 
@@ -387,8 +403,8 @@ it?" — the same test as the curation principle.
 
 | Version | Contents | Rationale |
 |---|---|---|
-| v0.7 (implementation DONE; v0.7.0 release pending) | FR-23 Handoff Protocol config, FR-28 Spec Loop, FR-24 generate skill, FR-29 progress reporting | Shipped implementation scope is complete: FR-23×FR-28 share the same CLAUDE.md surface; FR-29 landed before FR-25 so the i18n catalog can target the final string set |
-| v0.8 | FR-25 CLI i18n, FR-26 multi-agent render targets | Widens the audience once content and catalog are stable |
+| v0.7 (implementation DONE; v0.7.0 release pending) | FR-23 Handoff Protocol config, FR-28 Spec Loop, FR-24 generate skill, FR-29 progress reporting | Shipped implementation scope is complete: FR-23×FR-28 share the same CLAUDE.md surface; FR-29 landed before FR-25, which was subsequently withdrawn (D-3 rejected) |
+| v0.8 | FR-26 multi-agent render targets | FR-25 CLI i18n withdrawn 2026-07-26; Traditional Chinese is served by repository documentation instead |
 | v1.0 | FR-27 second template (Next.js — selected 2026-07-24, see D-5); Web UI decision revisited | Platform step; gated on real-user feedback and the D-5 hard gates |
 
 **2026-07-24 — v0.6 close-out re-confirmation (CEO-confirmed, Moofon):**
@@ -444,7 +460,8 @@ fraction) and **zero new dependencies**: `cli` passes a progress callback into
 `generate()`; lower modules never touch the terminal (module-boundary table
 unchanged). Finalize stages beside the target and uses a same-filesystem atomic
 rename, removing the existing cross-device partial-copy window. Sequenced before
-FR-25 so the i18n message catalog is created over the final string set.
+FR-25 so the i18n message catalog is created over the final string set — FR-25
+was subsequently withdrawn (D-3 rejected), which changes nothing about FR-29.
 
 ### v0.7 entry condition — cross-version upgrade E2E
 
@@ -464,6 +481,8 @@ application changes; it must not be written into the stamp as false provenance.
 
 ### v0.7 release rider — distribution + a decidable real-users gate
 
+*(v0.8 scope is amended at the end of this document — see "2026-07-26 amendment".)*
+
 The D-5 hard gate "real users on the FastAPI template" is now **defined**:
 signals from at least three independent external, non-maintainer identities
 (one identity counts once), **or** strictly increasing adjusted PyPI downloads
@@ -475,3 +494,71 @@ ever pass, the v0.7 release includes three distribution actions (~1 day, no
 new FR): prove the FR-24 skill installs from the public repository and seed
 skills.sh discovery telemetry; one launch post
 (Show HN / r/FastAPI / X); a clear "report an issue" entry point in the README.
+
+---
+
+## 2026-07-26 amendment — v0.8 scope, ordering, and decisions (CEO-confirmed, Moofon)
+
+Decided in the `grill-with-docs` session of 2026-07-26 and amended by a second
+session the same day. Amends D-3 and D-4 for v0.8 only; v1.0 is unchanged.
+Decision records: ADR-015, ADR-016. Accepted spec:
+`docs/specs/v0.8/fr-26-agent-targets.md`.
+
+**v0.8 ships FR-26 alone.** The first session sequenced FR-26 before FR-25 so
+the i18n catalog would be built once over the final string set; the second
+session withdrew FR-25 entirely, which makes the ordering question moot.
+
+### FR-26 — Agent Targets (D-4 as amended, ADR-015)
+
+The ecosystem settled the mechanism question. The Agent Skills standard
+location is `.agents/skills/`, and the reference installer (`vercel-labs/skills`,
+which distributes mattpocock/skills) maps 70+ agents to paths: most
+standard-compliant harnesses (Cursor, Cline, Zed, OpenCode, Codex) read
+`.agents/skills/` directly, while a minority use uniquely-named directories.
+dev-ready therefore productizes the pattern it already applies to itself under
+ADR-011:
+
+- **Canonical Content is always written** — skills at `.agents/skills/`, rules
+  at `AGENTS.md`. Standard-compliant harnesses need no declared target.
+- **Agent Targets are selected** (`--agents claude,windsurf`) and declared as
+  manifest data (`skills_dir`, nullable `rules_file`, nullable `mcp_file`), so
+  adding an agent is a data change. v0.8 declares the two verified deviators.
+- **Per-target artifacts are Pointer Stubs**, never symlinks (generation
+  refuses link destinations, the inventory hashes bytes, and Windows requires
+  elevated permissions) and never content copies. `CLAUDE.md` becomes
+  `@AGENTS.md`.
+- **MCP is rendered only where a project-level config exists** — Claude Code in
+  v0.8. Windsurf's is user-global and dev-ready never writes outside the target
+  project; the report says so rather than skipping silently.
+- **The `agents` component is renamed `handoff`** — it always meant the Handoff
+  Protocol scaffold, never a coding agent. `--no-agents` survives one version as
+  a deprecated alias.
+- **Stamp advances to version 4**, recording Agent Targets as Overlay Currency.
+  `upgrade` infers `["claude"]` for pre-v0.8 projects and migrates through
+  ADR-014's obsolete-file rules; the rename rides the same migration.
+
+Declared per-agent paths are transcribed from a moving external ecosystem with
+no FR-16-style byte-equality guard, so each must be re-verified at
+implementation and at every bump.
+
+### FR-25 — withdrawn (D-3 rejected, ADR-016)
+
+FR-25 was specced and accepted earlier the same day, then withdrawn before any
+code was written. The full rationale is recorded under D-3 above; in short, the
+need was discovery rather than runtime comprehension, dev-ready has no
+attributable external users yet, and the entire cost landed before the first
+translated word. The spec is not retained — D-3 carries the reasoning, which is
+the part worth keeping.
+
+What survives the withdrawal is the language boundary itself, now ADR-016:
+everything dev-ready emits and everything it generates stays English; Chinese
+exists only as repository documentation aimed at external readers. That rule is
+load-bearing precisely because the repository now contains a Chinese README, so
+the question "should this file be translated too?" has a written answer.
+
+### Accepted consequence
+
+v0.8 carries one structural refactor — FR-26's layout migration — plus one
+stamp migration. The permanent N-1 lifecycle gate is extended to assert the
+layout migration, not only content currency. Withdrawing FR-25 cost nothing
+already built: no i18n code was ever written, and FR-26 never depended on it.
