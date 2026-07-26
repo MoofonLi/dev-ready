@@ -1,6 +1,6 @@
 # CLI Specification — dev-ready
 
-Status: Current through v0.7. This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
+Status: Current through v0.8. This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
 
 ## Commands
 
@@ -14,12 +14,14 @@ Generate a new project.
 | `--dir PATH` | path | `./PROJECT_NAME` | Target directory (must not exist or be empty) |
 | `--skills IDS` | string | `all` | Item selection for skills: comma-separated ids, `all`, or `none` |
 | `--mcp IDS` | string | `all` | Item selection for mcp: comma-separated ids, `all`, or `none` |
-| `--no-skills` | bool | false | Skip Claude Code skills overlay (alias for `--skills none`) |
+| `--agents IDS` | string | `all` | Agent Target selection: comma-separated identifiers, `all`, or `none` |
+| `--no-skills` | bool | false | Skip Canonical Skill content and target Pointer Stubs (alias for `--skills none`) |
 | `--no-mcp` | bool | false | Skip MCP server configuration overlay (alias for `--mcp none`) |
 | `--no-docs` | bool | false | Skip design-doc templates overlay |
-| `--no-agents` | bool | false | Skip the agent-team handoff scaffold overlay (`docs/handoffs/`) |
+| `--no-handoff` | bool | false | Skip the Handoff Protocol scaffold overlay (`docs/handoffs/`) |
+| `--no-agents` | bool | false | Deprecated alias for `--no-handoff`; accepted for one version and emits a deprecation notice |
 
-Unknown item ids in `--skills` or `--mcp` fail fast with an invalid-arguments error (exit 2) listing valid item ids. Conflicting flags (e.g. `--no-skills` with `--skills <id>`) exit 2.
+Unknown item ids in `--skills` or `--mcp`, and unknown target identifiers in `--agents`, fail fast with an invalid-arguments error (exit 2) listing valid identifiers. Conflicting flags (e.g. `--no-skills` with `--skills <id>`) exit 2.
 
 Selections are resolved before confirmation, rendering, reporting, verification,
 and stamping. In v0.7 the skills catalog contains 10/10 items. Selecting
@@ -78,7 +80,7 @@ Re-apply only overlay-managed whole-file content to an existing generated projec
 | `PATH` | path | `.` | Target project directory to upgrade |
 | `--dry-run` | bool | false | Report planned changes without modifying the project |
 
-The project stamp is now `stamp_version` 3 and records the project name and a managed-file inventory. Version 1 and 2 stamps remain checkable but cannot be upgraded. Across an overlay-only upgrade, the stamped upstream repository and commit are immutable Base Provenance; the dev-ready version, selected-item pins, and managed-file inventory are Overlay Currency and advance to the running CLI. A newer manifest base pin is a non-blocking advisory because `upgrade` does not rewrite upstream application content. Untouched obsolete managed files may be deleted transactionally; modified obsolete files are preserved and reported. Exit codes: 0 success; 6 invalid or missing stamp; 8 pre-v3 stamp cannot be upgraded; 9 upgrade failure after rollback.
+The project stamp is now `stamp_version` 4 and records the project name, a managed-file inventory, selected Agent Target identifiers in the top-level `agent_targets` list, and the Handoff Protocol component under `components.handoff`. Versions 1–3 remain readable; version 3 stamps map the former `components.agents` key to `handoff` and can be upgraded without new input, while versions 1 and 2 remain checkable but cannot be upgraded. Across an overlay-only upgrade, the stamped upstream repository and commit are immutable Base Provenance; the dev-ready version, selected-item pins, selected Agent Targets, and managed-file inventory are Overlay Currency and advance to the running CLI. A newer manifest base pin is a non-blocking advisory because `upgrade` does not rewrite upstream application content. Untouched obsolete managed files may be deleted transactionally; modified obsolete files are preserved and reported. Exit codes: 0 success; 6 invalid or missing stamp; 8 pre-v3 stamp cannot be upgraded; 9 upgrade failure after rollback.
 
 ### `dev-ready --version` / `dev-ready --help`
 
@@ -90,14 +92,15 @@ This flow applies only to `init`. `check` and `upgrade` are non-interactive by
 construction and dispatch directly to their respective operations.
 
 1. Project name (if not given as argument)
-2. Level-1 component selection (skills / MCP / docs / agents — multi-select, all on by default)
+2. Level-1 component selection (skills / MCP / docs / handoff — multi-select, all on by default)
 3. Level-2 item selection for `skills` and `mcp` components chosen at level 1 (multi-select of component items, all on by default; plain Enter accepts all items)
-4. Confirmation summary before writing anything
+4. Agent Target selection (described multi-select, all on by default; plain Enter accepts all targets)
+5. Confirmation summary before writing anything
 
-Skipped entirely if any component or item flag (`--skills`, `--mcp`, `--no-skills`, `--no-mcp`, `--no-docs`, `--no-agents`) was passed.
+Skipped entirely if any component, item, or target flag (`--skills`, `--mcp`, `--agents`, `--no-skills`, `--no-mcp`, `--no-docs`, `--no-handoff`, or deprecated `--no-agents`) was passed.
 
 All answers collect into a single `Answers` model shared with the flag-based path.
 
 Declining the confirmation, or cancelling any prompt (Ctrl-C), prints `aborted: nothing was written` to stderr and exits 1 — nothing has been written at that point by construction. `--yes` bypasses every prompt in this flow, including confirmation. A non-TTY stdin with missing inputs and no `--yes` fails fast with an invalid-arguments error (exit 2) instead of hanging.
 
-**Windows compatibility:** interactive prompts are tested against Windows Terminal. Legacy `cmd.exe` may render the checkbox prompt incorrectly (missing VT/ANSI support). In environments where terminal support is uncertain, use `--yes` with explicit `--no-skills`/`--no-mcp`/`--no-docs`/`--no-agents` flags instead of relying on prompts.
+**Windows compatibility:** interactive prompts are tested against Windows Terminal. Legacy `cmd.exe` may render the checkbox prompt incorrectly (missing VT/ANSI support). In environments where terminal support is uncertain, use `--yes` with explicit `--no-skills`/`--no-mcp`/`--no-docs`/`--no-handoff` flags instead of relying on prompts.
