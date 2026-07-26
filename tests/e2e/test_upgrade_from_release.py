@@ -322,6 +322,7 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
         )
         allowed_overlay_drift = (
             "overlay currency",
+            "overlay version drift",
             "dev-ready version",
             "skills pin drift",
             "mcp pin drift",
