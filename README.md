@@ -4,6 +4,8 @@
 [![PyPI](https://img.shields.io/pypi/v/dev-ready)](https://pypi.org/project/dev-ready/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+繁體中文導覽：[README.zh-TW.md](README.zh-TW.md)
+
 Scaffold a production-grade, AI-development-ready FastAPI + React project in one command:
 
 ```bash
@@ -161,11 +163,14 @@ gates.
 
 ## Roadmap
 
-v0.8 keeps CLI internationalization and multi-agent render targets deferred.
-v1.0's second template (Next.js) is gated on attributable external-user
-evidence or four strictly increasing adjusted complete UTC weeks of PyPI
-downloads. See [the v0.7 overview](docs/version_overview/v0.7-overview.md) for
-the decidable gate and evidence fields.
+v0.8 ships multi-agent render targets. CLI internationalization was withdrawn
+on 2026-07-26 — dev-ready's own output stays English, and Traditional Chinese
+speakers are served by [README.zh-TW.md](README.zh-TW.md) instead
+([ADR-016](docs/decisions/adr-016-language-boundary.md)). v1.0's second template
+(Next.js) is gated on attributable external-user evidence or four strictly
+increasing adjusted complete UTC weeks of PyPI downloads. See
+[the v0.7 overview](docs/version_overview/v0.7-overview.md) for the decidable
+gate and evidence fields.
 
 ## License
 

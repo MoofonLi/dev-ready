@@ -36,6 +36,8 @@ fetch, overlay, verify, and finalize progress before an atomic finalize.
 - Generation must be all-or-nothing: no partial output directories on failure.
 - Unit tests: no network, no filesystem outside tmp_path.
 - Conventional Commits.
+- English everywhere dev-ready speaks or generates — CLI output, generated project content, source, tests, and every document under `docs/` (ADR-016). There is no localized runtime: never add `--lang`, `DEV_READY_LANG`, locale detection, or a message catalog.
+- `README.zh-TW.md` is the single exception and the only Chinese file in the repo. It is a **focused overview, not a translation of `README.md`**: update it when the product facts it states change (what dev-ready is, what it produces, requirements, how to install and run it once, the lifecycle commands' guarantees). Do **not** sync it for new flags, exit codes, development setup, or English wording changes — it deliberately carries none of those and points to the English README instead. Adding a Chinese file anywhere else requires amending ADR-016.
 
 ## Multi-agent workflow (ADR-007; paths ADR-011; process v2 ADR-013)
 

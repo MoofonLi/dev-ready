@@ -1,5 +1,7 @@
 # dev-ready
 
+繁體中文導覽：<https://github.com/MoofonLi/dev-ready/blob/main/README.zh-TW.md>
+
 Scaffold a production-grade, AI-development-ready FastAPI + React project in one command:
 
 ```bash
