@@ -1,7 +1,7 @@
 [project]
 name = "dev-ready"
 version = "0.7.0"
-description = "Scaffold AI-development-ready FastAPI projects: pinned upstream template plus Claude Code skills, MCP config, and design docs"
+description = "Scaffold AI-development-ready FastAPI projects with canonical agent guidance, Agent Targets, MCP config, and design docs"
 readme = "README-pypi.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.12"

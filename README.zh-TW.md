@@ -20,8 +20,8 @@ uvx dev-ready init my-app
 
 一個以 [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) 為基底的專案（FastAPI、React、SQLModel、PostgreSQL、Docker Compose），外加一層 AI 工具疊加內容，讓 coding agent 一開箱就能順利工作：
 
-- **專案指示與開發護欄** — 供 agent 讀取的專案說明，含 Karpathy 開發原則衍生的護欄
-- **技能目錄（skills）** — 可逐項挑選。`spec-loop` 這組會帶入規劃、可留存的規格、tracer-bullet 工單、TDD、審查、除錯與架構改善的完整流程
+- **專案指示與開發護欄** — 共用內容只寫一份在標準位置；支援標準的 agent 可直接讀取，另有需要的 agent 則透過指向共用內容的普通檔案使用同一份指示
+- **技能目錄（skills）** — 技能只在標準位置保存一份並可逐項挑選。`spec-loop` 這組會帶入規劃、可留存的規格、tracer-bullet 工單、TDD、審查、除錯與架構改善的完整流程
 - **MCP 伺服器設定** — 包含可選的 codebase-memory 伺服器（版本已固定）
 - **設計文件範本** — 架構與需求文件的起始骨架
 - **可設定的交接協議（Handoff Protocol）** — 七個穩定角色、交接順序、升級路徑、審查關卡與提交權限，全部是可編輯的設定資料，執行時以該設定為準

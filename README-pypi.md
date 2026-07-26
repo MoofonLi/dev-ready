@@ -14,8 +14,11 @@ The upstream template is pinned to a CI-verified commit (never an untested "late
 
 A generated project based on [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) (FastAPI, React, SQLModel, PostgreSQL, Docker Compose), plus an AI tooling overlay so it works well with coding agents out of the box:
 
-- `CLAUDE.md` — project instructions for Claude Code, including Karpathy-derived development guardrails (MIT, per the upstream README)
-- Claude Code skills — a 10/10 catalog selectable at generation time:
+- Canonical project instructions in `AGENTS.md`, including Karpathy-derived
+  development guardrails (MIT, per the upstream README). Canonical skills are
+  written once under `.agents/skills/`, so standard-compliant agents such as
+  Cursor, Codex, Cline, Zed, and OpenCode need no Agent Target selection.
+- A 10/10 skills catalog selectable at generation time:
   - **project-orientation** (built-in) — codebase orientation helper
   - **react-doctor** (pinned devDependency) — frontend dependency health checks
   - **caveman** (vendored, MIT) — token-discipline communication mode
@@ -28,6 +31,9 @@ A generated project based on [fastapi/full-stack-fastapi-template](https://githu
   - **security-audit** (vendored, MIT) — multi-phase security audit
   - **webapp-testing** (vendored, Apache-2.0) — browser-automation end-to-end testing
   - **frontend-design** (vendored, Apache-2.0) — frontend UI design methodology
+- Optional Agent Targets for Claude Code and Windsurf. Selected targets receive
+  ordinary Pointer Stub files at their native paths that direct them to the one
+  Canonical Content copy; the stubs are neither symlinks nor content copies.
 - MCP server configuration (`.mcp.json`)
 - Design-doc templates (`docs/architecture.md`, `docs/requirements.md`)
 - Configurable Handoff Protocol (`docs/handoffs/`) with one authoritative
@@ -98,11 +104,16 @@ uvx dev-ready init my-app \
   --dir path/to/target \    # default: ./my-app
   --skills <ids|all|none> \ # choose individual skills (default: all)
   --mcp <ids|all|none> \    # choose individual MCP servers (default: all)
-  --no-skills \             # skip the Claude Code skills overlay
+  --agents <ids|all|none> \ # choose Agent Targets (default: all)
+  --no-skills \             # skip Canonical skills and target stubs
   --no-mcp \                # skip the MCP configuration overlay
   --no-docs \               # skip the design-doc templates
-  --no-agents               # skip the agent-team handoff scaffold
+  --no-handoff              # skip the Handoff Protocol scaffold
 ```
+
+Use `all`, `none`, or comma-separated identifiers with `--skills`, `--mcp`, and
+`--agents`. `--no-agents` remains a deprecated alias for `--no-handoff` for one
+version and emits a warning.
 
 ```bash
 # Inspect a generated project against its stamp and the current CLI (read-only)
@@ -119,7 +130,9 @@ and upstream application content while advancing Overlay Currency. It
 re-applies only unmodified overlay-managed whole files, removes untouched
 obsolete managed files, preserves user-modified files, and rolls the complete
 plan back on failure. Both commands default to the current directory when
-`PATH` is omitted.
+`PATH` is omitted. Upgrading a v0.7 project infers Claude Code, migrates
+untouched skills to Canonical Content plus Pointer Stubs, and preserves edited
+files while reporting any resulting divergence.
 
 Then follow the printed next steps (typically `docker compose watch` inside the generated project).
 

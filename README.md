@@ -18,11 +18,17 @@ No half-finished output, no untested "latest": the upstream template is pinned t
 
 A generated project based on [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) (FastAPI, React, SQLModel, PostgreSQL, Docker Compose), plus an AI tooling overlay so it works well with coding agents out of the box:
 
-- `CLAUDE.md` — project instructions and Karpathy-derived development guardrails
+- Canonical project instructions in `AGENTS.md`, including Karpathy-derived
+  development guardrails. Canonical skills are written once under
+  `.agents/skills/`, so standard-compliant agents such as Cursor, Codex, Cline,
+  Zed, and OpenCode need no Agent Target selection.
 - A 10/10 skills catalog with item-level selection. The `spec-loop` bundle adds
   planning, durable specs, tracer-bullet tickets, TDD, review, diagnosis, and
   architecture improvement; selecting it automatically resolves `tdd`,
   `diagnosing-bugs`, and `code-review`.
+- Optional Agent Targets for Claude Code and Windsurf. Selected targets receive
+  ordinary Pointer Stub files at their native paths that direct them to the one
+  Canonical Content copy; the stubs are neither symlinks nor content copies.
 - MCP server configuration (`.mcp.json`), including the selectable pinned
   codebase-memory server
 - Design-doc templates (`docs/architecture.md`, `docs/requirements.md`)
@@ -90,12 +96,15 @@ uvx dev-ready init my-app \
   --dir path/to/target \
   --skills spec-loop,security-audit \
   --mcp code-memory \
+  --agents claude,windsurf \
   --no-docs \
-  --no-agents
+  --no-handoff
 ```
 
-Use `all`, `none`, or comma-separated ids with `--skills` and `--mcp`.
-`--no-skills` and `--no-mcp` are aliases for `none`. During generation, stderr
+Use `all`, `none`, or comma-separated identifiers with `--skills`, `--mcp`, and
+`--agents`. `--no-skills` and `--no-mcp` are aliases for `none`.
+`--no-agents` remains a deprecated alias for `--no-handoff` for one version and
+emits a warning. During generation, stderr
 shows fetch → overlay → verify → finalize progress (a spinner on TTYs and stable
 plain lines when redirected); stdout retains the final report.
 
@@ -113,7 +122,9 @@ uvx dev-ready upgrade path/to/project
 application content while advancing Overlay Currency. It updates only
 unmodified overlay-managed whole files, removes untouched obsolete managed
 files, preserves user-modified files, and rolls back the complete plan on
-failure.
+failure. Upgrading a v0.7 project infers Claude Code, migrates untouched skills
+to Canonical Content plus Pointer Stubs, and preserves edited files while
+reporting any resulting divergence.
 
 ### Exit codes
 
