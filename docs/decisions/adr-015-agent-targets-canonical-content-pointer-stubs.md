@@ -14,4 +14,38 @@
   - **A full content copy per agent** — rejected: N copies of every skill in the stamp inventory, N places for user edits to diverge, and N reconciliations per upgrade.
   - **`CLAUDE.md` stays canonical with `AGENTS.md` as the stub** — rejected: every non-Claude target would be redirected into a Claude-branded file by the very FR meant to decouple them.
   - **Freezing layout at generation time** (legacy projects keep `.claude/` content forever) — rejected: it makes a one-version migration into permanent dual-layout support across overlay, inspection, verify, and upgrade.
+- Status update (2026-07-27): symlinks were re-examined in the v0.9 grilling session and **rejected again**; see the amendment below. Agent Target path data is extended and drift-guarded by ADR-019.
 - Consequences: One content copy means an upgrade touches one file per skill regardless of how many agents are selected. Stubs cost one indirection hop the agent must follow — the same cost this repo already lives with. The v3→v4 stamp migration carries both the new `agent_targets` field and the `agents`→`handoff` component rename, so the rename rides a migration already being paid for. A user who edited a skill before upgrading ends with divergent content (their edit at the Claude path, canonical at `.agents/`); this is reported, not silently reconciled. Per-agent path maps are transcribed from a moving upstream table with no FR-16-style byte-equality drift guard, so each declared target must be re-verified at bump time.
+
+## 2026-07-27 amendment — symlinks re-examined and rejected again
+
+Raised in the v0.9 grilling session on the grounds that the reference installer
+recommends symlinks. Re-rejected. Recorded here because the question is
+recurrent and the original entry stated the mechanics without stating why the
+upstream recommendation does not transfer.
+
+The installer symlinks each agent's directory to a canonical copy held **outside
+the project**, so one cached copy serves many existing repositories — that is
+what the recommendation buys. dev-ready *generates* a project whose Canonical
+Content already lives inside it, so a link from `.claude/skills/x` to
+`../../.agents/skills/x` deduplicates nothing that a Pointer Stub does not
+already deduplicate, while costing portability.
+
+Three findings settled it beyond the original three mechanics:
+
+- **The indirection cost is smaller than this ADR implied.** Stubs preserve the
+  canonical YAML frontmatter, so an agent sees each skill's name and
+  description during discovery and pays one extra read only for skills it
+  decides to use.
+- **A symlink degrades worse than a stub when it degrades.** Cloned on Windows
+  without `core.symlinks` and developer mode, a symlink becomes a plain file
+  containing a path — a broken stub with no explanation. A Pointer Stub is
+  valid markdown that says what to read instead.
+- **A platform-conditional hybrid violates NFR-1.** Falling back to stubs where
+  links are unavailable makes one dev-ready version produce different output on
+  different machines, and forces the stamp inventory, verify, and upgrade to
+  carry two shapes.
+
+Reopening this needs a change in the underlying facts — Windows symlinks
+without elevation, or a generated-project layout where the canonical copy is
+genuinely external — not another appeal to the installer's recommendation.

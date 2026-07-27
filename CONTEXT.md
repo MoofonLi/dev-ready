@@ -10,22 +10,26 @@ no implementation details, no specs. Decisions live in `docs/decisions/`.
 
 **Handoff Protocol**:
 The macro, cross-role collaboration mechanism for a multi-agent team: role
-definitions, handoff sequence, review gates, and loop rules (ADR-007). Configured
-as data in generated projects from v0.7 (FR-23).
+definitions, handoff sequence, review gates, and loop rules (ADR-007). **This
+repository's own process only.** It was generated into projects from v0.2 and
+configured as data from v0.7; v0.9 removes it from the overlay (ADR-020). It is
+practice here, not a product surface.
 _Avoid_: workflow, team workflow, agent workflow, multi-agent flow
 
 **Protocol Configuration**:
-The authoritative runtime description of a generated project's Handoff
-Protocol. Agent-facing prose refers to its stable role ids; editable titles and
-model assignments are read from the configuration rather than copied elsewhere.
+The authoritative runtime description of a Handoff Protocol: stable role ids
+with editable titles and model assignments, read rather than copied. Retired
+from generated projects in v0.9 along with the Protocol itself (ADR-020).
 _Avoid_: rendered role table, workflow config
 
 **Spec Loop**:
 The micro, within-session development loop one agent follows for one task:
-grill → spec → tickets → TDD → review → architecture cleanup. Ships as a single
-catalog item (`spec-loop`). The Handoff Protocol is the exoskeleton; the Spec
-Loop is the neuromuscular system inside each role's session.
-_Avoid_: spec-workflow, Pocock workflow, dev workflow
+setup → grill → spec → tickets → implement (TDD, review) → architecture
+cleanup. From v0.9 every generated project has one and none can decline it — it
+is the single option in the mandatory Dev Category, not an unnamed constant, so
+the stamp records which loop a project uses (ADR-018). Through v0.8 it shipped
+as the optional catalog item `spec-loop`.
+_Avoid_: spec-workflow, Pocock workflow, dev workflow, spine, backbone
 
 **Workflow**:
 Reserved exclusively for GitHub Actions workflow files (`ci.yml`, `release.yml`,
@@ -33,22 +37,49 @@ Reserved exclusively for GitHub Actions workflow files (`ci.yml`, `release.yml`,
 
 ### Catalog
 
+**Category**:
+The top-level axis a user selects along from v0.9: Dev, Security, Quality,
+Design, Token Optimize (ADR-017). A Category cuts across Components — Design
+holds both a skill and a design-doc template — and is the vocabulary prompts and
+flags are expressed in. Dev is a mandatory single-select; the rest are
+multi-select and may be declined. Categories are named for what they hold today,
+because adding one is free and renaming one breaks every stamped project.
+_Avoid_: section, block, group, component (as a user-facing word), Ops
+
 **Component**:
-One of the four top-level overlay groups a user selects: skills, mcp, docs,
-handoff (FR-3/FR-14). The `handoff` component was named `agents` through v0.7;
-it always meant the Handoff Protocol scaffold, never a coding agent.
-_Avoid_: agents (as a component name)
+An internal grouping that decides where a Catalog Item's files are written:
+skills, mcp, docs. It was the user-facing selection axis through v0.8 and is not
+one from v0.9 (ADR-017). A fourth, `handoff` — named `agents` through v0.7 —
+generated the Handoff Protocol scaffold and is removed in v0.9 (ADR-020).
+_Avoid_: agents (as a component name); using it for anything a user picks
 
 **Catalog Item**:
-An individually selectable unit inside a component, declared as data in the
-manifest (ADR-010). The unit of the 10-item cap.
+An individually selectable unit, declared as data in the manifest (ADR-010) and
+presented under exactly one Category.
 _Avoid_: skill entry, module, addon
+
+**Enhancement**:
+A Catalog Item outside the Spec Loop, declaring the Mount Point it attaches to.
+Everything a user can add or drop is an Enhancement.
+_Avoid_: plugin, extra, addon, optional skill
+
+**Mount Point**:
+The Spec Loop skill an Enhancement attaches to, declared as manifest data —
+react-doctor mounts on `code-review`, not on `implement` (ADR-018). Guidance is
+injected at generation time; nothing rewrites a skill at runtime.
+_Avoid_: hook, anchor, attachment point, phase
+
+**Default Set**:
+What a generated project receives when the user accepts every default: the Spec
+Loop and the project's own documentation skeletons. It is the only thing the
+size limit governs — the rest of the catalog is unbounded (ADR-018). Every
+Enhancement is off by default, reference design-document templates included.
+_Avoid_: default selection, baseline, starter set, the cap
 
 **Bundle**:
 A catalog item that materializes multiple related assets selected as one unit
-because they are only valuable together (e.g. `spec-loop`). A bundle includes
-the dependency closure needed for those assets to work and counts as one item
-against the cap.
+because they are only valuable together, including the dependency closure those
+assets need.
 
 ### Agent targets
 
@@ -70,6 +101,13 @@ directs the agent to its [[Canonical Content]]. A stub is neither a symlink nor
 a second copy of the content — generated projects must remain portable to
 filesystems and platforms where symlinks are unavailable.
 _Avoid_: shim, alias, symlink, mirror, proxy
+
+**Agent Target Map**:
+The manifest's transcription of every Agent Target's project-level skills
+directory, derived from the reference installer's machine-readable agent list
+and held to it by a drift check (ADR-019). Rules and MCP paths are absent from
+that source and stay hand-declared.
+_Avoid_: agent table, path map, target registry
 
 ### Lifecycle
 
