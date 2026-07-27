@@ -18,8 +18,8 @@
     "base_template": {
       "repo": "fastapi/full-stack-fastapi-template",
       "ref": "master",
-      "commit": "4d3d5e92c1ea6b3fa0fab02c41124844ec45bca8",
-      "verified_at": "2026-07-20",
+      "commit": "5b358ea6f422a09cc0d6f75c4164cf8a36005c4c",
+      "verified_at": "2026-07-27",
       "license": "MIT",
       "exclude": [
         ".git",
@@ -174,13 +174,18 @@
           "license": "MIT",
           "pin": "0.8.1",
           "paths": [
-            { "src": "claude/skills/react-doctor", "dest": ".agents/skills/react-doctor" }
+            {
+              "src": "claude/skills/react-doctor",
+              "dest": ".agents/skills/react-doctor"
+            }
           ],
           "inject": {
             "kind": "npm-dev-dependency",
             "target": "frontend/package.json",
             "package": "react-doctor",
-            "scripts": { "doctor": "react-doctor" }
+            "scripts": {
+              "doctor": "react-doctor"
+            }
           }
         },
         {
@@ -296,7 +301,7 @@
         },
         {
           "id": "webapp-testing",
-          "description": "Browser-automation skill for testing web apps end-to-end — drives a headless browser to exercise UI flows, capture console logs, and discover elements. Vendored from anthropics/skills (Apache-2.0).",
+          "description": "Browser-automation skill for testing web apps end-to-end \u2014 drives a headless browser to exercise UI flows, capture console logs, and discover elements. Vendored from anthropics/skills (Apache-2.0).",
           "mode": "vendor",
           "license": "Apache-2.0",
           "vendored_repo": "anthropics/skills",
@@ -309,7 +314,7 @@
         },
         {
           "id": "frontend-design",
-          "description": "Methodology skill for how to build high-quality frontend UI — layout, spacing, visual hierarchy, and interaction polish. Distinct from the awesome-design-md DESIGN.md reference templates in the docs component (which show what good design systems like Stripe and Linear look like): this is the how-to process, those are the what-good-looks-like references. Vendored from anthropics/skills (Apache-2.0).",
+          "description": "Methodology skill for how to build high-quality frontend UI \u2014 layout, spacing, visual hierarchy, and interaction polish. Distinct from the awesome-design-md DESIGN.md reference templates in the docs component (which show what good design systems like Stripe and Linear look like): this is the how-to process, those are the what-good-looks-like references. Vendored from anthropics/skills (Apache-2.0).",
           "mode": "vendor",
           "license": "Apache-2.0",
           "vendored_repo": "anthropics/skills",
