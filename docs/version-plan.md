@@ -6,6 +6,7 @@ Close-out 2026-07-26: v0.7 is released — `v0.7.0` is tagged and published to P
 Amended 2026-07-26: v0.8 scope, ordering, and decisions settled — see "2026-07-26 amendment" below (ADR-015, ADR-016).
 Amended 2026-07-26 (later the same day): FR-25 (CLI i18n) withdrawn before implementation and D-3 rejected. v0.8 is FR-26 only — see "FR-25 — withdrawn" in the amendment.
 Close-out 2026-07-27: v0.8 is released. FR-26 is shipped in `v0.8.0`, which is tagged and published to PyPI; Phase 4 documentation, review, release, and distribution verification are complete. FR-25 remains withdrawn settled history.
+Amended 2026-07-27: v0.9 and v0.10 added between v0.8 and v1.0 — see "2026-07-27 amendment" at the end of this document (ADR-017, ADR-018, ADR-019). v1.0 is unchanged.
 Numbering continues from requirements.md (FR-1..FR-10 shipped in v0.1/v0.2).
 
 ## End goal
@@ -406,6 +407,8 @@ it?" — the same test as the curation principle.
 |---|---|---|
 | v0.7 (DONE; v0.7.0 released) | FR-23 Handoff Protocol config, FR-28 Spec Loop, FR-24 generate skill, FR-29 progress reporting | FR-23×FR-28 share the generated rules surface; FR-29 landed before FR-25, which was subsequently withdrawn (D-3 rejected) |
 | v0.8 (DONE; v0.8.0 released) | FR-26 multi-agent render targets | Canonical Content, Agent Target Pointer Stubs, stamp v4, and the v0.7 migration are complete; FR-25 remains withdrawn and Traditional Chinese is served by repository documentation instead |
+| v0.9 (added 2026-07-27) | FR-30 Category-first selection, FR-31 Spec Loop always generated + Default Set, FR-35 retire the generated Handoff Protocol | Every breaking change on one theme — how a user chooses and what a default project contains — so an upgrading user pays once |
+| v0.10 (added 2026-07-27) | FR-32 Mount Points, FR-33 Agent Target Map, FR-34 interview-driven generation skill | Assembly and reach, all non-breaking, and all downstream of v0.9's contract |
 | v1.0 | FR-27 second template (Next.js — selected 2026-07-24, see D-5); Web UI decision revisited | Platform step; gated on real-user feedback and the D-5 hard gates |
 
 **2026-07-24 — v0.6 close-out re-confirmation (CEO-confirmed, Moofon):**
@@ -563,3 +566,179 @@ v0.8 carries one structural refactor — FR-26's layout migration — plus one
 stamp migration. The permanent N-1 lifecycle gate is extended to assert the
 layout migration, not only content currency. Withdrawing FR-25 cost nothing
 already built: no i18n code was ever written, and FR-26 never depended on it.
+
+---
+
+## 2026-07-27 amendment — v0.9 and v0.10 scope (CEO-confirmed, Moofon)
+
+Decided in the `grill-with-docs` session of 2026-07-27, the first planning pass
+after the v0.8 release. Adds two versions between v0.8 and v1.0; **v1.0 is
+unchanged** (FR-27 second template, Web UI decision, the same D-5 hard gates and
+the same real-users checklist). Decision records: ADR-017, ADR-018, ADR-019,
+plus a symlink amendment to ADR-015. FR numbering resumes at FR-30 (FR-25 is
+permanently retired; FR-27 stays reserved for v1.0).
+
+### The shape of the change
+
+dev-ready has been a catalog of parts: ADR-010 promised free composition and
+treated every item as peer. From v0.9 it becomes **an opinionated development
+loop with enhancements around it** — a half-turn, not a full one. The Spec Loop
+becomes the structure every generated project has; the catalog stays freely
+composable but is presented, selected, and reasoned about along Categories that
+match how a user thinks rather than how the overlay writes files.
+
+The half-turn is deliberate. The four-layer loop is the only part of dev-ready
+with real usage evidence — this repository has run v0.7 and v0.8 through it —
+which is why it earns the default. Locking the catalog shut is what was
+rejected: a user who wants only `caveman` and `security-audit` is legitimate,
+and with the v1.0 real-users gate still open those users are the likeliest
+source of the evidence the gate demands.
+
+### v0.9 — Selection model (FR-30, FR-31, FR-35)
+
+One theme: **how a user chooses, and what they get by default.** Every breaking
+change lands together so an upgrading user pays once.
+
+FR-30. **Category-first selection (ADR-017).** Category — Dev, Security,
+Quality, Design, Token Optimize — replaces Component as the user-facing axis;
+Component survives only as the internal grouping deciding where files are
+written. Dev is a mandatory single-select holding the development loop; the
+other four are multi-select. Categories are named for what they hold at
+release: "Ops" was rejected because its only member is browser end-to-end
+testing, which is quality assurance. Adding a Category later is free; renaming
+one breaks every stamped project.
+`--skills` / `--mcp` / `--no-docs` / `--no-handoff` are replaced by a
+Category-shaped contract, the interactive flow is rebuilt against it, and the
+stamp advances to version 5 recording Categories with the resolved item set.
+Two defects close as consequences: `mcp-config` stops being a selectable item
+and becomes infrastructure generated when something needs it — repairing the
+selection that fails today — and the two awesome-design-md DESIGN.md templates
+become individually selectable, closing a gap open since v0.4 because `docs`
+was modelled as a boolean component.
+
+FR-31. **Spec Loop always generated; Default Set replaces the catalog cap
+(ADR-018).** The Spec Loop stops being optional. It is modelled as the single
+option of the mandatory Dev Category rather than as an unnamed constant, so the
+loop stays visible in the menu and the stamp records which loop a project uses
+— making a second loop a data addition rather than a record-format migration.
+This reopens ADR-012's "preset, not framework" deferral to the minimum degree
+that costs nothing. The loop gains `implement` — audited as never vendored, so
+the loop dev-ready advertises has been missing its Execution step since v0.7 —
+and an opt-in `setup-all` Enhancement for post-generation configuration. `init`
+writes working defaults (local-markdown tracker, default domain-doc locations)
+so nothing manual stands between `init` and a usable project. The ten-item cap
+is retired; the limit moves to the **Default Set**, which is deliberately
+small: the Spec Loop and the project's own documentation skeletons. Everything
+else ships off by default, reference design-document templates included.
+`project-orientation` is removed from the product: its whole content tells the
+agent to read the auto-loaded root rules file, so it fails the curation
+principle's own test.
+
+FR-35. **Retire the Handoff Protocol from generated projects (ADR-020).** The
+seven-role, four-layer scaffold — protocol configuration, four gate templates,
+ticket directory, execution-report skeleton — is removed from the overlay along
+with its Component, its flag, and the deprecated alias kept from v0.8. It
+presumes a team of agents where an ordinary user has one, and it arrives before
+the work it governs exists. **dev-ready's own process is untouched** — ADR-007
+is scoped to internal practice, not superseded; ADR-013, the role definitions in
+`AGENTS.md`, and `docs/handoff/<version>/` all continue. Existing projects
+retire the files through ADR-014's obsolete-file rules in the same transaction
+as the version's other retirements; edited files are preserved and reported.
+Nothing replaces it — no reduced scaffold, no preset, no stub.
+
+**Accepted cost.** `--yes` changes meaning — a published interface — and needs
+a CHANGELOG entry, a README correction, and N-1 lifecycle-gate coverage. Five
+ids (`spec-loop`, `tdd`, `diagnosing-bugs`, `code-review`,
+`project-orientation`) leave the selectable catalog while remaining in v4
+stamps, so the migration maps or retires them rather than rejecting them. Two
+shipped FRs (FR-10, FR-23) are retired, one of them a version's headline work;
+that is a deliberate scope reduction and it is not cheap to reverse. The N-1
+gate must assert the v4 to v5 stamp migration and both retirement passes
+alongside content currency, as the v3 to v4 gate did in v0.8.
+
+### v0.10 — Assembly and reach (FR-32, FR-33, FR-34)
+
+One theme: **once selected, how content is assembled and who can read it.**
+Nothing here is breaking.
+
+FR-32. **Mount Points (ADR-018).** Every Enhancement declares the Spec Loop
+skill its guidance is injected into, as manifest data. `react-doctor` mounts on
+`code-review`, not on `implement`: `implement` coordinates and delegates, so
+guidance attached there sits one level above the step that acts on it.
+Injection is a third catalog effect kind beside the existing MCP-server and
+npm-dev-dependency effects, applied at generation into a delimited, regenerable
+block. Nothing edits a skill at runtime — a runtime edit marks the file
+user-modified and permanently excludes it from `upgrade`.
+
+FR-33. **Agent Target Map (ADR-019).** Measurement against `vercel-labs/skills`
+`src/agents.ts` found that of 75 declared agents only 19 read `.agents/skills/`
+at project level — **56 declare a unique project directory**. v0.8's two
+declared targets are a data gap, not a capability gap. The map joins the
+manifest `vendored` section at a pinned commit, a maintainer script derives
+`agent_targets` from it, and CI fails on divergence — FR-16's mechanism applied
+to a second kind of content, which closes the unmitigated risk ADR-015
+recorded. Only `skills_dir` is derived; `rules_file` and `mcp_file` have no
+upstream source and stay hand-declared.
+
+FR-34. **Interview-driven generation skill.** FR-24's skill teaches an agent to
+compose `dev-ready init` flags; it must be rewritten for FR-30's contract
+regardless. It is rewritten as an interview: the agent questions the user about
+what they are building, maps the answers to Categories and items, and then
+composes the command. Mapping a described need onto a selection is what a model
+does well and what CLI branching does badly. Distribution is unchanged — this
+repository, outside the generated overlay (D-2).
+
+Also in v0.10: the README pair is refreshed for the Category model, the Default
+Set, and the supported-agent count. `README.zh-TW.md` is updated only where the
+product facts it carries change — what dev-ready produces and what the
+lifecycle commands guarantee — and gains none of the new flags or exit codes
+(ADR-016).
+
+### Considered and rejected in this session
+
+- **Symlinks instead of Pointer Stubs** — re-examined on the reference
+  installer's recommendation and rejected again; the reasoning is now recorded
+  as a 2026-07-27 amendment to ADR-015 so the recurring question has a written
+  answer.
+- **A measured context budget instead of the item cap** — a better instrument
+  and still the right one later, but it needs a defensible byte threshold and
+  there is no usage data to calibrate one against. The Default Set limit bounds
+  the same risk meanwhile (ADR-018).
+- **Locking the catalog into a mandatory loop** — rejected; see the half-turn
+  rationale above.
+- **Everything in a single version** — rejected: two structural refactors
+  landing on the same surfaces (CLI, stamp, overlay, verify, upgrade) is
+  several times v0.8's workload for one solo maintainer, and the N-1 gate would
+  have to assert two migrations at once.
+- **Keeping the generated Handoff Protocol, defaulted off** — rejected: it
+  preserves the whole maintenance surface (configuration schema, seven role
+  records, six templates, their rendering, their conditional interaction with
+  the Spec Loop, and their share of every future migration) to serve a
+  selection nobody has been observed making. See ADR-020 for the alternatives,
+  including a lighter two-role scaffold, which was rejected as a second
+  unvalidated design.
+- **`project-orientation` recategorized rather than removed** — rejected once
+  its content was read: it directs the agent to the auto-loaded root rules file
+  and repeats facts that file already carries. No Category makes an item worth
+  its context cost.
+
+### Graphify — evaluated, not adopted
+
+Proposed for a token-optimization Category and **not adopted**. Three findings.
+Its provenance does not meet ADR-009: the repository identity is inconsistent
+between `Graphify-Labs/graphify` and the `safishamsi/graphify` path its own
+install instructions use, branch references disagree (`v1` against `v8`), and
+the license is stated as dual Apache-2.0/MIT without a single verified grant —
+there is no 40-hex commit to pin against a license that has been checked. It
+requires an LLM API key with no zero-key mode, and `graphify install` writes
+into the user's home directory, which dev-ready never does; between them that
+is three manual steps against the "no manual install step" rule in the
+integration-modes table above. Finally the categorization does not hold: it
+*spends* tokens on whole-project multimodal extraction to produce an
+architecture report, where `code-memory` is the item that reduces per-query
+cost.
+
+Recorded here as a roadmap candidate rather than a rejection on merit — the
+architecture-report output is genuinely useful. Reconsidering it needs a
+resolved upstream identity, a pinnable commit carrying a verified license, and
+a launch path that does not write outside the project.

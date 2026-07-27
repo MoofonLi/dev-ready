@@ -7,7 +7,9 @@ This file is the single source of truth for agent rules; `CLAUDE.md` imports it 
 
 dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus Canonical Content for coding agents, optional Agent Target Pointer Stubs, MCP config, and design docs.
 
-Current phase: v0.8 is released. FR-26 is implemented, `v0.8.0` is tagged and published to PyPI, and Phase 4 documentation, review, release, and distribution verification are complete. Roadmap in `docs/version-plan.md`; per-version plans in `docs/handoff/<version>/<version>-plan.md`. Domain glossary: `CONTEXT.md`.
+Current phase: v0.8 is released (`v0.8.0` tagged and published to PyPI). v0.9 and v0.10 are scoped with accepted decisions and draft specs, but not yet planned into phases — v0.9 is the selection-model break (FR-30 Category-first selection, FR-31 Spec Loop always generated + Default Set, FR-35 retire the generated Handoff Protocol; ADR-017, ADR-018, ADR-020), v0.10 is assembly and reach (FR-32 Mount Points, FR-33 Agent Target Map, FR-34 interview-driven generation skill; ADR-019). Roadmap in `docs/version-plan.md`; per-version plans in `docs/handoff/<version>/<version>-plan.md`. Domain glossary: `CONTEXT.md`.
+
+**ADR-020 scope note:** v0.9 stops *generating* the Handoff Protocol into user projects. It does **not** change how this repository is developed — the roles, four-layer loop, and `docs/handoff/<version>/` below all stand.
 
 The v0.8 release surface is fixed: Canonical Content is always written to
 `.agents/skills/` and `AGENTS.md`; manifest-declared Agent Targets render Pointer
