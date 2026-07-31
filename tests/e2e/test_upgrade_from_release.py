@@ -13,10 +13,11 @@ from typing import Any, NamedTuple
 
 import pytest
 
+from dev_ready.manifest import load_default_manifest
+
 pytestmark = pytest.mark.network
 
 _RELEASED_VERSION = "0.8.0"
-_RETIRED_SKILL_IDS = frozenset({"project-orientation"})
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PROBE_PREFIX = "__DEV_READY_PROBE__="
 _PROBE_AND_RUN = f"""
@@ -185,7 +186,13 @@ def _json_report(result: subprocess.CompletedProcess[str], stage: str) -> dict[s
 def _selection_arguments(stamp: dict[str, Any]) -> list[str]:
     components = stamp.get("components")
     assert isinstance(components, dict), "released stamp has no component selection"
-    arguments: list[str] = []
+    manifest = load_default_manifest()
+    items_by_id = {
+        item.id: item
+        for component_items in manifest.components.values()
+        for item in component_items
+    }
+    selected_by_category: dict[str, set[str]] = {}
     for component in ("skills", "mcp"):
         selected = components.get(component)
         assert isinstance(selected, dict), f"released stamp has no {component} selection"
@@ -195,14 +202,21 @@ def _selection_arguments(stamp: dict[str, Any]) -> list[str]:
         assert all(isinstance(item_id, str) for item_id in item_ids), (
             f"released stamp has an invalid {component} item id"
         )
-        if component == "skills":
-            item_ids = [item_id for item_id in item_ids if item_id not in _RETIRED_SKILL_IDS]
-        selection = ",".join(item_ids) if selected.get("included") else "none"
-        arguments.extend((f"--{component}", selection))
-    for component in ("docs", "handoff"):
-        selected = components.get(component)
-        if not isinstance(selected, dict) or not selected.get("included"):
-            arguments.append(f"--no-{component}")
+        if selected.get("included"):
+            for item_id in item_ids:
+                item = items_by_id.get(item_id)
+                if item is not None:
+                    selected_by_category.setdefault(item.category, set()).add(item.id)
+
+    docs = components.get("docs")
+    if isinstance(docs, dict) and docs.get("included"):
+        for item in manifest.components.get("docs", ()):
+            selected_by_category.setdefault(item.category, set()).add(item.id)
+
+    categories = sorted(selected_by_category)
+    arguments = ["--categories", ",".join(categories) or "none"]
+    for category in categories:
+        arguments.extend((f"--{category}", ",".join(sorted(selected_by_category[category]))))
     agent_targets = stamp.get("agent_targets", ["claude"])
     assert isinstance(agent_targets, list) and all(
         isinstance(target_id, str) for target_id in agent_targets
@@ -244,9 +258,21 @@ def _base_provenance(stamp: dict[str, Any], stage: str) -> BaseProvenance:
 
 
 def _overlay_currency(stamp: dict[str, Any]) -> OverlayCurrency:
+    components = stamp.get("components")
+    normalized_components: dict[str, Any] | None = None
+    if isinstance(components, dict):
+        normalized_components = {}
+        for component in ("skills", "mcp", "docs"):
+            value = components.get(component)
+            if not isinstance(value, dict):
+                continue
+            normalized = dict(value)
+            if component == "docs":
+                normalized.pop("items", None)
+            normalized_components[component] = normalized
     return OverlayCurrency(
         dev_ready_version=stamp.get("dev_ready_version"),
-        components=stamp.get("components"),
+        components=normalized_components,
         inventory=stamp.get("inventory"),
     )
 

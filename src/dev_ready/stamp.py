@@ -10,7 +10,13 @@ import re
 
 from dev_ready.errors import StampInvalidError, StampMissingError
 
-__all__ = ["InventoryEntry", "Stamp", "StampItem", "UpstreamStampInfo", "load_stamp"]
+__all__ = [
+    "InventoryEntry",
+    "Stamp",
+    "StampItem",
+    "UpstreamStampInfo",
+    "load_stamp",
+]
 
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
@@ -42,10 +48,12 @@ class Stamp:
     mcp_included: bool
     mcp_items: tuple[StampItem, ...]
     docs_included: bool
+    docs_items: tuple[StampItem, ...]
     handoff_included: bool
     agent_targets: tuple[str, ...]
     upstream: UpstreamStampInfo
     project_name: str | None = None
+    categories: tuple[str, ...] = ()
     inventory: tuple[InventoryEntry, ...] = ()
 
 
@@ -78,9 +86,9 @@ def load_stamp(project_dir: Path) -> Stamp:
     if not isinstance(version, int) or isinstance(version, bool):
         raise StampInvalidError(".dev-ready.json is missing a valid integer 'stamp_version'")
 
-    if version < 1 or version > 4:
+    if version < 1 or version > 5:
         raise StampInvalidError(
-            f"unsupported stamp_version {version}; this CLI supports stamp versions 1, 2, 3 and 4."
+            f"unsupported stamp_version {version}; this CLI supports stamp versions 1, 2, 3, 4 and 5."
         )
 
     dev_ready_ver = data.get("dev_ready_version")
@@ -129,7 +137,10 @@ def load_stamp(project_dir: Path) -> Stamp:
     mcp_included, mcp_items = _parse_component_items("mcp")
 
     docs_raw = components.get("docs")
-    docs_included = bool(docs_raw.get("included", False)) if isinstance(docs_raw, dict) else False
+    if isinstance(docs_raw, dict):
+        docs_included, docs_items = _parse_component_items("docs")
+    else:
+        docs_included, docs_items = False, ()
 
     handoff_component = "handoff" if version >= 4 else "agents"
     handoff_raw = components.get(handoff_component)
@@ -155,6 +166,19 @@ def load_stamp(project_dir: Path) -> Stamp:
     if len(set(agent_targets_raw)) != len(agent_targets_raw):
         raise StampInvalidError(".dev-ready.json 'agent_targets' must not contain duplicates")
 
+    if version < 5:
+        categories_raw = []
+    elif "categories" not in data:
+        raise StampInvalidError(".dev-ready.json is missing 'categories' list")
+    else:
+        categories_raw = data["categories"]
+    if not isinstance(categories_raw, list) or any(
+        not isinstance(category_id, str) or not category_id for category_id in categories_raw
+    ):
+        raise StampInvalidError(".dev-ready.json 'categories' must be a list of identifiers")
+    if len(set(categories_raw)) != len(categories_raw):
+        raise StampInvalidError(".dev-ready.json 'categories' must not contain duplicates")
+
     inventory_raw = data.get("inventory", [])
     if not isinstance(inventory_raw, list):
         raise StampInvalidError(".dev-ready.json 'inventory' must be a list")
@@ -176,9 +200,11 @@ def load_stamp(project_dir: Path) -> Stamp:
         mcp_included=mcp_included,
         mcp_items=mcp_items,
         docs_included=docs_included,
+        docs_items=docs_items,
         handoff_included=handoff_included,
         agent_targets=tuple(agent_targets_raw),
         upstream=UpstreamStampInfo(repo=repo, commit=commit),
         project_name=project_name,
+        categories=tuple(categories_raw),
         inventory=tuple(inventory),
     )

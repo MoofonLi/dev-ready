@@ -15,11 +15,14 @@ CATALOG = load_default_manifest().components
 def test_flag_and_prompt_adapters_share_one_canonical_selection() -> None:
     selection = ProjectSelection.from_flags(
         catalog=CATALOG,
-        skills="caveman, tdd",
-        mcp="none",
-        no_skills=False,
-        no_mcp=False,
-        no_docs=True,
+        categories="all",
+        category_items={
+            "dev": "tdd",
+            "security": "none",
+            "quality": "none",
+            "design": "none",
+            "token-optimize": "caveman",
+        },
     )
 
     assert selection is not None
@@ -47,14 +50,76 @@ def test_no_selection_flags_leave_selection_unresolved() -> None:
     assert (
         ProjectSelection.from_flags(
             catalog=CATALOG,
-            skills=None,
-            mcp=None,
-            no_skills=False,
-            no_mcp=False,
-            no_docs=False,
+            categories=None,
+            category_items={},
         )
         is None
     )
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected_skills", "expected_mcp", "expected_docs"),
+    [
+        (
+            "all",
+            frozenset(item.id for item in CATALOG["skills"]),
+            frozenset(item.id for item in CATALOG["mcp"]),
+            True,
+        ),
+        ("none", frozenset(), frozenset(), False),
+    ],
+)
+def test_category_level_all_and_none(
+    raw: str,
+    expected_skills: frozenset[str],
+    expected_mcp: frozenset[str],
+    expected_docs: bool,
+) -> None:
+    selection = ProjectSelection.from_flags(
+        catalog=CATALOG,
+        categories=raw,
+        category_items={},
+    )
+
+    assert selection is not None
+    assert selection.items("skills") == expected_skills
+    assert selection.items("mcp") == expected_mcp
+    assert selection.includes("docs") is expected_docs
+
+
+def test_unknown_category_lists_valid_ids() -> None:
+    with pytest.raises(InvalidArgumentsError) as excinfo:
+        ProjectSelection.from_flags(
+            catalog=CATALOG,
+            categories="performance",
+            category_items={},
+        )
+
+    message = str(excinfo.value)
+    assert "unknown Category ids: ['performance']" in message
+    assert "['design', 'dev', 'quality', 'security', 'token-optimize']" in message
+
+
+def test_unknown_category_item_lists_valid_ids() -> None:
+    with pytest.raises(InvalidArgumentsError) as excinfo:
+        ProjectSelection.from_flags(
+            catalog=CATALOG,
+            categories="security",
+            category_items={"security": "ghost"},
+        )
+
+    message = str(excinfo.value)
+    assert "unknown Security item ids: ['ghost']" in message
+    assert "valid ids: ['security-audit']" in message
+
+
+def test_category_override_must_belong_to_selected_categories() -> None:
+    with pytest.raises(InvalidArgumentsError, match="--quality conflicts with --categories"):
+        ProjectSelection.from_flags(
+            catalog=CATALOG,
+            categories="security",
+            category_items={"quality": "react-doctor"},
+        )
 
 
 def test_answers_rejects_invalid_project_name_at_its_interface() -> None:
@@ -75,6 +140,7 @@ def _dependency_catalog() -> dict[str, tuple[CatalogItem, ...]]:
     def item(item_id: str, *requires: str) -> CatalogItem:
         return CatalogItem(
             id=item_id,
+            category="dev",
             description=item_id,
             mode="builtin",
             license="MIT",
@@ -101,28 +167,24 @@ def test_selection_resolves_transitive_requirements() -> None:
     assert selection.skills == frozenset({"spec-loop", "tdd", "review"})
 
 
-def test_flag_selection_exposes_resolved_requirements() -> None:
+def test_category_flag_selection_exposes_resolved_requirements() -> None:
     selection = ProjectSelection.from_flags(
-        catalog=_dependency_catalog(),
-        skills="spec-loop",
-        mcp="none",
-        no_skills=False,
-        no_mcp=False,
-        no_docs=False,
+        catalog=CATALOG,
+        categories="dev",
+        category_items={"dev": "spec-loop"},
     )
 
     assert selection is not None
-    assert selection.skills == frozenset({"spec-loop", "tdd", "review"})
+    assert selection.skills == frozenset(
+        {"spec-loop", "tdd", "diagnosing-bugs", "code-review"}
+    )
 
 
 def test_explicit_none_has_an_empty_dependency_closure() -> None:
     selection = ProjectSelection.from_flags(
-        catalog=_dependency_catalog(),
-        skills="none",
-        mcp="none",
-        no_skills=False,
-        no_mcp=False,
-        no_docs=False,
+        catalog=CATALOG,
+        categories="dev",
+        category_items={"dev": "none"},
     )
 
     assert selection is not None
@@ -140,12 +202,9 @@ def test_explicit_none_has_an_empty_dependency_closure() -> None:
 def test_agent_target_flag_selection(raw: str, expected: frozenset[str]) -> None:
     selection = ProjectSelection.from_flags(
         catalog=CATALOG,
-        skills=None,
-        mcp=None,
+        categories=None,
+        category_items={},
         agents=raw,
-        no_skills=False,
-        no_mcp=False,
-        no_docs=False,
     )
 
     assert selection is not None
@@ -156,12 +215,9 @@ def test_unknown_agent_target_lists_valid_ids() -> None:
     with pytest.raises(InvalidArgumentsError) as excinfo:
         ProjectSelection.from_flags(
             catalog=CATALOG,
-            skills=None,
-            mcp=None,
+            categories=None,
+            category_items={},
             agents="claud",
-            no_skills=False,
-            no_mcp=False,
-            no_docs=False,
         )
 
     message = str(excinfo.value)

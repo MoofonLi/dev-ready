@@ -36,7 +36,7 @@ def _answers(target_dir: Path, *, project_name: str = "my-app") -> Answers:
         selection=ProjectSelection.from_items(
             CATALOG,
             skills=frozenset({"caveman"}),
-            mcp=frozenset({"mcp-config"}),
+            mcp=frozenset({"code-memory"}),
         ),
     )
 

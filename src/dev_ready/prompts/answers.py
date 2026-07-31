@@ -32,6 +32,8 @@ class ProjectSelection:
 
     skills: frozenset[str] = frozenset()
     mcp: frozenset[str] = frozenset()
+    docs_items: frozenset[str] = frozenset()
+    categories: frozenset[str] = frozenset()
     agent_targets: frozenset[str] = frozenset()
     docs: bool = True
 
@@ -41,12 +43,16 @@ class ProjectSelection:
         *,
         skills: frozenset[str],
         mcp: frozenset[str],
+        docs_items: frozenset[str],
+        categories: frozenset[str],
         agent_targets: frozenset[str],
         docs: bool,
     ) -> ProjectSelection:
         selection = object.__new__(cls)
         object.__setattr__(selection, "skills", skills)
         object.__setattr__(selection, "mcp", mcp)
+        object.__setattr__(selection, "docs_items", docs_items)
+        object.__setattr__(selection, "categories", categories)
         object.__setattr__(selection, "agent_targets", agent_targets)
         object.__setattr__(selection, "docs", docs)
         return selection
@@ -56,6 +62,8 @@ class ProjectSelection:
         return cls._create(
             skills=frozenset(),
             mcp=frozenset(),
+            docs_items=frozenset(),
+            categories=frozenset(),
             agent_targets=frozenset({"claude"}),
             docs=True,
         )
@@ -65,6 +73,8 @@ class ProjectSelection:
         return cls._create(
             skills=frozenset(),
             mcp=frozenset(),
+            docs_items=frozenset(),
+            categories=frozenset(),
             agent_targets=frozenset(),
             docs=False,
         )
@@ -76,6 +86,8 @@ class ProjectSelection:
         *,
         skills: frozenset[str] = frozenset(),
         mcp: frozenset[str] = frozenset(),
+        docs_items: frozenset[str] | None = None,
+        categories: frozenset[str] | None = None,
         agent_targets: frozenset[str] | None = None,
         docs: bool = True,
         handoff: bool = False,
@@ -83,11 +95,30 @@ class ProjectSelection:
         _ = handoff  # Compatibility for internal v0.8 lifecycle fixtures only.
         _validate_items("skills", skills, catalog)
         _validate_items("mcp", mcp, catalog)
+        resolved_docs_items = (
+            frozenset(item.id for item in catalog.get("docs", ()))
+            if docs and docs_items is None
+            else (docs_items or frozenset())
+        )
+        _validate_items("docs", resolved_docs_items, catalog)
         resolved_targets = _all_agent_target_ids(catalog) if agent_targets is None else agent_targets
         _validate_agent_targets(resolved_targets, catalog)
+        resolved_categories = (
+            _categories_for_items(
+                catalog,
+                skills=skills,
+                mcp=mcp,
+                docs=resolved_docs_items,
+                include_legacy_docs=docs,
+            )
+            if categories is None
+            else categories
+        )
         return cls._create(
             skills=_resolve_requirements("skills", skills, catalog),
             mcp=_resolve_requirements("mcp", mcp, catalog),
+            docs_items=_resolve_requirements("docs", resolved_docs_items, catalog),
+            categories=resolved_categories,
             agent_targets=resolved_targets,
             docs=docs,
         )
@@ -97,6 +128,8 @@ class ProjectSelection:
         return cls._create(
             skills=frozenset(item.id for item in catalog.get("skills", ())),
             mcp=frozenset(item.id for item in catalog.get("mcp", ())),
+            docs_items=frozenset(item.id for item in catalog.get("docs", ())),
+            categories=frozenset(getattr(catalog, "categories", {})),
             agent_targets=_all_agent_target_ids(catalog),
             docs=True,
         )
@@ -106,33 +139,68 @@ class ProjectSelection:
         cls,
         *,
         catalog: Mapping[str, tuple[CatalogItem, ...]],
-        skills: str | None,
-        mcp: str | None,
-        no_skills: bool,
-        no_mcp: bool,
-        no_docs: bool,
+        categories: str | None,
+        category_items: Mapping[str, str | None],
         agents: str | None = None,
     ) -> ProjectSelection | None:
         """Resolve CLI selection flags, or return ``None`` when unspecified."""
-        explicit = (
-            no_skills
-            or no_mcp
-            or no_docs
-            or skills is not None
-            or mcp is not None
-            or agents is not None
-        )
+        explicit_category_items = {
+            category: value
+            for category, value in category_items.items()
+            if value is not None
+        }
+        explicit = categories is not None or bool(explicit_category_items) or agents is not None
         if not explicit:
             return None
 
-        all_skills = frozenset(item.id for item in catalog.get("skills", ()))
-        all_mcp = frozenset(item.id for item in catalog.get("mcp", ()))
+        valid_categories = frozenset(getattr(catalog, "categories", {}))
+        unknown_categories = sorted(set(category_items) - valid_categories)
+        if unknown_categories:
+            raise InvalidArgumentsError(
+                f"unknown Category ids: {unknown_categories!r}; "
+                f"valid ids: {sorted(valid_categories)!r}"
+            )
+        selected_categories = _resolve_category_ids(categories, valid_categories)
+        if categories is not None:
+            for category in explicit_category_items:
+                if category not in selected_categories:
+                    raise InvalidArgumentsError(
+                        f"--{category} conflicts with --categories {categories!r}; "
+                        "select the Category or remove its item flag."
+                    )
+
+        selected_ids: set[str] = set()
+        for category in selected_categories:
+            category_ids = frozenset(
+                item.id
+                for component in ("skills", "mcp", "docs")
+                for item in catalog.get(component, ())
+                if item.category == category
+            )
+            selected_ids.update(
+                _resolve_category_items(
+                    category,
+                    explicit_category_items.get(category),
+                    category_ids,
+                )
+            )
+        selected_by_component = {
+            component: frozenset(
+                item.id
+                for item in catalog.get(component, ())
+                if item.id in selected_ids
+            )
+            for component in ("skills", "mcp", "docs")
+        }
+
         return cls.from_items(
             catalog,
-            skills=_resolve_items("skills", skills, no_skills, all_skills),
-            mcp=_resolve_items("mcp", mcp, no_mcp, all_mcp),
+            skills=selected_by_component["skills"],
+            mcp=selected_by_component["mcp"],
+            docs_items=selected_by_component["docs"],
+            categories=selected_categories,
             agent_targets=_resolve_agent_targets(agents, _all_agent_target_ids(catalog)),
-            docs=not no_docs,
+            docs=bool(selected_by_component["docs"]),
         )
 
     def items(self, name: str) -> frozenset[str]:
@@ -140,6 +208,8 @@ class ProjectSelection:
             return self.skills
         if name == "mcp":
             return self.mcp
+        if name == "docs":
+            return self.docs_items
         raise ValueError(f"catalog selection {name!r} has no items")
 
     def includes(self, name: str) -> bool:
@@ -150,28 +220,43 @@ class ProjectSelection:
         raise ValueError(f"unknown selection {name!r}")
 
 
-def _resolve_items(
-    name: str,
+def _resolve_category_ids(
     raw_value: str | None,
-    no_flag: bool,
-    catalog_ids: frozenset[str],
+    valid_ids: frozenset[str],
 ) -> frozenset[str]:
-    if no_flag and raw_value is not None and raw_value.strip().lower() != "none":
-        raise InvalidArgumentsError(
-            f"--no-{name} conflicts with --{name} {raw_value!r}; use one."
-        )
-    if no_flag or (raw_value is not None and raw_value.strip().lower() == "none"):
+    if raw_value is not None and raw_value.strip().lower() == "none":
         return frozenset()
     if raw_value is None or raw_value.strip().lower() == "all":
-        return catalog_ids
+        return valid_ids
 
     requested = frozenset(item.strip() for item in raw_value.split(",") if item.strip())
     if not requested:
-        raise InvalidArgumentsError(f"empty item selection for --{name}")
-    unknown = sorted(requested - catalog_ids)
+        raise InvalidArgumentsError("empty Category selection for --categories")
+    unknown = sorted(requested - valid_ids)
     if unknown:
         raise InvalidArgumentsError(
-            f"unknown {name} item ids: {unknown!r}; valid ids: {sorted(catalog_ids)!r}"
+            f"unknown Category ids: {unknown!r}; valid ids: {sorted(valid_ids)!r}"
+        )
+    return requested
+
+
+def _resolve_category_items(
+    category: str,
+    raw_value: str | None,
+    valid_ids: frozenset[str],
+) -> frozenset[str]:
+    if raw_value is None or raw_value.strip().lower() == "all":
+        return valid_ids
+    if raw_value.strip().lower() == "none":
+        return frozenset()
+    requested = frozenset(item.strip() for item in raw_value.split(",") if item.strip())
+    label = category.replace("-", " ").title()
+    if not requested:
+        raise InvalidArgumentsError(f"empty item selection for --{category}")
+    unknown = sorted(requested - valid_ids)
+    if unknown:
+        raise InvalidArgumentsError(
+            f"unknown {label} item ids: {unknown!r}; valid ids: {sorted(valid_ids)!r}"
         )
     return requested
 
@@ -242,6 +327,26 @@ def _resolve_requirements(
                 resolved.add(required_id)
                 pending.append(required_id)
     return frozenset(resolved)
+
+
+def _categories_for_items(
+    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    *,
+    skills: frozenset[str],
+    mcp: frozenset[str],
+    docs: frozenset[str],
+    include_legacy_docs: bool,
+) -> frozenset[str]:
+    selected_by_component = {"skills": skills, "mcp": mcp, "docs": docs}
+    categories = {
+        item.category
+        for component, selected in selected_by_component.items()
+        for item in catalog.get(component, ())
+        if item.id in selected and item.category
+    }
+    if include_legacy_docs and not catalog.get("docs"):
+        categories.add("design")
+    return frozenset(categories)
 
 
 @dataclass(frozen=True)

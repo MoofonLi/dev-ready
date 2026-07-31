@@ -15,6 +15,7 @@ from dev_ready.errors import ManifestError
 from dev_ready.manifest.models import (
     AgentTarget,
     CatalogItem,
+    Category,
     ComponentCatalog,
     ItemPath,
     Manifest,
@@ -24,7 +25,7 @@ from dev_ready.manifest.models import (
 
 SUPPORTED_MANIFEST_VERSION = 1
 ALLOWED_MODES = ("builtin", "vendor", "pinned-dependency")
-CATALOG_COMPONENTS = ("skills", "mcp")
+CATALOG_COMPONENTS = ("skills", "mcp", "docs")
 _ITEM_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _PIN_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+.][0-9A-Za-z.-]+)?$")
 
@@ -77,9 +78,11 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
         raise ManifestError(f"{source}: 'upstream' must be a non-empty object")
     upstream = {name: _parse_pin(name, entry, source) for name, entry in upstream_raw.items()}
 
+    categories = _parse_categories(data, source)
     agent_targets = _parse_agent_targets(data, source)
     vendored = _parse_vendored(data, source)
-    components = _parse_components(data, source, vendored)
+    components = _parse_components(data, source, vendored, categories)
+    _validate_non_empty_categories(components, categories, source)
     _validate_catalog_requirements(components, source)
 
     overlay_version = data.get("overlay_version")
@@ -90,10 +93,43 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
         manifest_version=version,
         upstream=upstream,
         overlay_version=overlay_version,
-        components=ComponentCatalog(components, agent_targets),
+        components=ComponentCatalog(components, agent_targets, categories),
         agent_targets=agent_targets,
+        categories=categories,
         vendored=vendored,
     )
+
+
+def _parse_categories(data: dict, source: str) -> dict[str, Category]:
+    raw = data.get("categories")
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ManifestError(f"{source}: 'categories' must be an object")
+
+    categories: dict[str, Category] = {}
+    for category_id, entry in raw.items():
+        if (
+            not isinstance(category_id, str)
+            or not category_id
+            or not _ITEM_ID_PATTERN.fullmatch(category_id)
+        ):
+            raise ManifestError(
+                f"{source}: category id must match pattern, got {category_id!r}"
+            )
+        if not isinstance(entry, dict):
+            raise ManifestError(f"{source}: category {category_id!r} must be an object")
+        description = entry.get("description")
+        if not isinstance(description, str) or not description:
+            raise ManifestError(
+                f"{source}: category {category_id!r} field 'description' "
+                "must be a non-empty string"
+            )
+        categories[category_id] = Category(
+            id=category_id,
+            description=description,
+        )
+    return categories
 
 
 def _parse_agent_targets(data: dict, source: str) -> dict[str, AgentTarget]:
@@ -327,7 +363,10 @@ def _parse_vendored(data: dict, source: str) -> tuple[VendoredPin, ...]:
 
 
 def _parse_components(
-    data: dict, source: str, vendored: tuple[VendoredPin, ...]
+    data: dict,
+    source: str,
+    vendored: tuple[VendoredPin, ...],
+    categories: dict[str, Category],
 ) -> dict[str, tuple[CatalogItem, ...]]:
     raw = data.get("components")
     if not isinstance(raw, dict):
@@ -366,6 +405,18 @@ def _parse_components(
                     f"{source}: duplicate item id {item_id!r} in component '{comp_name}'"
                 )
             seen_ids.add(item_id)
+
+            category = item_entry.get("category")
+            if not isinstance(category, str) or not category:
+                raise ManifestError(
+                    f"{source}: component '{comp_name}' item '{item_id}' field "
+                    "'category' must be a non-empty string"
+                )
+            if category not in categories:
+                raise ManifestError(
+                    f"{source}: component '{comp_name}' item '{item_id}' references "
+                    f"unknown category {category!r}"
+                )
 
             desc = item_entry.get("description")
             if not isinstance(desc, str) or not desc:
@@ -455,6 +506,7 @@ def _parse_components(
             parsed_items.append(
                 CatalogItem(
                     id=item_id,
+                    category=category,
                     description=desc,
                     mode=mode,
                     license=lic,
@@ -468,6 +520,19 @@ def _parse_components(
 
         result[comp_name] = tuple(parsed_items)
     return result
+
+
+def _validate_non_empty_categories(
+    components: dict[str, tuple[CatalogItem, ...]],
+    categories: dict[str, Category],
+    source: str,
+) -> None:
+    used = {item.category for items in components.values() for item in items}
+    for category_id in categories:
+        if category_id not in used:
+            raise ManifestError(
+                f"{source}: category {category_id!r} contains no catalog items"
+            )
 
 
 def _parse_requirements(

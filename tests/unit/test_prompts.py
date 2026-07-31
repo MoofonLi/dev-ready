@@ -27,6 +27,31 @@ ALL_AGENT_LABELS = [
     "claude: Claude Code native project configuration.",
     "windsurf: Windsurf native project skill discovery.",
 ]
+ALL_CATEGORY_LABELS = [
+    f"{category.id}: {category.description}"
+    for category in CATALOG.categories.values()
+]
+ALL_ITEM_LABELS = [
+    f"{item.category}: {item.id} — {item.description}"
+    for items in CATALOG.values()
+    for item in items
+]
+
+
+def _item_labels(*item_ids: str) -> list[str]:
+    requested = set(item_ids)
+    return [
+        label
+        for label in ALL_ITEM_LABELS
+        if label.split(": ", 1)[1].split(" — ", 1)[0] in requested
+    ]
+
+
+def _category_labels(*category_ids: str) -> list[str]:
+    requested = set(category_ids)
+    return [
+        label for label in ALL_CATEGORY_LABELS if label.split(":", 1)[0] in requested
+    ]
 
 
 class FakeAsker:
@@ -78,17 +103,17 @@ def _partial(
     *,
     project_name: str | None = "my-app",
     target_dir: Path | None = None,
-    components_explicit: bool = True,
+    selection_explicit: bool = True,
     selection: ProjectSelection | None = None,
     assume_yes: bool = False,
 ) -> PartialAnswers:
-    if components_explicit and selection is None:
+    if selection_explicit and selection is None:
         selection = ProjectSelection.from_items(
             CATALOG,
             skills=frozenset({"caveman"}),
-            mcp=frozenset({"mcp-config"}),
+            mcp=frozenset({"code-memory"}),
         )
-    if not components_explicit:
+    if not selection_explicit:
         selection = None
     return PartialAnswers(
         project_name=project_name,
@@ -111,7 +136,7 @@ def _answers(
         or ProjectSelection.from_items(
             CATALOG,
             skills=frozenset({"caveman"}),
-            mcp=frozenset({"mcp-config"}),
+            mcp=frozenset({"code-memory"}),
         ),
     )
 
@@ -140,173 +165,140 @@ def test_name_prompt_result_lands_in_answers() -> None:
     assert answers.project_name == "prompted-name"
 
 
-# --- component prompt ---
+# --- Category prompt ---
 
 
-def test_component_prompt_fires_only_when_no_explicit_flag() -> None:
+def test_category_prompt_accepts_all_defaults_without_extra_item_prompts() -> None:
     asker = FakeAsker(
-        checkboxes=[
-            ["skills", "mcp", "docs"],
-            ["caveman"],
-            ["mcp-config"],
-            ALL_AGENT_LABELS,
-        ]
+        checkboxes=[ALL_CATEGORY_LABELS, ALL_ITEM_LABELS, ALL_AGENT_LABELS]
     )
+
     answers = collect_answers(
-        _partial(components_explicit=False), catalog=CATALOG, asker=asker
+        _partial(selection_explicit=False), catalog=CATALOG, asker=asker
     )
-    assert (answers.include_skills, answers.include_mcp, answers.include_docs) == (
-        True,
-        True,
-        True,
-    )
-    assert asker.checkbox_choices[0] == ["skills", "mcp", "docs"]
-    assert len(asker.checkbox_calls) == 4
+
+    assert answers.selection.categories == frozenset(CATALOG.categories)
+    assert answers.skills_items == frozenset(item.id for item in CATALOG["skills"])
+    assert answers.mcp_items == frozenset(item.id for item in CATALOG["mcp"])
+    assert answers.include_docs is True
+    assert asker.checkbox_choices[0] == ALL_CATEGORY_LABELS
+    assert asker.checkbox_choices[1] == ALL_ITEM_LABELS
+    assert asker.checkbox_choices[2] == ALL_AGENT_LABELS
+    assert len(asker.checkbox_calls) == 3
 
 
-def test_component_prompt_skipped_when_flag_explicit() -> None:
-    asker = FakeAsker(checkboxes=[["skills", "mcp", "docs"]])
+def test_category_prompt_skipped_when_flags_resolved_selection() -> None:
+    asker = FakeAsker(checkboxes=[ALL_CATEGORY_LABELS])
     answers = collect_answers(
         _partial(
-            components_explicit=True,
             selection=ProjectSelection.from_items(
                 CATALOG,
-                mcp=frozenset({"mcp-config"}),
+                mcp=frozenset({"code-memory"}),
             ),
         ),
         asker=asker,
     )
+
     assert answers.include_skills is False
     assert asker.checkbox_calls == []
 
 
-def test_component_prompt_selection_can_disable_some() -> None:
-    asker = FakeAsker(checkboxes=[["mcp"], ["mcp-config"], ALL_AGENT_LABELS])
-    answers = collect_answers(
-        _partial(components_explicit=False), catalog=CATALOG, asker=asker
-    )
-    assert (answers.include_skills, answers.include_mcp, answers.include_docs) == (
-        False,
-        True,
-        False,
-    )
-
-
-@pytest.mark.parametrize(
-    ("selected", "expected_skills", "expected_mcp", "expected_docs"),
-    [
-        (["skills", "mcp", "docs"], True, True, True),
-        (["docs"], False, False, True),
-        ([], False, False, False),
-    ]
-)
-def test_component_matrix(selected, expected_skills, expected_mcp, expected_docs) -> None:
-    item_responses = []
-    if "skills" in selected:
-        item_responses.append(["caveman"])
-    if "mcp" in selected:
-        item_responses.append(["mcp-config"])
-    asker = FakeAsker(checkboxes=[selected, *item_responses, ALL_AGENT_LABELS])
-    answers = collect_answers(
-        _partial(components_explicit=False), catalog=CATALOG, asker=asker
-    )
-    assert answers.include_skills is expected_skills
-    assert answers.include_mcp is expected_mcp
-    assert answers.include_docs is expected_docs
-
-
-def test_interactive_level2_item_prompts() -> None:
+def test_category_and_item_choices_resolve_across_components() -> None:
     asker = FakeAsker(
         checkboxes=[
-            ["skills", "mcp", "docs"],
-            ["caveman"],
-            ["mcp-config"],
+            _category_labels("token-optimize"),
+            _item_labels("caveman", "code-memory"),
             ALL_AGENT_LABELS,
         ]
     )
-    answers = collect_answers(_partial(components_explicit=False), catalog=CATALOG, asker=asker)
+
+    answers = collect_answers(
+        _partial(selection_explicit=False), catalog=CATALOG, asker=asker
+    )
+
     assert answers.skills_items == frozenset({"caveman"})
-    assert answers.mcp_items == frozenset({"mcp-config"})
-    assert answers.include_skills is True
-    assert answers.include_mcp is True
+    assert answers.mcp_items == frozenset({"code-memory"})
+    assert answers.include_docs is False
 
 
-def test_interactive_agent_targets_are_described_and_resolved() -> None:
+def test_empty_category_selection_produces_no_catalog_content() -> None:
+    asker = FakeAsker(checkboxes=[[], [], ALL_AGENT_LABELS])
+
+    answers = collect_answers(
+        _partial(selection_explicit=False), catalog=CATALOG, asker=asker
+    )
+
+    assert answers.skills_items == frozenset()
+    assert answers.mcp_items == frozenset()
+    assert answers.include_docs is False
+
+
+def test_interactive_agent_targets_remain_last_and_are_resolved() -> None:
     asker = FakeAsker(
         checkboxes=[
-            ["docs"],
+            _category_labels("design"),
+            _item_labels("frontend-design"),
             ["windsurf: Windsurf native project skill discovery."],
         ]
     )
 
     answers = collect_answers(
-        _partial(components_explicit=False), catalog=CATALOG, asker=asker
+        _partial(selection_explicit=False), catalog=CATALOG, asker=asker
     )
 
     assert answers.agent_targets == frozenset({"windsurf"})
     assert asker.checkbox_calls[-1] == "Select Agent Targets:"
-    assert asker.checkbox_choices[-1] == [
-        "claude: Claude Code native project configuration.",
-        "windsurf: Windsurf native project skill discovery.",
-    ]
+    assert asker.checkbox_choices[-1] == ALL_AGENT_LABELS
 
 
-def test_interactive_level1_drops_mcp_skips_level2_mcp_prompt() -> None:
+def test_category_item_selection_can_be_narrowed_to_one_item() -> None:
     asker = FakeAsker(
         checkboxes=[
-            ["skills", "docs"],
-            ["caveman"],
+            _category_labels("quality"),
+            _item_labels("react-doctor"),
             ALL_AGENT_LABELS,
         ]
     )
-    answers = collect_answers(_partial(components_explicit=False), catalog=CATALOG, asker=asker)
-    assert answers.skills_items == frozenset({"caveman"})
+
+    answers = collect_answers(
+        _partial(selection_explicit=False), catalog=CATALOG, asker=asker
+    )
+
+    assert answers.skills_items == frozenset({"react-doctor"})
     assert answers.mcp_items == frozenset()
-    assert answers.include_mcp is False
-    assert len(asker.checkbox_calls) == 3
 
 
-def test_interactive_level2_narrowed_selection() -> None:
-    asker = FakeAsker(
-        checkboxes=[
-            ["skills", "mcp"],
-            [],
-            ["mcp-config"],
-            ALL_AGENT_LABELS,
-        ]
-    )
-    answers = collect_answers(_partial(components_explicit=False), catalog=CATALOG, asker=asker)
-    assert answers.skills_items == frozenset()
-    assert answers.include_skills is False
-    assert answers.mcp_items == frozenset({"mcp-config"})
-    assert answers.include_mcp is True
+def test_category_prompt_cancel_raises_aborted() -> None:
+    with pytest.raises(AbortedError, match="Category selection prompt cancelled"):
+        collect_answers(
+            _partial(selection_explicit=False),
+            catalog=CATALOG,
+            asker=FakeAsker(checkboxes=[None]),
+        )
 
 
-def test_interactive_level2_cancel_raises_aborted() -> None:
-    asker = FakeAsker(
-        checkboxes=[
-            ["skills"],
-            None,
-        ]
-    )
-    with pytest.raises(AbortedError, match="skills item selection cancelled"):
-        collect_answers(_partial(components_explicit=False), catalog=CATALOG, asker=asker)
+def test_category_item_prompt_cancel_raises_aborted() -> None:
+    asker = FakeAsker(checkboxes=[_category_labels("dev"), None])
+
+    with pytest.raises(AbortedError, match="Category item selection cancelled"):
+        collect_answers(
+            _partial(selection_explicit=False), catalog=CATALOG, asker=asker
+        )
 
 
 def test_flags_explicit_path_no_prompts() -> None:
     partial = _partial(
-        components_explicit=True,
         selection=ProjectSelection.from_items(
             CATALOG,
             skills=frozenset({"caveman"}),
         ),
     )
     asker = FakeAsker()
+
     answers = collect_answers(partial, catalog=CATALOG, asker=asker)
+
     assert answers.skills_items == frozenset({"caveman"})
     assert answers.mcp_items == frozenset()
-    assert answers.include_skills is True
-    assert answers.include_mcp is False
     assert len(asker.checkbox_calls) == 0
 
 
@@ -319,10 +311,13 @@ def test_name_prompt_cancel_raises_aborted() -> None:
         collect_answers(_partial(project_name=None), asker=asker)
 
 
-def test_component_prompt_cancel_raises_aborted() -> None:
-    asker = FakeAsker(checkboxes=[None])
+def test_category_prompt_keyboard_interrupt_raises_aborted() -> None:
     with pytest.raises(AbortedError):
-        collect_answers(_partial(components_explicit=False), asker=asker)
+        collect_answers(
+            _partial(selection_explicit=False),
+            catalog=CATALOG,
+            asker=_RaisingAsker(),
+        )
 
 
 def test_name_prompt_keyboard_interrupt_raises_aborted() -> None:
@@ -340,14 +335,14 @@ def test_non_tty_missing_name_raises_invalid_arguments(monkeypatch: pytest.Monke
     assert "project name is required" in str(excinfo.value)
 
 
-def test_non_tty_missing_components_raises_invalid_arguments(
+def test_non_tty_missing_category_selection_raises_invalid_arguments(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(collect_module, "_is_interactive", lambda: False)
     with pytest.raises(InvalidArgumentsError) as excinfo:
-        collect_answers(_partial(components_explicit=False))
-    assert "component selection requires an interactive terminal" in str(excinfo.value)
-    assert "--no-handoff" not in str(excinfo.value)
+        collect_answers(_partial(selection_explicit=False))
+    assert "Category selection requires an interactive terminal" in str(excinfo.value)
+    assert "--categories" in str(excinfo.value)
 
 
 # --- interactive/flag path convergence (ADR-004) ---
@@ -364,26 +359,66 @@ def test_interactive_and_flag_paths_produce_identical_answers(tmp_path: Path) ->
         target_dir=target_dir,
         selection=ProjectSelection.from_items(
             CATALOG,
-            mcp=frozenset({"mcp-config"}),
+            mcp=frozenset({"code-memory"}),
+            categories=frozenset({"token-optimize"}),
+            docs=False,
         ),
         assume_yes=False,
     )
 
     asker = FakeAsker(
         texts=["my-app"],
-        checkboxes=[["mcp", "docs"], ["mcp-config"], ALL_AGENT_LABELS],
+        checkboxes=[
+            _category_labels("token-optimize"),
+            _item_labels("code-memory"),
+            ALL_AGENT_LABELS,
+        ],
     )
     prompt_answers = collect_answers(
         _partial(
             project_name=None,
             target_dir=target_dir,
-            components_explicit=False,
+            selection_explicit=False,
         ),
         catalog=CATALOG,
         asker=asker,
     )
 
     assert flag_answers == prompt_answers
+
+
+def test_design_skill_only_is_identical_through_flags_and_prompts(tmp_path: Path) -> None:
+    target_dir = tmp_path / "design-app"
+    flag_selection = ProjectSelection.from_flags(
+        catalog=CATALOG,
+        categories="design",
+        category_items={"design": "frontend-design"},
+    )
+    assert flag_selection is not None
+    flag_answers = Answers(
+        project_name="design-app",
+        target_dir=target_dir,
+        selection=flag_selection,
+    )
+
+    prompt_answers = collect_answers(
+        _partial(
+            project_name="design-app",
+            target_dir=target_dir,
+            selection_explicit=False,
+        ),
+        catalog=CATALOG,
+        asker=FakeAsker(
+            checkboxes=[
+                _category_labels("design"),
+                _item_labels("frontend-design"),
+                ALL_AGENT_LABELS,
+            ]
+        ),
+    )
+
+    assert flag_answers == prompt_answers
+    assert flag_answers.includes("docs") is False
 
 
 def test_non_tty_with_asker_injected_still_prompts(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -421,7 +456,7 @@ def test_collect_answers_never_constructs_default_asker_when_nothing_missing(
         raise AssertionError("_default_asker should not be called")
 
     monkeypatch.setattr(collect_module, "_default_asker", _boom)
-    collect_answers(_partial(project_name="my-app", components_explicit=True))
+    collect_answers(_partial(project_name="my-app", selection_explicit=True))
 
 
 # --- confirmation ---
@@ -468,6 +503,19 @@ def test_render_confirmation_summary_omits_removed_handoff() -> None:
     summary = _render_confirmation_summary(_answers(), PIN)
 
     assert "handoff" not in summary
+
+
+def test_render_confirmation_summary_names_categories_and_items() -> None:
+    from dev_ready.prompts.collect import _render_confirmation_summary
+
+    summary = _render_confirmation_summary(_answers(), PIN)
+
+    assert "categories:" in summary
+    assert "token-optimize" in summary
+    assert "selected items:" in summary
+    assert "caveman" in summary
+    assert "code-memory" in summary
+    assert "components:" not in summary
 
 
 def test_render_confirmation_summary_includes_resolved_agent_targets() -> None:

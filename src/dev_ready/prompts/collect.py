@@ -7,7 +7,7 @@ which never calls into this module at all) never triggers the import.
 """
 
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from pathlib import Path
 
 from dev_ready.errors import AbortedError, InvalidArgumentsError
@@ -16,9 +16,6 @@ from dev_ready.prompts.answers import Answers, PartialAnswers, ProjectSelection,
 from dev_ready.prompts.asker import Asker
 
 __all__ = ["collect_answers", "confirm_generation"]
-
-_COMPONENT_CHOICES = ("skills", "mcp", "docs")
-
 
 def _is_interactive() -> bool:
     return sys.stdin.isatty()
@@ -44,21 +41,21 @@ def collect_answers(
     is not a TTY (and no `asker` was injected).
     """
     needs_name = partial.project_name is None
-    needs_components = partial.selection is None
+    needs_selection = partial.selection is None
 
     if needs_name and asker is None and not _is_interactive():
         raise InvalidArgumentsError(
             "project name is required: dev-ready init <project-name> "
             "(or run in an interactive terminal to be prompted, or pass --yes)"
         )
-    if needs_components and asker is None and not _is_interactive():
+    if needs_selection and asker is None and not _is_interactive():
         raise InvalidArgumentsError(
-            "component selection requires an interactive terminal — pass "
-            "--no-skills/--no-mcp/--no-docs explicitly, or use --yes"
+            "Category selection requires an interactive terminal — pass "
+            "--categories with per-Category item flags, or use --yes"
         )
 
     resolved_asker = asker
-    if (needs_name or needs_components) and resolved_asker is None:
+    if (needs_name or needs_selection) and resolved_asker is None:
         resolved_asker = _default_asker()
 
     project_name = partial.project_name
@@ -66,36 +63,34 @@ def collect_answers(
         assert resolved_asker is not None
         project_name = _prompt_project_name(resolved_asker)
 
-    if needs_components:
+    if needs_selection:
         assert resolved_asker is not None
-        skills_on, mcp_on, include_docs = _prompt_components(resolved_asker)
-        if catalog is not None:
-            if skills_on and "skills" in catalog and catalog["skills"]:
-                skills_items = _prompt_items(
-                    resolved_asker, "skills", [item.id for item in catalog["skills"]]
-                )
-            else:
-                skills_items = frozenset()
-
-            if mcp_on and "mcp" in catalog and catalog["mcp"]:
-                mcp_items = _prompt_items(
-                    resolved_asker, "mcp", [item.id for item in catalog["mcp"]]
-                )
-            else:
-                mcp_items = frozenset()
-
-        else:
-            skills_items = frozenset()
-            mcp_items = frozenset()
-        if catalog is None and (skills_on or mcp_on):
-            raise InvalidArgumentsError("catalog is required to validate selected items")
-        agent_targets = _prompt_agent_targets(resolved_asker, catalog or {})
+        if catalog is None:
+            raise InvalidArgumentsError("catalog is required for Category selection")
+        selected_categories = _prompt_categories(resolved_asker, catalog)
+        selected_item_ids = _prompt_category_items(
+            resolved_asker,
+            catalog,
+            selected_categories,
+        )
+        selected_by_component = {
+            component: frozenset(
+                item.id
+                for item in catalog.get(component, ())
+                if item.id in selected_item_ids
+            )
+            for component in ("skills", "mcp", "docs")
+        }
+        agent_targets = _prompt_agent_targets(resolved_asker, catalog)
         selection = ProjectSelection.from_items(
-            catalog or {},
-            skills=skills_items if skills_on else frozenset(),
-            mcp=mcp_items if mcp_on else frozenset(),
+            catalog,
+            skills=selected_by_component["skills"],
+            mcp=selected_by_component["mcp"],
+            docs_items=selected_by_component["docs"],
+            categories=selected_categories,
             agent_targets=agent_targets,
-            docs=include_docs,
+            docs=bool(selected_by_component["docs"])
+            or ("design" in selected_categories and not catalog.get("docs")),
         )
     else:
         assert partial.selection is not None
@@ -137,18 +132,13 @@ def confirm_generation(
 
 
 def _render_confirmation_summary(answers: Answers, pin: UpstreamPin) -> str:
-    comp_parts = []
-    if answers.includes("skills"):
-        skills = answers.items("skills")
-        skills_str = ", ".join(sorted(skills)) if skills else "(none)"
-        comp_parts.append(f"skills ({skills_str})")
-    if answers.includes("mcp"):
-        mcp = answers.items("mcp")
-        mcp_str = ", ".join(sorted(mcp)) if mcp else "(none)"
-        comp_parts.append(f"mcp ({mcp_str})")
-    if answers.includes("docs"):
-        comp_parts.append("docs")
-    components_line = ", ".join(comp_parts) if comp_parts else "(none)"
+    categories_line = ", ".join(sorted(answers.selection.categories)) or "(none)"
+    selected_items = set().union(
+        answers.items("skills"),
+        answers.items("mcp"),
+        answers.items("docs"),
+    )
+    items_line = ", ".join(sorted(selected_items)) or "(none)"
     targets_line = ", ".join(sorted(answers.agent_targets)) or "(none)"
     return "\n".join(
         [
@@ -156,7 +146,8 @@ def _render_confirmation_summary(answers: Answers, pin: UpstreamPin) -> str:
             f"  project name: {answers.project_name}",
             f"  target dir:   {answers.target_dir}",
             f"  upstream:     {pin.repo}@{pin.commit[:12]}",
-            f"  components:   {components_line}",
+            f"  categories:   {categories_line}",
+            f"  selected items: {items_line}",
             f"  agent targets: {targets_line}",
         ]
     )
@@ -183,29 +174,45 @@ def _prompt_project_name(asker: Asker) -> str:
         )
 
 
-def _prompt_components(asker: Asker) -> tuple[bool, bool, bool]:
+def _prompt_categories(
+    asker: Asker,
+    catalog: Mapping[str, tuple[CatalogItem, ...]],
+) -> frozenset[str]:
+    categories = getattr(catalog, "categories", {})
+    labels = {
+        f"{category_id}: {category.description}": category_id
+        for category_id, category in categories.items()
+    }
     try:
-        selected = asker.checkbox("Select components to include:", _COMPONENT_CHOICES)
+        selected = asker.checkbox("Select Categories to include:", tuple(labels))
     except KeyboardInterrupt:
         selected = None
     if selected is None:
-        raise AbortedError("component selection prompt cancelled")
-    selected_set = set(selected)
-    return (
-        "skills" in selected_set,
-        "mcp" in selected_set,
-        "docs" in selected_set,
-    )
+        raise AbortedError("Category selection prompt cancelled")
+    return frozenset(labels[label] for label in selected)
 
 
-def _prompt_items(asker: Asker, component: str, item_ids: Sequence[str]) -> frozenset[str]:
+def _prompt_category_items(
+    asker: Asker,
+    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    selected_categories: frozenset[str],
+) -> frozenset[str]:
+    labels = {
+        f"{item.category}: {item.id} — {item.description}": item.id
+        for component_items in catalog.values()
+        for item in component_items
+        if item.category in selected_categories
+    }
     try:
-        selected = asker.checkbox(f"Select {component} items to include:", item_ids)
+        selected = asker.checkbox(
+            "Select items within the chosen Categories:",
+            tuple(labels),
+        )
     except KeyboardInterrupt:
         selected = None
     if selected is None:
-        raise AbortedError(f"{component} item selection cancelled")
-    return frozenset(selected)
+        raise AbortedError("Category item selection cancelled")
+    return frozenset(labels[label] for label in selected)
 
 
 def _prompt_agent_targets(

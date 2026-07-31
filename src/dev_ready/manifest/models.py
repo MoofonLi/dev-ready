@@ -55,11 +55,20 @@ class VendoredPin:
 
 
 @dataclass(frozen=True)
+class Category:
+    """One user-facing catalog grouping."""
+
+    id: str
+    description: str
+
+
+@dataclass(frozen=True)
 class CatalogItem:
     id: str
     description: str
     mode: str
     license: str
+    category: str = ""
     paths: tuple[ItemPath, ...] = ()
     pin: str | None = None
     effect: CatalogEffect | None = None
@@ -85,9 +94,11 @@ class ComponentCatalog(dict[str, tuple[CatalogItem, ...]]):
         self,
         components: Mapping[str, tuple[CatalogItem, ...]],
         agent_targets: Mapping[str, AgentTarget],
+        categories: Mapping[str, Category] | None = None,
     ) -> None:
         super().__init__(components)
         self.agent_targets = dict(agent_targets)
+        self.categories = dict(categories or {})
 
 
 @dataclass(frozen=True)
@@ -99,6 +110,7 @@ class Manifest:
     overlay_version: str
     components: ComponentCatalog
     agent_targets: dict[str, AgentTarget]
+    categories: dict[str, Category]
     vendored: tuple[VendoredPin, ...] = ()
 
 

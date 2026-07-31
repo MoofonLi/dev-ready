@@ -13,6 +13,14 @@ from dev_ready.manifest import (
 
 VALID = {
     "manifest_version": 1,
+    "categories": {
+        "dev": {
+            "description": "Development methods for planning, implementation, and review."
+        },
+        "token-optimize": {
+            "description": "Tools that reduce agent context use and improve codebase recall."
+        },
+    },
     "agent_targets": {
         "claude": {
             "description": "Claude Code native project configuration.",
@@ -35,6 +43,7 @@ VALID = {
             "items": [
                 {
                     "id": "sample-skill",
+                    "category": "dev",
                     "description": "Sample skill for manifest parsing.",
                     "mode": "builtin",
                     "license": "MIT",
@@ -51,6 +60,7 @@ VALID = {
             "items": [
                 {
                     "id": "mcp-config",
+                    "category": "token-optimize",
                     "description": "Base .mcp.json MCP server configuration for the generated project.",
                     "mode": "builtin",
                     "license": "MIT",
@@ -58,6 +68,7 @@ VALID = {
                 }
             ]
         },
+        "docs": {"items": []},
     },
     "overlay_version": "0.1.0",
 }
@@ -67,6 +78,9 @@ def test_parse_valid_manifest() -> None:
     manifest = parse_manifest(json.dumps(VALID))
     assert manifest.manifest_version == 1
     assert manifest.overlay_version == "0.1.0"
+    assert set(manifest.categories) == {"dev", "token-optimize"}
+    assert manifest.categories["dev"].id == "dev"
+    assert manifest.categories["dev"].description.startswith("Development methods")
     claude = manifest.agent_targets["claude"]
     assert claude.skills_dir == ".claude/skills"
     assert claude.rules_file == "CLAUDE.md"
@@ -79,6 +93,7 @@ def test_parse_valid_manifest() -> None:
     assert len(manifest.components["skills"]) == 1
     skill = manifest.components["skills"][0]
     assert skill.id == "sample-skill"
+    assert skill.category == "dev"
     assert skill.mode == "builtin"
     assert skill.license == "MIT"
     assert skill.paths[0].src == "claude/skills/sample-skill"
@@ -86,10 +101,47 @@ def test_parse_valid_manifest() -> None:
     assert len(manifest.components["mcp"]) == 1
     mcp = manifest.components["mcp"][0]
     assert mcp.id == "mcp-config"
+    assert mcp.category == "token-optimize"
     assert mcp.mode == "builtin"
     assert mcp.license == "MIT"
     assert mcp.paths[0].src == "mcp/mcp.json"
     assert mcp.paths[0].dest == ".mcp.json"
+
+
+def test_catalog_item_requires_a_category() -> None:
+    data = json.loads(json.dumps(VALID))
+    del data["components"]["skills"]["items"][0]["category"]
+
+    with pytest.raises(ManifestError, match="item 'sample-skill'.*category"):
+        parse_manifest(json.dumps(data))
+
+    data["components"]["skills"]["items"][0]["category"] = "dev"
+    assert parse_manifest(json.dumps(data)).components["skills"][0].category == "dev"
+
+
+def test_catalog_item_category_must_be_declared() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["category"] = "unknown"
+
+    with pytest.raises(ManifestError, match="item 'sample-skill'.*unknown category"):
+        parse_manifest(json.dumps(data))
+
+    data["components"]["skills"]["items"][0]["category"] = "dev"
+    assert parse_manifest(json.dumps(data)).components["skills"][0].category == "dev"
+
+
+def test_declared_category_must_contain_an_item() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["categories"]["security"] = {
+        "description": "Tools for finding and reducing security risks."
+    }
+
+    with pytest.raises(ManifestError, match="category 'security'.*no catalog items"):
+        parse_manifest(json.dumps(data))
+
+    data["components"]["skills"]["items"][0]["category"] = "security"
+    del data["categories"]["dev"]
+    assert "security" in parse_manifest(json.dumps(data)).categories
 
 
 def test_default_manifest_declares_verified_claude_and_windsurf_targets() -> None:
@@ -102,6 +154,30 @@ def test_default_manifest_declares_verified_claude_and_windsurf_targets() -> Non
     assert targets["windsurf"].skills_dir == ".windsurf/skills"
     assert targets["windsurf"].rules_file is None
     assert targets["windsurf"].mcp_file is None
+
+
+def test_default_manifest_declares_category_assignments() -> None:
+    manifest = load_default_manifest()
+    items = {
+        item.id: item
+        for component_items in manifest.components.values()
+        for item in component_items
+    }
+
+    assert set(manifest.categories) == {
+        "dev",
+        "security",
+        "quality",
+        "design",
+        "token-optimize",
+    }
+    assert items["spec-loop"].category == "dev"
+    assert items["security-audit"].category == "security"
+    assert items["react-doctor"].category == "quality"
+    assert items["webapp-testing"].category == "quality"
+    assert items["frontend-design"].category == "design"
+    assert items["caveman"].category == "token-optimize"
+    assert items["code-memory"].category == "token-optimize"
 
 
 @pytest.mark.parametrize("field", ["skills_dir", "rules_file", "mcp_file"])
@@ -152,6 +228,7 @@ def _add_required_skill(
     assert isinstance(items, list)
     item: dict[str, object] = {
         "id": item_id,
+        "category": "dev",
         "description": f"{item_id} skill",
         "mode": "builtin",
         "license": "MIT",
@@ -444,7 +521,7 @@ def test_missing_components_rejected() -> None:
 
 def test_unknown_component_key_rejected() -> None:
     data = json.loads(json.dumps(VALID))
-    data["components"]["docs"] = {"items": []}
+    data["components"]["unknown"] = {"items": []}
     with pytest.raises(ManifestError, match="unknown component key"):
         parse_manifest(json.dumps(data))
 
@@ -512,6 +589,7 @@ def test_valid_pinned_dependency_mcp_server() -> None:
     data = json.loads(json.dumps(VALID))
     data["components"]["mcp"]["items"].append({
         "id": "code-memory",
+        "category": "token-optimize",
         "description": "Codebase memory server",
         "mode": "pinned-dependency",
         "license": "MIT",
@@ -538,6 +616,7 @@ def test_valid_pinned_dependency_npm_dev_dependency() -> None:
     data = json.loads(json.dumps(VALID))
     data["components"]["skills"]["items"].append({
         "id": "react-doctor",
+        "category": "dev",
         "description": "React doctor skill",
         "mode": "pinned-dependency",
         "license": "MIT",
@@ -563,6 +642,7 @@ def test_malformed_pin_rejected(bad_pin: str) -> None:
     data = json.loads(json.dumps(VALID))
     data["components"]["mcp"]["items"].append({
         "id": "code-memory",
+        "category": "token-optimize",
         "description": "Codebase memory server",
         "mode": "pinned-dependency",
         "license": "MIT",
@@ -583,6 +663,7 @@ def test_pinned_dependency_without_pin_rejected() -> None:
     data = json.loads(json.dumps(VALID))
     data["components"]["mcp"]["items"].append({
         "id": "code-memory",
+        "category": "token-optimize",
         "description": "Codebase memory server",
         "mode": "pinned-dependency",
         "license": "MIT",
@@ -622,6 +703,7 @@ def test_unknown_inject_kind_rejected() -> None:
     data = json.loads(json.dumps(VALID))
     data["components"]["mcp"]["items"].append({
         "id": "code-memory",
+        "category": "token-optimize",
         "description": "Codebase memory server",
         "mode": "pinned-dependency",
         "license": "MIT",
@@ -640,6 +722,7 @@ def test_mcp_server_missing_server_name_rejected() -> None:
     data = json.loads(json.dumps(VALID))
     data["components"]["mcp"]["items"].append({
         "id": "code-memory",
+        "category": "token-optimize",
         "description": "Codebase memory server",
         "mode": "pinned-dependency",
         "license": "MIT",
@@ -659,6 +742,7 @@ def test_npm_dev_dependency_missing_scripts_rejected() -> None:
     data = json.loads(json.dumps(VALID))
     data["components"]["skills"]["items"].append({
         "id": "react-doctor",
+        "category": "dev",
         "description": "React doctor skill",
         "mode": "pinned-dependency",
         "license": "MIT",
@@ -678,6 +762,7 @@ def test_inject_target_traversal_rejected() -> None:
     data = json.loads(json.dumps(VALID))
     data["components"]["mcp"]["items"].append({
         "id": "code-memory",
+        "category": "token-optimize",
         "description": "Codebase memory server",
         "mode": "pinned-dependency",
         "license": "MIT",
@@ -698,6 +783,7 @@ def test_item_with_neither_paths_nor_inject_rejected() -> None:
     data = json.loads(json.dumps(VALID))
     data["components"]["mcp"]["items"].append({
         "id": "empty-item",
+        "category": "token-optimize",
         "description": "Empty item",
         "mode": "pinned-dependency",
         "license": "MIT",
@@ -707,12 +793,18 @@ def test_item_with_neither_paths_nor_inject_rejected() -> None:
         parse_manifest(json.dumps(data))
 
 
-def test_builtin_items_regression() -> None:
+def test_default_catalog_excludes_mcp_infrastructure() -> None:
     manifest = load_default_manifest()
     mcp_items = {item.id: item for item in manifest.components["mcp"]}
     assert "code-memory" in mcp_items
     assert mcp_items["code-memory"].pin == "0.9.0"
-    assert mcp_items["mcp-config"].pin is None
+    assert "mcp-config" not in mcp_items
+    docs_items = {item.id: item for item in manifest.components["docs"]}
+    assert set(docs_items) == {"design-stripe", "design-linear"}
+    assert docs_items["design-stripe"].category == "design"
+    assert docs_items["design-stripe"].paths[0].dest == "docs/design-stripe.md"
+    assert docs_items["design-linear"].category == "design"
+    assert docs_items["design-linear"].paths[0].dest == "docs/design-linear.md"
     skills_items = {item.id: item for item in manifest.components["skills"]}
     assert "react-doctor" in skills_items
     assert skills_items["react-doctor"].pin == "0.8.1"
@@ -822,6 +914,7 @@ def test_vendor_mode_item_without_vendored_repo_rejected() -> None:
     data["vendored"] = [VALID_VENDORED_ENTRY]
     data["components"]["skills"]["items"].append({
         "id": "caveman",
+        "category": "dev",
         "description": "Caveman skill",
         "mode": "vendor",
         "license": "MIT",
@@ -836,6 +929,7 @@ def test_vendor_mode_item_dangling_vendored_repo_rejected() -> None:
     data["vendored"] = [VALID_VENDORED_ENTRY]
     data["components"]["skills"]["items"].append({
         "id": "caveman",
+        "category": "dev",
         "description": "Caveman skill",
         "mode": "vendor",
         "license": "MIT",
@@ -851,6 +945,7 @@ def test_vendored_repo_on_non_vendor_item_rejected() -> None:
     data["vendored"] = [VALID_VENDORED_ENTRY]
     data["components"]["skills"]["items"].append({
         "id": "builtin-skill",
+        "category": "dev",
         "description": "Builtin skill with vendored_repo",
         "mode": "builtin",
         "license": "MIT",

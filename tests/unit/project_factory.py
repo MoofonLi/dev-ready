@@ -44,7 +44,7 @@ def materialize_project_structure(
     if selection.docs:
         (root / "docs").mkdir(exist_ok=True)
 
-    for name in ("skills", "mcp"):
+    for name in ("skills", "mcp", "docs"):
         selected = selection.items(name)
         for item in catalog.get(name, ()):
             if item.id not in selected:

@@ -8,6 +8,7 @@ import pytest
 
 from dev_ready.cli import main
 from dev_ready import __version__
+from dev_ready.errors import StampInvalidError
 from dev_ready.manifest import load_default_manifest
 from dev_ready.prompts import ProjectSelection
 from dev_ready.stamp import load_stamp
@@ -77,6 +78,8 @@ def _create_minimal_valid_project(project_dir: Path, stamp_version: int = 2) -> 
         }
         if stamp_version >= 4:
             stamp_data["agent_targets"] = sorted(selection.agent_targets)
+        if stamp_version >= 5:
+            stamp_data["categories"] = sorted(selection.categories)
 
     (project_dir / ".dev-ready.json").write_text(json.dumps(stamp_data, indent=2) + "\n", encoding="utf-8")
 
@@ -104,6 +107,13 @@ def test_check_fresh_v1_project(tmp_path: Path, capsys: pytest.CaptureFixture[st
     assert exit_code == 0
     captured = capsys.readouterr()
     assert "Status: CLEAN" in captured.out
+
+
+def test_check_fresh_v5_project(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=5)
+
+    assert main(["check", str(tmp_path)]) == 0
+    assert "Status: CLEAN" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
@@ -191,13 +201,66 @@ def test_check_future_stamp_version(tmp_path: Path, capsys: pytest.CaptureFixtur
     _create_minimal_valid_project(tmp_path, stamp_version=2)
     stamp_path = tmp_path / ".dev-ready.json"
     data = json.loads(stamp_path.read_text(encoding="utf-8"))
-    data["stamp_version"] = 5
+    data["stamp_version"] = 6
     stamp_path.write_text(json.dumps(data), encoding="utf-8")
 
     exit_code = main(["check", str(tmp_path)])
     assert exit_code == 6
     captured = capsys.readouterr()
-    assert "unsupported stamp_version 5" in captured.err
+    assert "unsupported stamp_version 6" in captured.err
+
+
+def test_malformed_v5_categories_raise_typed_stamp_error(tmp_path: Path) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=5)
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["categories"] = "design"
+    stamp_path.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(StampInvalidError, match="categories.*list of identifiers"):
+        load_stamp(tmp_path)
+
+
+def test_v5_stamp_loads_selected_docs_items(tmp_path: Path) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=5)
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["components"]["docs"] = {
+        "included": True,
+        "items": [{"id": "design-stripe", "pin": "a" * 40}],
+    }
+    stamp_path.write_text(json.dumps(data), encoding="utf-8")
+
+    stamp = load_stamp(tmp_path)
+
+    assert [(item.id, item.pin) for item in stamp.docs_items] == [
+        ("design-stripe", "a" * 40)
+    ]
+
+
+def test_check_v5_uses_the_recorded_docs_item_selection(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    manifest = load_default_manifest()
+    selection = ProjectSelection.from_items(
+        manifest.components,
+        docs_items=frozenset({"design-stripe"}),
+        docs=True,
+    )
+    materialize_project_structure(tmp_path, manifest.components, selection)
+    _create_minimal_valid_project(tmp_path, stamp_version=5)
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["categories"] = ["design"]
+    data["components"]["docs"] = {
+        "included": True,
+        "items": [{"id": "design-stripe", "pin": None}],
+    }
+    stamp_path.write_text(json.dumps(data), encoding="utf-8")
+
+    assert main(["check", str(tmp_path)]) == 0
+    assert "Status: CLEAN" in capsys.readouterr().out
 
 
 def test_v4_stamp_requires_agent_target_state(

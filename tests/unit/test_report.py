@@ -73,7 +73,7 @@ def test_report_states_selected_target_artifacts_and_manual_windsurf_mcp() -> No
         selection=ProjectSelection.from_items(
             CATALOG,
             skills=frozenset({"caveman"}),
-            mcp=frozenset({"mcp-config"}),
+            mcp=frozenset({"code-memory"}),
             agent_targets=frozenset({"claude", "windsurf"}),
         ),
     )

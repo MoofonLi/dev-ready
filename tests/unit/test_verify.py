@@ -23,7 +23,7 @@ def _answers(
     tmp_path: Path,
     *,
     skills_items: frozenset[str] = frozenset({"caveman"}),
-    mcp_items: frozenset[str] = frozenset({"mcp-config"}),
+    mcp_items: frozenset[str] = frozenset({"code-memory"}),
 ) -> Answers:
     return Answers(
         project_name="my-app",
@@ -137,13 +137,19 @@ def test_verify_rejects_missing_canonical_rules(tmp_path: Path) -> None:
         verify_project(tmp_path, ans, CATALOG)
 
 
-def test_verify_raises_when_unselected_item_path_is_present(tmp_path: Path) -> None:
+def test_verify_raises_when_unselected_mcp_effect_is_present(tmp_path: Path) -> None:
     ans = _answers(tmp_path, mcp_items=frozenset())
     _make_complete_project(tmp_path, ans)
-    # create .mcp.json which should not be present when mcp_items is empty
-    (tmp_path / ".mcp.json").write_text("stub", encoding="utf-8")
+    (tmp_path / ".mcp.json").write_text(
+        '{"mcpServers":{"codebase-memory":{"command":"uvx",'
+        '"args":["codebase-memory-mcp==0.9.0"]}}}',
+        encoding="utf-8",
+    )
 
-    with pytest.raises(VerificationError, match="unselected mcp item 'mcp-config' left path"):
+    with pytest.raises(
+        VerificationError,
+        match="unselected mcp item 'code-memory' left inject effect",
+    ):
         verify_project(tmp_path, ans, CATALOG)
 
 
@@ -159,7 +165,7 @@ def test_verify_selection_matrix_all_on(tmp_path: Path) -> None:
     ans = _answers(
         tmp_path,
         skills_items=frozenset({"caveman", "react-doctor"}),
-        mcp_items=frozenset({"mcp-config", "code-memory"}),
+        mcp_items=frozenset({"code-memory"}),
     )
     _make_complete_project(tmp_path, ans)
     verify_project(tmp_path, ans, CATALOG)  # must not raise
@@ -177,13 +183,13 @@ def test_verify_selection_matrix_mixed_and_negative(tmp_path: Path) -> None:
     ans = _answers(
         tmp_path,
         skills_items=frozenset({"react-doctor"}),
-        mcp_items=frozenset({"mcp-config"}),
+        mcp_items=frozenset(),
     )
     _make_complete_project(tmp_path, ans)
     verify_project(tmp_path, ans, CATALOG)  # passes
 
     # Leaked code-memory server entry while code-memory is unselected -> raises
-    mcp_json = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
+    mcp_json: dict[str, object] = {}
     mcp_json.setdefault("mcpServers", {})["codebase-memory"] = {
         "command": "uvx",
         "args": ["codebase-memory-mcp==0.9.0"],

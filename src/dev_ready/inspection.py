@@ -139,7 +139,7 @@ def inspect_project(
                 )
             )
 
-    for name in ("skills", "mcp"):
+    for name in ("skills", "mcp", "docs"):
         selected = expectation.selection.items(name)
         for item in catalog.get(name, ()):
             if name == "mcp" and isinstance(catalog, ComponentCatalog):

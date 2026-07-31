@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 import dev_ready.upgrade as upgrade_module
-import dev_ready.overlay as overlay_module
+import dev_ready.overlay.stamp_rendering as stamp_rendering_module
 from dev_ready.cli import main
 from dev_ready.errors import UpgradeError, UpgradeNotSupportedError
 from dev_ready.inspection import REQUIRED_UPSTREAM_PATHS
@@ -34,7 +34,7 @@ def _snapshot(root: Path) -> dict[str, str]:
 def _make_project(tmp_path: Path, *, code_memory: bool = False) -> Path:
     project = tmp_path / "project"
     project.mkdir()
-    mcp_items = frozenset({"mcp-config", "code-memory"} if code_memory else {"mcp-config"})
+    mcp_items = frozenset({"code-memory"} if code_memory else set())
     answers = Answers(
         project_name="upgrade-app",
         target_dir=project,
@@ -316,9 +316,23 @@ def test_upgrade_rewrites_v3_stamp_inventory(tmp_path: Path) -> None:
     _set_inventory_hash(project, "CLAUDE.md", old)
     upgrade_project(project)
     stamp = load_stamp(project)
-    assert stamp.stamp_version == 4
+    assert stamp.stamp_version == 5
     inventory = {entry.path: entry.sha256 for entry in stamp.inventory}
     assert inventory["CLAUDE.md"] == hashlib.sha256((project / "CLAUDE.md").read_bytes()).hexdigest()
+
+
+def test_upgrade_keeps_a_v4_record_at_v4(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["stamp_version"] = 4
+    data.pop("categories")
+    data["components"]["docs"].pop("items", None)
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    upgrade_project(project)
+
+    assert load_stamp(project).stamp_version == 4
 
 
 def test_upgrade_preserves_recorded_base_provenance(tmp_path: Path) -> None:
@@ -339,7 +353,7 @@ def test_upgrade_advances_overlay_currency_without_adding_new_defaults(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project = _make_project(tmp_path)
-    monkeypatch.setattr(overlay_module, "__version__", "0.7.0")
+    monkeypatch.setattr(stamp_rendering_module, "__version__", "0.7.0")
 
     upgrade_project(project)
 
@@ -470,6 +484,7 @@ def test_pre_target_stamp_migrates_to_canonical_claude_layout(tmp_path: Path) ->
     assert not stub.is_symlink()
     assert not (project / ".windsurf").exists()
     migrated = load_stamp(project)
+    assert migrated.stamp_version == 4
     assert migrated.agent_targets == ("claude",)
     assert migrated.upstream == old_provenance
     assert main(["check", str(project)]) == 0

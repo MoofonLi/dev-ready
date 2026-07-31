@@ -40,12 +40,13 @@ def _init_args(**overrides) -> argparse.Namespace:
         "project_name": "my-app",
         "yes": False,
         "target_dir": None,
-        "skills": None,
-        "mcp": None,
+        "categories": None,
+        "dev": None,
+        "security": None,
+        "quality": None,
+        "design": None,
+        "token_optimize": None,
         "agents": None,
-        "no_skills": False,
-        "no_mcp": False,
-        "no_docs": False,
     }
     defaults.update(overrides)
     return argparse.Namespace(**defaults)
@@ -271,9 +272,8 @@ def test_init_success_omits_disabled_components_from_summary(
                 "--yes",
                 "--dir",
                 str(tmp_path / "my-app"),
-                "--no-skills",
-                "--no-mcp",
-                "--no-docs",
+                "--categories",
+                "none",
             ]
         )
         == 0
@@ -326,8 +326,8 @@ def test_init_flags_reach_generate_via_answers(
             "--yes",
             "--dir",
             str(target_dir),
-            "--no-skills",
-            "--no-mcp",
+            "--categories",
+            "none",
         ]
     )
 
@@ -336,7 +336,7 @@ def test_init_flags_reach_generate_via_answers(
     assert answers.target_dir == target_dir
     assert answers.include_skills is False
     assert answers.include_mcp is False
-    assert answers.include_docs is True
+    assert answers.include_docs is False
     assert answers.assume_yes is True
 
 
@@ -359,14 +359,14 @@ def test_build_answers_defaults() -> None:
             "frontend-design",
         }
     )
-    assert answers.mcp_items == frozenset({"mcp-config", "code-memory"})
+    assert answers.mcp_items == frozenset({"code-memory"})
     assert answers.include_docs is True
     assert answers.assume_yes is False
 
 
 def test_build_answers_respects_flags(tmp_path) -> None:
     answers = build_answers(
-        _init_args(yes=True, target_dir=tmp_path / "out", no_skills=True, no_mcp=True),
+        _init_args(yes=True, target_dir=tmp_path / "out", categories="none"),
         CATALOG,
     )
     assert answers.target_dir == tmp_path / "out"
@@ -374,7 +374,7 @@ def test_build_answers_respects_flags(tmp_path) -> None:
     assert answers.include_mcp is False
     assert answers.skills_items == frozenset()
     assert answers.mcp_items == frozenset()
-    assert answers.include_docs is True
+    assert answers.include_docs is False
     assert answers.assume_yes is True
 
 
@@ -386,29 +386,42 @@ def test_parser_accepts_all_documented_flags() -> None:
             "-y",
             "--dir",
             "x",
-            "--skills",
+            "--categories",
+            "dev,token-optimize",
+            "--dev",
+            "tdd",
+            "--token-optimize",
             "caveman",
-            "--mcp",
-            "none",
             "--agents",
             "claude,windsurf",
-            "--no-docs",
         ]
     )
     assert args.command == "init"
     assert args.yes is True
     assert args.target_dir == Path("x")
-    assert args.skills == "caveman"
-    assert args.mcp == "none"
+    assert args.categories == "dev,token-optimize"
+    assert args.dev == "tdd"
+    assert args.token_optimize == "caveman"
     assert args.agents == "claude,windsurf"
-    assert args.no_docs is True
     assert not hasattr(args, "no_handoff")
     assert not hasattr(args, "no_agents")
 
 
-@pytest.mark.parametrize("removed_flag", ["--no-handoff", "--no-agents"])
-def test_removed_handoff_flags_exit_2_before_generation(
+@pytest.mark.parametrize(
+    ("removed_flag", "replacement"),
+    [
+        ("--no-handoff", "Handoff Protocol"),
+        ("--no-agents", "Handoff Protocol"),
+        ("--skills", "--categories"),
+        ("--mcp", "--token-optimize"),
+        ("--no-skills", "--categories"),
+        ("--no-mcp", "--token-optimize none"),
+        ("--no-docs", "--design none"),
+    ],
+)
+def test_removed_selection_flags_exit_2_before_generation(
     removed_flag: str,
+    replacement: str,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -426,7 +439,7 @@ def test_removed_handoff_flags_exit_2_before_generation(
     error = capsys.readouterr().err
     assert removed_flag in error
     assert "removed" in error
-    assert "Handoff Protocol" in error
+    assert replacement in error
 
 
 def test_agents_flag_reaches_generation_as_resolved_target_selection(
@@ -503,62 +516,80 @@ def test_upgrade_missing_stamp_exits_6(tmp_path: Path, capsys: pytest.CaptureFix
     assert "missing .dev-ready.json" in capsys.readouterr().err
 
 
-def test_skills_and_mcp_item_flag_variations() -> None:
-    # --skills all / --mcp none
-    ans = build_answers(_init_args(skills="all", mcp="none"), CATALOG)
+def test_category_item_flag_variations() -> None:
+    ans = build_answers(
+        _init_args(
+            categories="dev,token-optimize",
+            dev="all",
+            token_optimize="none",
+        ),
+        CATALOG,
+    )
     assert ans.skills_items == frozenset(
         {
-            "react-doctor",
-            "caveman",
-                "security-audit",
-                "spec-loop",
-                "tdd",
+            "spec-loop",
+            "tdd",
             "diagnosing-bugs",
             "code-review",
-            "webapp-testing",
-            "frontend-design",
         }
     )
     assert ans.mcp_items == frozenset()
     assert ans.include_skills is True
     assert ans.include_mcp is False
 
-    # --skills caveman / --mcp mcp-config
-    ans2 = build_answers(_init_args(skills="caveman", mcp="mcp-config"), CATALOG)
+    ans2 = build_answers(
+        _init_args(
+            categories="token-optimize",
+            token_optimize="caveman,code-memory",
+        ),
+        CATALOG,
+    )
     assert ans2.skills_items == frozenset({"caveman"})
-    assert ans2.mcp_items == frozenset({"mcp-config"})
+    assert ans2.mcp_items == frozenset({"code-memory"})
 
 
 def test_unknown_item_id_exits_2(capsys) -> None:
-    assert main(["init", "my-app", "--yes", "--skills", "bogus"]) == 2
+    assert main(["init", "my-app", "--yes", "--security", "bogus"]) == 2
     err = capsys.readouterr().err
-    assert "unknown skills item ids: ['bogus']" in err
-    assert "valid ids: ['caveman', 'code-review', 'diagnosing-bugs', 'frontend-design', 'react-doctor', 'security-audit', 'spec-loop', 'tdd', 'webapp-testing']" in err
+    assert "unknown Security item ids: ['bogus']" in err
+    assert "valid ids: ['security-audit']" in err
 
 
 def test_removed_project_orientation_id_uses_standard_unknown_item_error(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main(["init", "my-app", "--yes", "--skills", "project-orientation"]) == 2
+    assert main(["init", "my-app", "--yes", "--dev", "project-orientation"]) == 2
     error = capsys.readouterr().err
-    assert "unknown skills item ids: ['project-orientation']" in error
+    assert "unknown Dev item ids: ['project-orientation']" in error
     assert (
-        "valid ids: ['caveman', 'code-review', 'diagnosing-bugs', "
-        "'frontend-design', 'react-doctor', 'security-audit', 'spec-loop', "
-        "'tdd', 'webapp-testing']"
+        "valid ids: ['code-review', 'diagnosing-bugs', 'spec-loop', 'tdd']"
     ) in error
 
 
 def test_conflicting_flags_exits_2(capsys) -> None:
-    assert main(["init", "my-app", "--yes", "--no-skills", "--skills", "caveman"]) == 2
+    assert (
+        main(
+            [
+                "init",
+                "my-app",
+                "--yes",
+                "--categories",
+                "security",
+                "--quality",
+                "react-doctor",
+            ]
+        )
+        == 2
+    )
     err = capsys.readouterr().err
-    assert "--no-skills conflicts with --skills 'caveman'" in err
+    assert "--quality conflicts with --categories" in err
 
 
-def test_no_skills_with_skills_none_is_allowed() -> None:
-    ans = build_answers(_init_args(no_skills=True, skills="none"), CATALOG)
-    assert ans.skills_items == frozenset()
-    assert ans.include_skills is False
+def test_unknown_category_exits_2_with_valid_ids(capsys) -> None:
+    assert main(["init", "my-app", "--yes", "--categories", "performance"]) == 2
+    error = capsys.readouterr().err
+    assert "unknown Category ids: ['performance']" in error
+    assert "['design', 'dev', 'quality', 'security', 'token-optimize']" in error
 
 
 # --- interactive flow (no --yes): confirm / abort / questionary isolation ---

@@ -41,7 +41,16 @@ _STAGE_POSITION = {
     GenerationStage.FINALIZE: 4,
 }
 
-_REMOVED_HANDOFF_FLAGS = frozenset({"--no-handoff", "--no-agents"})
+_CATEGORY_FLAGS = ("dev", "security", "quality", "design", "token-optimize")
+_REMOVED_SELECTION_FLAGS = {
+    "--no-handoff": "it was removed because dev-ready no longer generates the Handoff Protocol",
+    "--no-agents": "it was removed because dev-ready no longer generates the Handoff Protocol",
+    "--skills": "use --categories and the per-Category item flags instead",
+    "--no-skills": "use --categories and the per-Category item flags instead",
+    "--mcp": "use --token-optimize to select code-memory instead",
+    "--no-mcp": "use --token-optimize none instead",
+    "--no-docs": "use --design none instead",
+}
 
 
 class ProgressRenderer:
@@ -168,30 +177,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Target directory (default: ./PROJECT_NAME)",
     )
     init_parser.add_argument(
-        "--skills",
-        dest="skills",
+        "--categories",
         default=None,
-        help="Item selection for the skills component: comma-separated ids, or 'all' / 'none'.",
+        help="Category selection: comma-separated ids, or 'all' / 'none'.",
     )
-    init_parser.add_argument(
-        "--mcp",
-        dest="mcp",
-        default=None,
-        help="Item selection for the mcp component: comma-separated ids, or 'all' / 'none'.",
-    )
+    for category in _CATEGORY_FLAGS:
+        init_parser.add_argument(
+            f"--{category}",
+            dest=category.replace("-", "_"),
+            default=None,
+            help=(
+                f"{category.replace('-', ' ').title()} item selection: "
+                "comma-separated ids, or 'all' / 'none'."
+            ),
+        )
     init_parser.add_argument(
         "--agents",
         default=None,
         help="Agent Target selection: comma-separated ids, or 'all' / 'none'.",
-    )
-    init_parser.add_argument(
-        "--no-skills", action="store_true", help="Skip Claude Code skills overlay"
-    )
-    init_parser.add_argument(
-        "--no-mcp", action="store_true", help="Skip MCP server configuration overlay"
-    )
-    init_parser.add_argument(
-        "--no-docs", action="store_true", help="Skip design-doc templates overlay"
     )
     check_parser = subparsers.add_parser(
         "check", help="Inspect an existing project for structural or pin drift"
@@ -242,11 +245,8 @@ def build_answers(
         )
     selection = ProjectSelection.from_flags(
         catalog=catalog,
-        skills=args.skills,
-        mcp=args.mcp,
-        no_skills=args.no_skills,
-        no_mcp=args.no_mcp,
-        no_docs=args.no_docs,
+        categories=args.categories,
+        category_items=_category_items_from_args(args),
         agents=args.agents,
     ) or ProjectSelection.all(catalog)
 
@@ -268,11 +268,8 @@ def _build_partial_answers(
     name = args.project_name
     selection = ProjectSelection.from_flags(
         catalog=catalog,
-        skills=args.skills,
-        mcp=args.mcp,
-        no_skills=args.no_skills,
-        no_mcp=args.no_mcp,
-        no_docs=args.no_docs,
+        categories=args.categories,
+        category_items=_category_items_from_args(args),
         agents=args.agents,
     )
 
@@ -325,13 +322,20 @@ def _run_upgrade(args: argparse.Namespace) -> int:
     return 0
 
 
-def _reject_removed_handoff_flags(argv: list[str]) -> None:
+def _category_items_from_args(args: argparse.Namespace) -> dict[str, str | None]:
+    return {
+        category: getattr(args, category.replace("-", "_"))
+        for category in _CATEGORY_FLAGS
+    }
+
+
+def _reject_removed_selection_flags(argv: list[str]) -> None:
     for argument in argv:
         flag = argument.partition("=")[0]
-        if flag in _REMOVED_HANDOFF_FLAGS:
+        replacement = _REMOVED_SELECTION_FLAGS.get(flag)
+        if replacement is not None:
             raise InvalidArgumentsError(
-                f"{flag} was removed because dev-ready no longer generates "
-                "the Handoff Protocol"
+                f"{flag} was removed; {replacement}"
             )
 
 
@@ -339,7 +343,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     resolved_argv = sys.argv[1:] if argv is None else argv
     try:
-        _reject_removed_handoff_flags(resolved_argv)
+        _reject_removed_selection_flags(resolved_argv)
         args = parser.parse_args(resolved_argv)
         if args.command is None:
             parser.print_help()

@@ -87,11 +87,31 @@ def test_inspection_strips_template_suffix_from_catalog_assets(tmp_path: Path) -
     assert not any("issue-tracker.md.tmpl" in issue.detail for issue in issues)
 
 
+def test_inspection_requires_the_selected_design_reference(tmp_path: Path) -> None:
+    selection = ProjectSelection.from_items(
+        CATALOG,
+        docs_items=frozenset({"design-stripe"}),
+        docs=True,
+    )
+
+    issues = inspect_project(
+        tmp_path,
+        CATALOG,
+        ProjectExpectation.generation(selection),
+    )
+
+    assert any(
+        issue.category == "missing item path"
+        and "docs item 'design-stripe'" in issue.detail
+        for issue in issues
+    )
+
+
 def test_inspection_requires_only_selected_agent_target_artifacts(tmp_path: Path) -> None:
     selection = ProjectSelection.from_items(
         CATALOG,
         skills=frozenset({"caveman"}),
-        mcp=frozenset({"mcp-config"}),
+        mcp=frozenset({"code-memory"}),
         agent_targets=frozenset({"windsurf"}),
         docs=False,
     )
