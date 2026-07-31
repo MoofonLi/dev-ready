@@ -30,7 +30,8 @@ def _answers(
     include_mcp: bool = True,
     include_docs: bool = True,
     skills_items: frozenset[str] = frozenset({"caveman"}),
-    mcp_items: frozenset[str] = frozenset({"mcp-config"}),
+    mcp_items: frozenset[str] = frozenset({"code-memory"}),
+    docs_items: frozenset[str] = frozenset({"design-stripe", "design-linear"}),
     agent_targets: frozenset[str] | None = None,
 ) -> Answers:
     return Answers(
@@ -40,6 +41,7 @@ def _answers(
             CATALOG,
             skills=skills_items if include_skills else frozenset(),
             mcp=mcp_items if include_mcp else frozenset(),
+            docs_items=docs_items if include_docs else frozenset(),
             agent_targets=agent_targets,
             docs=include_docs,
         ),
@@ -443,7 +445,8 @@ def test_render_stamp_structure(tmp_path: Path) -> None:
     )
     stamp_text = render_stamp(ans, PIN, CATALOG)
     data = json.loads(stamp_text)
-    assert data["stamp_version"] == 4
+    assert data["stamp_version"] == 5
+    assert data["categories"] == ["design", "quality", "token-optimize"]
     assert data["project_name"] == "my-app"
     assert data["inventory"] == []
     assert data["dev_ready_version"] == __version__
@@ -455,6 +458,10 @@ def test_render_stamp_structure(tmp_path: Path) -> None:
     assert data["components"]["mcp"]["included"] is True
     assert data["components"]["mcp"]["items"] == [{"id": "code-memory", "pin": "0.9.0"}]
     assert data["components"]["docs"]["included"] is True
+    assert data["components"]["docs"]["items"] == [
+        {"id": "design-linear", "pin": None},
+        {"id": "design-stripe", "pin": None},
+    ]
     assert "handoff" not in data["components"]
     assert data["agent_targets"] == ["claude", "windsurf"]
     assert "agents" not in data["components"]
@@ -480,7 +487,7 @@ def test_code_memory_injection(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
     apply_overlay(
-        _answers(tmp_path, mcp_items=frozenset({"mcp-config", "code-memory"})),
+        _answers(tmp_path, mcp_items=frozenset({"code-memory"})),
         project_dir,
         CATALOG,
         PIN,
@@ -493,16 +500,23 @@ def test_code_memory_injection(tmp_path: Path) -> None:
     }
 
 
-def test_code_memory_without_mcp_config_raises_overlay_error(tmp_path: Path) -> None:
+def test_code_memory_without_selectable_mcp_config_creates_server_config(
+    tmp_path: Path,
+) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
-    with pytest.raises(OverlayError, match="requires target"):
-        apply_overlay(
-            _answers(tmp_path, mcp_items=frozenset({"code-memory"})),
-            project_dir,
-            CATALOG,
-            PIN,
-        )
+    apply_overlay(
+        _answers(tmp_path, mcp_items=frozenset({"code-memory"})),
+        project_dir,
+        CATALOG,
+        PIN,
+    )
+
+    mcp_json = json.loads((project_dir / ".mcp.json").read_text(encoding="utf-8"))
+    assert mcp_json["mcpServers"]["codebase-memory"] == {
+        "command": "uvx",
+        "args": ["codebase-memory-mcp==0.9.0"],
+    }
 
 
 def test_react_doctor_skill_copy(tmp_path: Path) -> None:
@@ -586,7 +600,7 @@ def test_render_stamp_records_vendored_pins(tmp_path: Path) -> None:
     answers = _answers(tmp_path, skills_items=frozenset({"caveman"}))
     raw = render_stamp(answers, PIN, manifest.components, manifest.vendored)
     data = json.loads(raw)
-    assert data["stamp_version"] == 4
+    assert data["stamp_version"] == 5
     items = data["components"]["skills"]["items"]
     caveman_item = next(i for i in items if i["id"] == "caveman")
     assert caveman_item["pin"] == "0d95a81d35a9f2d123a5e9430d1cfc43d55f1bb0"
@@ -619,6 +633,32 @@ def test_apply_overlay_writes_vendored_skills_and_docs(tmp_path: Path) -> None:
     assert (project_dir / "docs" / "design-linear.md").exists()
     assert Path(".claude/skills/caveman/SKILL.md") in written
     assert Path("docs/design-stripe.md") in written
+
+
+@pytest.mark.parametrize(
+    ("selected", "absent"),
+    [
+        ("design-stripe", "design-linear"),
+        ("design-linear", "design-stripe"),
+    ],
+)
+def test_either_design_reference_can_be_selected_alone(
+    tmp_path: Path,
+    selected: str,
+    absent: str,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    answers = _answers(
+        tmp_path,
+        include_mcp=False,
+        docs_items=frozenset({selected}),
+    )
+
+    apply_overlay(answers, project_dir, CATALOG, PIN)
+
+    assert (project_dir / "docs" / f"{selected}.md").is_file()
+    assert not (project_dir / "docs" / f"{absent}.md").exists()
 
 
 def test_apply_overlay_deselected_vendored_skills_are_absent(tmp_path: Path) -> None:
@@ -718,7 +758,7 @@ def test_render_stamp_records_anthropics_pin(tmp_path: Path) -> None:
     answers = _answers(tmp_path, skills_items=frozenset({"webapp-testing"}))
     raw = render_stamp(answers, PIN, manifest.components, manifest.vendored)
     data = json.loads(raw)
-    assert data["stamp_version"] == 4
+    assert data["stamp_version"] == 5
     items = data["components"]["skills"]["items"]
     webapp_item = next(i for i in items if i["id"] == "webapp-testing")
     assert webapp_item["pin"] == "1f630fdf9259cec4a14913127dfd7c3b69ef72eb"
@@ -844,7 +884,7 @@ def test_manifest_only_project_mcp_path_retargets_catalog_effects(tmp_path: Path
         target_dir=tmp_path / "project",
         selection=ProjectSelection.from_items(
             custom_catalog,
-            mcp=frozenset({"mcp-config", "code-memory"}),
+            mcp=frozenset({"code-memory"}),
             agent_targets=frozenset({"custom"}),
             docs=False,
         ),

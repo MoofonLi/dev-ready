@@ -83,7 +83,7 @@ def test_check_notices_sync_success_when_matching(tmp_path: Path) -> None:
       "paths": []
     }}
   ],
-  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}, "docs": {{"items": []}}}},
   "overlay_version": "0.1.0"
 }}""",
         encoding="utf-8",
@@ -127,7 +127,7 @@ def test_check_notices_sync_detects_missing_in_notices(tmp_path: Path) -> None:
       "paths": []
     }}
   ],
-  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}, "docs": {{"items": []}}}},
   "overlay_version": "0.1.0"
 }}""",
         encoding="utf-8",
@@ -158,7 +158,7 @@ def test_check_notices_sync_detects_missing_in_manifest(tmp_path: Path) -> None:
     }}
   }},
   "vendored": [],
-  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}, "docs": {{"items": []}}}},
   "overlay_version": "0.1.0"
 }}""",
         encoding="utf-8",
@@ -204,7 +204,7 @@ def test_check_notices_sync_detects_commit_or_license_mismatch(tmp_path: Path) -
       "paths": []
     }}
   ],
-  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}, "docs": {{"items": []}}}},
   "overlay_version": "0.1.0"
 }}""",
         encoding="utf-8",
@@ -259,7 +259,7 @@ def test_check_notices_sync_apache_license_presence(tmp_path: Path) -> None:
       ]
     }}
   ],
-  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}, "docs": {{"items": []}}}},
   "overlay_version": "0.1.0"
 }}""",
         encoding="utf-8",
@@ -313,7 +313,7 @@ def test_check_notices_sync_apache_license_missing_fails(tmp_path: Path) -> None
       ]
     }}
   ],
-  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}, "docs": {{"items": []}}}},
   "overlay_version": "0.1.0"
 }}""",
         encoding="utf-8",
@@ -368,7 +368,7 @@ def test_check_notices_sync_mit_without_license_does_not_fail(tmp_path: Path) ->
       ]
     }}
   ],
-  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}, "docs": {{"items": []}}}},
   "overlay_version": "0.1.0"
 }}""",
         encoding="utf-8",
@@ -398,7 +398,7 @@ def test_attribution_only_entry_is_recognized(tmp_path: Path) -> None:
   "agent_targets": {{"claude": {{"description": "Claude Code.", "skills_dir": ".claude/skills", "rules_file": "CLAUDE.md", "mcp_file": ".mcp.json"}}}},
   "upstream": {{"base_template": {{"repo": "fastapi/full-stack-fastapi-template", "ref": "master", "commit": "{'a' * 40}", "license": "MIT"}}}},
   "vendored": [],
-  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}, "docs": {{"items": []}}}},
   "overlay_version": "0.1.0"
 }}""",
         encoding="utf-8",
@@ -427,7 +427,7 @@ def test_attribution_only_without_marker_is_orphan(tmp_path: Path) -> None:
   "agent_targets": {{"claude": {{"description": "Claude Code.", "skills_dir": ".claude/skills", "rules_file": "CLAUDE.md", "mcp_file": ".mcp.json"}}}},
   "upstream": {{"base_template": {{"repo": "fastapi/full-stack-fastapi-template", "ref": "master", "commit": "{'a' * 40}", "license": "MIT"}}}},
   "vendored": [],
-  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}}},
+  "components": {{"skills": {{"items": []}}, "mcp": {{"items": []}}, "docs": {{"items": []}}}},
   "overlay_version": "0.1.0"
 }}""",
         encoding="utf-8",

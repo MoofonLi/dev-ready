@@ -160,7 +160,7 @@ def test_sync_all_empty_vendored_returns_zero(tmp_path: Path) -> None:
     }
   },
   "vendored": [],
-  "components": {"skills": {"items": []}, "mcp": {"items": []}},
+  "components": {"skills": {"items": []}, "mcp": {"items": []}, "docs": {"items": []}},
   "overlay_version": "0.1.0"
 }"""
         % ("a" * 40),

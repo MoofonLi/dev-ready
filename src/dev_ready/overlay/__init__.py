@@ -6,64 +6,25 @@ there is one authoritative rendering of managed files.
 """
 
 import hashlib
-import json
 from collections.abc import Collection, Mapping
 from dataclasses import replace
 from importlib import resources
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
-from dev_ready import __version__
 from dev_ready.catalog_effects import CatalogEffectError
 from dev_ready.errors import OverlayError
 from dev_ready.manifest import AgentTarget, CatalogItem, ComponentCatalog, UpstreamPin, VendoredPin
+from dev_ready.overlay.infrastructure import (
+    base_mcp_config_targets,
+    documentation_scaffold_paths,
+)
 from dev_ready.overlay.rendering import TEMPLATE_SUFFIX as _TEMPLATE_SUFFIX
 from dev_ready.overlay.rendering import render_asset as _render_asset
+from dev_ready.overlay.stamp_rendering import render_stamp
 from dev_ready.prompts import Answers
 
 __all__ = ["apply_overlay", "build_overlay_content", "content_inventory", "render_stamp"]
-
-def render_stamp(
-    answers: Answers,
-    pin: UpstreamPin,
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
-    vendored: Collection[VendoredPin] = (),
-    inventory: Collection[tuple[str, str]] = (),
-) -> str:
-    """Render the v4 project stamp without writing it."""
-    vendored_map = {v.repo: v.commit for v in vendored}
-
-    def _stamp_items(component: str, selected: Collection[str]) -> list[dict[str, str | None]]:
-        out = []
-        for item in catalog.get(component, ()):
-            if item.id not in selected:
-                continue
-            item_pin = item.pin
-            if item.mode == "vendor" and item.vendored_repo and item.vendored_repo in vendored_map:
-                item_pin = vendored_map[item.vendored_repo]
-            out.append({"id": item.id, "pin": item_pin})
-        return sorted(out, key=lambda d: str(d["id"]))
-
-    data = {
-        "stamp_version": 4,
-        "dev_ready_version": __version__,
-        "project_name": answers.project_name,
-        "agent_targets": sorted(answers.agent_targets),
-        "components": {
-            "skills": {
-                "included": answers.includes("skills"),
-                "items": _stamp_items("skills", answers.items("skills")),
-            },
-            "mcp": {
-                "included": answers.includes("mcp"),
-                "items": _stamp_items("mcp", answers.items("mcp")),
-            },
-            "docs": {"included": answers.includes("docs")},
-        },
-        "upstream": {"repo": pin.repo, "commit": pin.commit},
-        "inventory": [{"path": path, "sha256": digest} for path, digest in sorted(inventory)],
-    }
-    return json.dumps(data, indent=2) + "\n"
 
 
 def build_overlay_content(
@@ -109,7 +70,14 @@ def build_overlay_content(
             add_bytes(Path(target.rules_file), b"@AGENTS.md\n")
     add(templates_root.joinpath("readme", "README.md.tmpl"), Path("README.md"))
 
-    for component in ("skills", "mcp"):
+    for target_path in base_mcp_config_targets(
+        catalog,
+        answers.items("mcp"),
+        agent_targets,
+    ):
+        collect(templates_root.joinpath("mcp", "mcp.json"), target_path)
+
+    for component in ("skills", "mcp", "docs"):
         selected = answers.items(component)
         for item in catalog.get(component, ()):
             if item.id not in selected:
@@ -139,8 +107,8 @@ def build_overlay_content(
                 _render_pointer_stub(canonical_bytes, relative.parts[0], canonical_path, target),
             )
 
-    if answers.includes("docs"):
-        collect(templates_root.joinpath("docs"), Path("docs"))
+    for source, destination in documentation_scaffold_paths(answers.includes("docs")):
+        collect(templates_root.joinpath(source), destination)
     return content
 
 
