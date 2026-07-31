@@ -39,9 +39,8 @@ def _init_examples(text: str) -> list[str]:
     return re.findall(r"^uvx dev-ready init .+$", text, flags=re.MULTILINE)
 
 
-def _documented_ids(text: str, component: str) -> set[str]:
-    label = "MCP" if component == "mcp" else component
-    match = re.search(rf"^Current {label} ids: (.+)$", text, flags=re.MULTILINE)
+def _documented_ids(text: str, label: str) -> set[str]:
+    match = re.search(rf"^Current {re.escape(label)} ids: (.+)$", text, flags=re.MULTILINE)
     assert match is not None
     return set(re.findall(r"`([^`]+)`", match.group(1)))
 
@@ -59,11 +58,13 @@ def test_skill_uses_the_minimal_standard_frontmatter_and_layout() -> None:
 def test_skill_examples_cover_default_none_and_mixed_current_cli_contract() -> None:
     examples = _init_examples(_skill_text())
     assert len(examples) >= 3
-    assert any("--skills all" in command and "--mcp all" in command for command in examples)
-    assert any("--skills none" in command and "--mcp none" in command for command in examples)
+    assert any("--categories all" in command and "--agents all" in command for command in examples)
+    assert any("--categories none" in command and "--agents none" in command for command in examples)
     assert any(
-        "--skills spec-loop,frontend-design" in command
-        and "--mcp code-memory" in command
+        "--categories dev,design,token-optimize" in command
+        and "--dev spec-loop" in command
+        and "--design frontend-design,design-stripe" in command
+        and "--token-optimize code-memory" in command
         for command in examples
     )
 
@@ -74,11 +75,15 @@ def test_skill_examples_cover_default_none_and_mixed_current_cli_contract() -> N
         build_answers(args, CATALOG)
 
 
-def test_skill_catalog_ids_match_the_current_manifest() -> None:
+def test_skill_category_and_item_ids_match_the_current_manifest() -> None:
     text = _skill_text()
-    for component in ("skills", "mcp"):
-        assert _documented_ids(text, component) == {
-            item.id for item in CATALOG[component]
+    assert _documented_ids(text, "Category") == set(MANIFEST.categories)
+    for category in MANIFEST.categories:
+        assert _documented_ids(text, f"{category} item") == {
+            item.id
+            for component_items in CATALOG.values()
+            for item in component_items
+            if item.category == category
         }
 
 
@@ -103,9 +108,11 @@ def test_skill_documents_safe_failure_and_verification_behavior() -> None:
     for required in (
         "--yes",
         "--dir",
-        "--no-skills",
-        "--no-mcp",
-        "--no-docs",
+        "--categories",
+        "--design",
+        "--token-optimize",
+        "--agents",
+        "unknown category",
         "unknown item",
         "conflicting flags",
         "nonzero",
@@ -118,9 +125,8 @@ def test_skill_documents_safe_failure_and_verification_behavior() -> None:
         "do not delete",
     ):
         assert required in text
-    assert "--no-handoff" not in text
-    assert "--no-agents" not in text
-    assert "handoff protocol" not in text
+    for removed in ("--skills", "--mcp", "--no-docs", "--no-handoff", "--no-agents"):
+        assert removed in text
 
 
 def test_distribution_skill_is_not_a_catalog_or_generated_overlay_asset(tmp_path: Path) -> None:

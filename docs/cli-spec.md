@@ -1,6 +1,6 @@
 # CLI Specification — dev-ready
 
-Status: Current through unreleased v0.9 Phase 1. This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
+Status: Current through unreleased v0.9 Phase 2. This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
 
 ## Commands
 
@@ -12,24 +12,42 @@ Generate a new project.
 |---|---|---|---|
 | `--yes` / `-y` | bool | false | Accept all defaults, no prompts |
 | `--dir PATH` | path | `./PROJECT_NAME` | Target directory (must not exist or be empty) |
-| `--skills IDS` | string | `all` | Item selection for skills: comma-separated ids, `all`, or `none` |
-| `--mcp IDS` | string | `all` | Item selection for mcp: comma-separated ids, `all`, or `none` |
+| `--categories IDS` | string | interactive; `all` with `--yes` | Category selection: comma-separated ids, `all`, or `none` |
+| `--dev IDS` | string | `all` when Dev is selected | Dev items: `tdd`, `diagnosing-bugs`, `code-review`, `spec-loop`, `all`, or `none` |
+| `--security IDS` | string | `all` when Security is selected | Security items: `security-audit`, `all`, or `none` |
+| `--quality IDS` | string | `all` when Quality is selected | Quality items: `react-doctor`, `webapp-testing`, `all`, or `none` |
+| `--design IDS` | string | `all` when Design is selected | Design items: `frontend-design`, `design-stripe`, `design-linear`, `all`, or `none` |
+| `--token-optimize IDS` | string | `all` when Token Optimize is selected | Token Optimize items: `caveman`, `code-memory`, `all`, or `none` |
 | `--agents IDS` | string | `all` | Agent Target selection: comma-separated identifiers, `all`, or `none` |
-| `--no-skills` | bool | false | Skip Canonical Skill content and target Pointer Stubs (alias for `--skills none`) |
-| `--no-mcp` | bool | false | Skip MCP server configuration overlay (alias for `--mcp none`) |
-| `--no-docs` | bool | false | Skip design-doc templates overlay |
 
-`--no-handoff` and its former deprecated alias `--no-agents` have been removed.
-Passing either flag is an invalid-arguments error (exit 2) whose message states
-that dev-ready no longer generates the Handoff Protocol.
+The Category identifiers accepted by `--categories` are `dev`, `security`,
+`quality`, `design`, and `token-optimize`. If `--categories` is omitted while
+another selection flag is supplied, all Categories are selected and each
+per-Category flag narrows only its named Category. A per-Category flag
+conflicts with an explicit `--categories` value that omits that Category.
 
-Unknown item ids in `--skills` or `--mcp`, and unknown target identifiers in `--agents`, fail fast with an invalid-arguments error (exit 2) listing valid identifiers. Conflicting flags (e.g. `--no-skills` with `--skills <id>`) exit 2.
+Unknown Category ids, unknown item ids, empty comma-separated selections, and
+conflicting Category/item flags fail before generation with an
+invalid-arguments error (exit 2). Unknown errors list the valid identifiers.
+Unknown Agent Target identifiers in `--agents` follow the same exit-2 policy.
+
+The old Component-shaped flags are removed and always exit 2 with these
+replacements named:
+
+| Removed flag | Replacement named by the error |
+|---|---|
+| `--skills`, `--no-skills` | `--categories` and the per-Category item flags |
+| `--mcp` | `--token-optimize code-memory` |
+| `--no-mcp` | `--token-optimize none` |
+| `--no-docs` | `--design none` |
+| `--no-handoff`, `--no-agents` | No replacement; dev-ready no longer generates the Handoff Protocol |
 
 Selections are resolved before confirmation, rendering, reporting, verification,
-and stamping. The skills catalog contains 9/9 items. Selecting
+and stamping. Selecting
 `spec-loop` automatically includes its required existing items: `tdd`,
 `diagnosing-bugs`, and `code-review`. The resolved set is shown to the user and
-recorded in `.dev-ready.json`; explicit `--skills none` remains empty.
+recorded in `.dev-ready.json`. Explicit `none` leaves the named Category or the
+whole Category selection empty.
 
 Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification; 6 stamp missing or unparseable/invalid; 7 drift detected; 8 upgrade not supported (pre-v3 stamp); 9 upgrade failed (rolled back).
 
@@ -86,14 +104,18 @@ inventory is added. All planned writes and deletions commit all-or-nothing.
 | `PATH` | path | `.` | Target project directory to upgrade |
 | `--dry-run` | bool | false | Report planned changes without modifying the project |
 
-The project stamp remains `stamp_version` 4 and records the project name, a
+Fresh projects use `stamp_version` 5. The record stores the selected Category
+identifiers in the top-level `categories` list, plus the project name, a
 managed-file inventory, selected Agent Target identifiers in the top-level
 `agent_targets` list, and the skills, MCP, and docs selection under `components`.
-Fresh stamps no longer record Handoff Protocol inclusion. Stamp versions 1–4
-remain readable; legacy version 4 `components.handoff` and version 3
+Fresh stamps no longer record Handoff Protocol inclusion. Stamp versions 1–5
+remain readable, including version 3 and version 4 projects that do not carry
+Categories; legacy version 4 `components.handoff` and version 3
 `components.agents` entries are accepted for compatibility. Version 3 stamps
-can be upgraded without new input, while versions 1 and 2 remain checkable but
-cannot be upgraded. Across an overlay-only upgrade, the stamped upstream
+can be upgraded without new input, but Phase 2 does not migrate existing
+version 3 or version 4 records to version 5: version 3 first advances to version
+4, and version 4 remains version 4. Versions 1 and 2 remain checkable but cannot
+be upgraded. Across an overlay-only upgrade, the stamped upstream
 repository and commit are immutable Base Provenance; the dev-ready version,
 selected-item pins, selected Agent Targets, and managed-file inventory are
 Overlay Currency and advance to the running CLI. A newer manifest base pin is a
@@ -113,14 +135,14 @@ This flow applies only to `init`. `check` and `upgrade` are non-interactive by
 construction and dispatch directly to their respective operations.
 
 1. Project name (if not given as argument)
-2. Level-1 component selection (skills / MCP / docs — multi-select, all on by default)
-3. Level-2 item selection for `skills` and `mcp` components chosen at level 1 (multi-select of component items, all on by default; plain Enter accepts all items)
+2. Category selection (`dev`, `security`, `quality`, `design`, and `token-optimize`; described multi-select, all on by default)
+3. Item selection across the chosen Categories (described multi-select, all on by default; plain Enter accepts all items)
 4. Agent Target selection (described multi-select, all on by default; plain Enter accepts all targets)
-5. Confirmation summary before writing anything
+5. Confirmation summary naming the resolved Categories, Catalog Items, and Agent Targets before writing anything
 
-Steps 2–4 are skipped as a unit if any selection flag (`--skills`, `--mcp`,
-`--agents`, `--no-skills`, `--no-mcp`, or `--no-docs`) was passed. An omitted
-project name is still prompted for, and confirmation still occurs.
+Steps 2–4 are skipped as a unit if any selection flag (`--categories`, any
+per-Category item flag, or `--agents`) was passed. An omitted project name is
+still prompted for, and confirmation still occurs.
 
 All answers collect into a single `Answers` model shared with the flag-based path.
 
