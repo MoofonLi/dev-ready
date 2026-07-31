@@ -9,14 +9,6 @@ from dev_ready.prompts import Answers
 TEMPLATE_SUFFIX = ".tmpl"
 
 
-def _handoff_guidance(answers: Answers) -> str:
-    if not answers.includes("handoff"):
-        return ""
-    return """## Handoff Protocol
-
-`docs/handoffs/protocol.yaml` is the authoritative Protocol Configuration. Read it together with `docs/handoffs/README.md` before using the reusable process-v2 phase scaffold."""
-
-
 def _spec_loop_guidance(answers: Answers) -> str:
     if "spec-loop" not in answers.items("skills"):
         return ""
@@ -27,55 +19,22 @@ Use the installed loop as one end-to-end method: `grill-with-docs` -> `to-spec` 
 Tracker and domain conventions are in `docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md`, and `docs/agents/domain.md`. Follow those files when a skill asks where to publish specs or tickets; domain terminology is created lazily when a real term is resolved."""
 
 
-def _methodology_mapping(answers: Answers) -> str:
-    if not answers.includes("handoff") or "spec-loop" not in answers.items("skills"):
-        return ""
-    return """## Process-v2 role mapping
-
-- Planning - `tech_lead`: `grill-with-docs` and `to-spec`.
-- Dispatch - `senior_engineer`: `to-tickets` and the Handoff Protocol.
-- Execution - `junior_engineer`: `tdd`, `diagnosing-bugs`, and `code-review` within one ticket footprint.
-- Verification - `qa_reviewer`, `security_reviewer`, and `sre_reviewer`: independent gates after `senior_engineer` spec review."""
-
-
-def _documentation_values(answers: Answers) -> tuple[str, str, str]:
+def _documentation_values(answers: Answers) -> tuple[str, str]:
     guidance = ""
     ownership = (
         "Keep this architecture document current as module boundaries and "
         "dependency rules change."
     )
-    tech_lead_responsibility = ""
     if not answers.includes("docs"):
-        return guidance, ownership, tech_lead_responsibility
+        return guidance, ownership
 
     guidance = """## Architecture documentation
 
 Read `docs/architecture.md` before structural changes; it records the system overview, module boundaries, and dependency rules."""
-    if answers.includes("handoff"):
-        guidance += " The Protocol Configuration assigns its maintenance to `tech_lead`."
-        ownership = (
-            "The `tech_lead` role maintains this document under "
-            "`docs/handoffs/protocol.yaml`."
-        )
-        tech_lead_responsibility = (
-            "      - Maintain docs/architecture.md as binding architecture guidance."
-        )
-    return guidance, ownership, tech_lead_responsibility
+    return guidance, ownership
 
 
-def _issue_tracker_configuration(answers: Answers) -> str:
-    if answers.includes("handoff"):
-        return """# Issue tracker: Handoff Protocol files
-
-Read `docs/handoffs/protocol.yaml` before publishing planning or dispatch artifacts.
-
-- Durable accepted specs live under `docs/specs/<version>/`.
-- Publish one tracer-bullet ticket per file under `docs/handoffs/phase-<number>/tickets/`.
-- Record blocking edges, the exact file footprint, `parallel-safe`, and `Status: ready-for-agent` in each ticket.
-- Active phase gates and reports live beside the tickets under the same numeric phase directory.
-
-When a skill says to publish to or fetch from the issue tracker, use these local process-v2 paths."""
-
+def _issue_tracker_configuration() -> str:
     return """# Issue tracker: local Markdown
 
 Specs and tickets for this repository live as local Markdown files under `.scratch/`.
@@ -90,16 +49,13 @@ When a skill says to publish to or fetch from the issue tracker, use these local
 
 def template_values(answers: Answers) -> dict[str, str]:
     """Return every supported template token for one resolved selection."""
-    guidance, ownership, tech_lead_responsibility = _documentation_values(answers)
+    guidance, ownership = _documentation_values(answers)
     return {
         "project_name": answers.project_name,
-        "handoff_protocol_guidance": _handoff_guidance(answers),
         "spec_loop_guidance": _spec_loop_guidance(answers),
-        "methodology_mapping": _methodology_mapping(answers),
         "documentation_guidance": guidance,
         "architecture_ownership": ownership,
-        "tech_lead_architecture_responsibility": tech_lead_responsibility,
-        "issue_tracker_configuration": _issue_tracker_configuration(answers),
+        "issue_tracker_configuration": _issue_tracker_configuration(),
     }
 
 

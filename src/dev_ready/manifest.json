@@ -101,6 +101,10 @@
           "dest": "src/dev_ready/templates/claude/skills/to-tickets"
         },
         {
+          "src": "skills/engineering/implement",
+          "dest": "src/dev_ready/templates/claude/skills/implement"
+        },
+        {
           "src": "skills/engineering/improve-codebase-architecture",
           "dest": "src/dev_ready/templates/claude/skills/improve-codebase-architecture"
         },
@@ -155,18 +159,6 @@
   "components": {
     "skills": {
       "items": [
-        {
-          "id": "project-orientation",
-          "description": "Skill that orients an AI agent to the generated project's layout, stack, and dev workflow.",
-          "mode": "builtin",
-          "license": "MIT",
-          "paths": [
-            {
-              "src": "claude/skills/project-orientation",
-              "dest": ".agents/skills/project-orientation"
-            }
-          ]
-        },
         {
           "id": "react-doctor",
           "description": "Wrapper skill teaching the agent when to run react-doctor on the frontend and how to act on its findings.",
@@ -284,6 +276,10 @@
             {
               "src": "claude/skills/to-tickets",
               "dest": ".agents/skills/to-tickets"
+            },
+            {
+              "src": "claude/skills/implement",
+              "dest": ".agents/skills/implement"
             },
             {
               "src": "claude/skills/improve-codebase-architecture",

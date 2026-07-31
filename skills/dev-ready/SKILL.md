@@ -28,7 +28,7 @@ Always use `--yes` for agent-driven, non-interactive generation.
 Top-level components:
 
 - Skills and MCP are item catalogs controlled by `--skills IDS` and `--mcp IDS`.
-- Docs and the Handoff Protocol are enabled by default; disable them with `--no-docs` and `--no-agents`.
+- Docs are enabled by default; disable them with `--no-docs`.
 - `--no-skills` aliases `--skills none`; `--no-mcp` aliases `--mcp none`.
 
 Selection values:
@@ -37,7 +37,7 @@ Selection values:
 - `none` selects no item in that catalog.
 - A comma-separated list selects those ids. Do not add spaces inside the list.
 
-Current skills ids: `project-orientation`, `react-doctor`, `caveman`, `security-audit`, `tdd`, `diagnosing-bugs`, `code-review`, `spec-loop`, `webapp-testing`, `frontend-design`.
+Current skills ids: `react-doctor`, `caveman`, `security-audit`, `tdd`, `diagnosing-bugs`, `code-review`, `spec-loop`, `webapp-testing`, `frontend-design`.
 
 Current MCP ids: `mcp-config`, `code-memory`.
 
@@ -56,13 +56,13 @@ uvx dev-ready init my-app --yes --skills all --mcp all --dir ./my-app
 No optional components:
 
 ```shell
-uvx dev-ready init minimal-app --yes --skills none --mcp none --no-docs --no-agents --dir ./minimal-app
+uvx dev-ready init minimal-app --yes --skills none --mcp none --no-docs --dir ./minimal-app
 ```
 
 Mixed standalone Spec Loop selection:
 
 ```shell
-uvx dev-ready init focused-app --yes --skills spec-loop,frontend-design --mcp code-memory --no-agents --dir ./focused-app
+uvx dev-ready init focused-app --yes --skills spec-loop,frontend-design --mcp code-memory --dir ./focused-app
 ```
 
 Run exactly one selected command. Do not invent flags for language, render targets, overwriting, or cleanup.
@@ -79,4 +79,4 @@ Treat only exit 0 as success. Every nonzero exit is a failure:
 
 Report the command, exit code, and error text. Do not hide the failure, weaken the selection, or retry destructively.
 
-After exit 0, verify that the requested target exists, contains `.dev-ready.json`, and matches the final generation report. Check representative selected outputs when relevant, such as `docs/handoffs/protocol.yaml`, `docs/architecture.md`, `.claude/skills/to-spec/SKILL.md`, or `.mcp.json`. Only then report generation as successful and present the CLI's next steps.
+After exit 0, verify that the requested target exists, contains `.dev-ready.json`, and matches the final generation report. Check representative selected outputs when relevant, such as `docs/architecture.md`, `.claude/skills/to-spec/SKILL.md`, or `.mcp.json`. Only then report generation as successful and present the CLI's next steps.

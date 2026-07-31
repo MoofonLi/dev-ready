@@ -26,7 +26,7 @@ def test_lifecycle_inspection_aggregates_shared_structural_facts(tmp_path: Path)
 
 
 def test_generation_inspection_rejects_unselected_catalog_paths(tmp_path: Path) -> None:
-    leaked = tmp_path / ".agents" / "skills" / "project-orientation" / "SKILL.md"
+    leaked = tmp_path / ".agents" / "skills" / "caveman" / "SKILL.md"
     leaked.parent.mkdir(parents=True)
     leaked.write_text("leak", encoding="utf-8")
 
@@ -37,7 +37,7 @@ def test_generation_inspection_rejects_unselected_catalog_paths(tmp_path: Path) 
     )
 
     assert any(
-        issue.category == "unexpected item path" and "project-orientation" in issue.detail
+        issue.category == "unexpected item path" and "caveman" in issue.detail
         for issue in issues
     )
 
@@ -49,7 +49,6 @@ def test_inspection_reports_malformed_effect_target_as_a_fact(tmp_path: Path) ->
         CATALOG,
         mcp=frozenset({"code-memory"}),
         docs=False,
-        handoff=False,
     )
 
     issues = inspect_project(
@@ -69,7 +68,6 @@ def test_inspection_strips_template_suffix_from_catalog_assets(tmp_path: Path) -
         CATALOG,
         skills=frozenset({"spec-loop"}),
         docs=False,
-        handoff=False,
     )
 
     # Fake generation of spec-loop asset without .tmpl suffix (rendered destination path)
@@ -92,14 +90,13 @@ def test_inspection_strips_template_suffix_from_catalog_assets(tmp_path: Path) -
 def test_inspection_requires_only_selected_agent_target_artifacts(tmp_path: Path) -> None:
     selection = ProjectSelection.from_items(
         CATALOG,
-        skills=frozenset({"project-orientation"}),
+        skills=frozenset({"caveman"}),
         mcp=frozenset({"mcp-config"}),
         agent_targets=frozenset({"windsurf"}),
         docs=False,
-        handoff=False,
     )
     materialize_project_structure(tmp_path, CATALOG, selection)
-    missing_stub = tmp_path / ".windsurf/skills/project-orientation/SKILL.md"
+    missing_stub = tmp_path / ".windsurf/skills/caveman/SKILL.md"
     missing_stub.unlink()
 
     issues = inspect_project(
@@ -111,7 +108,7 @@ def test_inspection_requires_only_selected_agent_target_artifacts(tmp_path: Path
     assert any(
         issue.category == "missing agent target artifact"
         and "windsurf" in issue.detail
-        and ".windsurf/skills/project-orientation/SKILL.md" in issue.detail
+        and ".windsurf/skills/caveman/SKILL.md" in issue.detail
         for issue in issues
     )
     assert not any("claude" in issue.detail for issue in issues)

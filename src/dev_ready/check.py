@@ -56,7 +56,6 @@ def check_project(project_dir: Path, json_output: bool = False) -> str:
         mcp=frozenset(item.id for item in stamp.mcp_items) & known_mcp,
         agent_targets=frozenset(stamp.agent_targets) & frozenset(manifest.agent_targets),
         docs=stamp.docs_included,
-        handoff=stamp.handoff_included,
     )
     structural_issues = inspect_project(
         resolved_dir,

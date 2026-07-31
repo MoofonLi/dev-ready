@@ -38,13 +38,13 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | [ADR-004](decisions/adr-004-interactive-prompts-escape-hatch.md) | Interactive prompts with a non-interactive escape hatch | Accepted |
 | [ADR-005](decisions/adr-005-consume-upstream-via-copier.md) | Consume upstream via Copier, superseding the tarball fetch (v0.1.3) | Accepted (2026-07-14), amends ADR-003 |
 | [ADR-006](decisions/adr-006-manifest-prune-list.md) | Manifest-driven prune list, separate from exclude (v0.2) | Accepted (2026-07-16) |
-| [ADR-007](decisions/adr-007-multi-agent-handoff-protocol.md) | Multi-agent development team and handoff protocol (v0.2) | Accepted (2026-07-16) |
+| [ADR-007](decisions/adr-007-multi-agent-handoff-protocol.md) | Multi-agent development team and handoff protocol (v0.2) | Superseded by ADR-021 (2026-07-31) |
 | [ADR-008](decisions/adr-008-integration-modes-vendor-vs-pinned.md) | Two third-party integration modes — vendor vs pinned dependency (v0.3+) | Accepted (2026-07-17) |
 | [ADR-009](decisions/adr-009-manifest-vendored-provenance.md) | Manifest `vendored` section with enforced provenance (v0.4) | Implemented |
 | [ADR-010](decisions/adr-010-item-level-catalog-selection.md) | Item-level component selection with a data-driven catalog (v0.3) | Accepted (2026-07-17) |
-| [ADR-011](decisions/adr-011-agent-config-restructure.md) | Standard agent-config layout: AGENTS.md, docs/decisions/, docs/handoff/, .agents/skills/ | Accepted (2026-07-20) |
+| [ADR-011](decisions/adr-011-agent-config-restructure.md) | Standard agent-config layout: AGENTS.md, docs/decisions/, docs/handoff/, .agents/skills/ | Accepted (2026-07-20), partly superseded by ADR-021 |
 | [ADR-012](decisions/adr-012-spec-loop-bundle-and-methodology-layering.md) | Spec Loop as a single bundled catalog item, layered with the Handoff Protocol (v0.7) | Accepted (2026-07-24) |
-| [ADR-013](decisions/adr-013-internal-process-v2-spec-loop-adoption.md) | Internal process v2 — the Spec Loop layered into the Handoff Protocol (amends ADR-007/011) | Accepted (2026-07-24) |
+| [ADR-013](decisions/adr-013-internal-process-v2-spec-loop-adoption.md) | Internal process v2 — the Spec Loop layered into the Handoff Protocol (amends ADR-007/011) | Accepted (2026-07-24), partly superseded by ADR-021 |
 | [ADR-014](decisions/adr-014-truthful-overlay-lifecycle-state.md) | Separate immutable Base Provenance from Overlay Currency | Accepted (2026-07-25) |
 | [ADR-015](decisions/adr-015-agent-targets-canonical-content-pointer-stubs.md) | Agent Targets render as Pointer Stubs over one Canonical Content copy (v0.8) | Accepted (2026-07-26) |
 | [ADR-016](decisions/adr-016-language-boundary.md) | Language boundary — English everywhere dev-ready speaks or generates; Chinese only in outward-facing repository docs (v0.8) | Accepted (2026-07-26) |
@@ -52,6 +52,7 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | [ADR-018](decisions/adr-018-spec-loop-spine-and-default-set.md) | Spec Loop always generated; catalog cap becomes a Default Set limit (v0.9) | Accepted (2026-07-27) |
 | [ADR-019](decisions/adr-019-agent-target-map-drift-guard.md) | Agent Target Map derived from the reference installer and drift-guarded (v0.10) | Accepted (2026-07-27) |
 | [ADR-020](decisions/adr-020-handoff-protocol-not-generated.md) | The Handoff Protocol is dev-ready's own process, not a generated artifact (v0.9) | Accepted (2026-07-27) |
+| [ADR-021](decisions/adr-021-internal-process-v3-spec-loop-only.md) | Internal process v3 — the Spec Loop only, no generated gate documents (supersedes ADR-007's protocol) | Accepted (2026-07-31) |
 
 ## Module Boundary
 

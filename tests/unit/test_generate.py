@@ -35,7 +35,7 @@ def _answers(target_dir: Path, *, project_name: str = "my-app") -> Answers:
         target_dir=target_dir,
         selection=ProjectSelection.from_items(
             CATALOG,
-            skills=frozenset({"project-orientation"}),
+            skills=frozenset({"caveman"}),
             mcp=frozenset({"mcp-config"}),
         ),
     )
@@ -85,8 +85,8 @@ def test_generate_happy_path_merges_upstream_and_overlay(
     assert (target_dir / "backend" / "main.py").exists()
     assert (target_dir / "AGENTS.md").is_file()
     assert (target_dir / "CLAUDE.md").exists()
-    canonical_skill = target_dir / ".agents" / "skills" / "project-orientation" / "SKILL.md"
-    claude_stub = target_dir / ".claude" / "skills" / "project-orientation" / "SKILL.md"
+    canonical_skill = target_dir / ".agents" / "skills" / "caveman" / "SKILL.md"
+    claude_stub = target_dir / ".claude" / "skills" / "caveman" / "SKILL.md"
     assert canonical_skill.is_file()
     assert claude_stub.is_file()
     assert canonical_skill.read_bytes() != claude_stub.read_bytes()

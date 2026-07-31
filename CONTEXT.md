@@ -10,10 +10,11 @@ no implementation details, no specs. Decisions live in `docs/decisions/`.
 
 **Handoff Protocol**:
 The macro, cross-role collaboration mechanism for a multi-agent team: role
-definitions, handoff sequence, review gates, and loop rules (ADR-007). **This
-repository's own process only.** It was generated into projects from v0.2 and
-configured as data from v0.7; v0.9 removes it from the overlay (ADR-020). It is
-practice here, not a product surface.
+definitions, handoff sequence, review gates, and loop rules (ADR-007).
+**Retired.** It was generated into projects from v0.2 and configured as data
+from v0.7; v0.9 removes it from the overlay (ADR-020) and ADR-021 retires it as
+this repo's own practice too — development here runs the Spec Loop and nothing
+else. The term survives only to name what was removed.
 _Avoid_: workflow, team workflow, agent workflow, multi-agent flow
 
 **Protocol Configuration**:
@@ -132,25 +133,27 @@ exists only in repository documentation addressed to external readers, today
 `README.zh-TW.md`. dev-ready has no localized runtime and records no language.
 _Avoid_: localization, i18n, localized surface, translation policy
 
-### Internal process (ADR-013)
+### Internal process (ADR-021)
 
 **Spec**:
-The durable, committed record of what one FR builds and why, produced by the
-Planning layer and accepted by the CEO. Code is reviewed against it, in the
-phase and after.
+The durable, committed record of what one FR builds and why, produced by
+`to-spec` and accepted by Moofon. Code is reviewed against it, in the phase and
+after — and it is the only artifact of the phase that outlives it.
 _Avoid_: plan, PRD, 01-plan
 
 **Ticket**:
-A tracer-bullet vertical slice dispatched to one Junior session, declaring its
-blocked-by edges, file footprint, and parallel-safety. A gitignored working
-file with a one-phase lifespan.
+A tracer-bullet vertical slice sized for one session, declaring its blocked-by
+edges, file footprint, parallel-safety, and commit message. A gitignored working
+file with a one-phase lifespan, self-contained enough to run cold.
 _Avoid_: task, issue, 02-implementation
 
 **File footprint**:
 The set of paths a ticket is expected to create or modify; the basis for
 deciding whether tickets may run in parallel.
 
-**Gate**:
-A review pass that must approve before a phase's work is committed: Senior
-review (03), then QA / Security / SRE (04–06).
-_Avoid_: check, audit (Security's gate is "the security review", not "an audit")
+**Hat**:
+One of the three roles a session wears in turn — Tech Lead, Engineer, Reviewer.
+Worn, not assigned: no hat binds to a model, a tool, or a separate session, and
+no document has to pass between them.
+_Avoid_: role assignment, agent identity, CEO / Senior / Junior (retired with
+ADR-007)

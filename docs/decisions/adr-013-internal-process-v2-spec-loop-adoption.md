@@ -1,6 +1,6 @@
 # ADR-013: Internal process v2 — the Spec Loop layered into the Handoff Protocol (amends ADR-007, ADR-011)
 
-- Status: Accepted (2026-07-24)
+- Status: Partly superseded by ADR-021 (2026-07-31) — the four-layer loop, the `03`–`07` gate documents, and the `handoff` skill are retired; what survives is the committed-spec rule, the ticket format (footprint + `parallel-safe`), and sequential-by-default execution. Originally Accepted (2026-07-24)
 - Context: dev-ready's own development ran on the ADR-007 handoff loop with a
   seven-document set (`01-plan` … `07-release`), all gitignored working files
   (ADR-011). The CEO adopted the same four-phase model dev-ready will ship to

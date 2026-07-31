@@ -127,14 +127,6 @@ def inspect_project(
                     "recorded 'docs' selection but 'docs/' directory is missing",
                 )
             )
-        if expectation.selection.handoff and not (root / "docs" / "handoffs").exists():
-            issues.append(
-                ProjectIssue(
-                    "missing overlay directory",
-                    "recorded 'handoff' selection but 'docs/handoffs/' directory is missing",
-                )
-            )
-
     for relative in FORBIDDEN_PATHS:
         if (root / relative).exists():
             issues.append(

@@ -19,7 +19,7 @@ def test_report_contains_target_path_pin_and_written_paths() -> None:
     answers = Answers(project_name="my-app", target_dir=Path("/does/not/exist/my-app"))
     written = [
         Path("CLAUDE.md"),
-        Path(".claude") / "skills" / "project-orientation" / "SKILL.md",
+        Path(".claude") / "skills" / "caveman" / "SKILL.md",
         Path(".mcp.json"),
     ]
 
@@ -72,7 +72,7 @@ def test_report_states_selected_target_artifacts_and_manual_windsurf_mcp() -> No
         target_dir=Path("/does/not/exist/my-app"),
         selection=ProjectSelection.from_items(
             CATALOG,
-            skills=frozenset({"project-orientation"}),
+            skills=frozenset({"caveman"}),
             mcp=frozenset({"mcp-config"}),
             agent_targets=frozenset({"claude", "windsurf"}),
         ),

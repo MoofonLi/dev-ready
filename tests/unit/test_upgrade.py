@@ -40,10 +40,9 @@ def _make_project(tmp_path: Path, *, code_memory: bool = False) -> Path:
         target_dir=project,
         selection=ProjectSelection.from_items(
             CATALOG,
-            skills=frozenset({"project-orientation"}),
+            skills=frozenset({"caveman"}),
             mcp=mcp_items,
             docs=False,
-            handoff=False,
         ),
     )
     apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
@@ -90,8 +89,8 @@ def _make_pre_agent_target_project(tmp_path: Path) -> Path:
             path.mkdir(parents=True, exist_ok=True)
         else:
             path.write_text("upstream", encoding="utf-8")
-    canonical_skill = project / ".agents/skills/project-orientation/SKILL.md"
-    legacy_skill = project / ".claude/skills/project-orientation/SKILL.md"
+    canonical_skill = project / ".agents/skills/caveman/SKILL.md"
+    legacy_skill = project / ".claude/skills/caveman/SKILL.md"
     legacy_skill.write_bytes(canonical_skill.read_bytes())
     legacy_rules = (project / "AGENTS.md").read_bytes()
     (project / "CLAUDE.md").write_bytes(legacy_rules)
@@ -103,7 +102,7 @@ def _make_pre_agent_target_project(tmp_path: Path) -> Path:
     data = json.loads(stamp_path.read_text(encoding="utf-8"))
     data["stamp_version"] = 3
     data.pop("agent_targets")
-    data["components"]["agents"] = data["components"].pop("handoff")
+    data["components"]["agents"] = {"included": False}
     retired_prefixes = (".agents/", ".windsurf/")
     data["inventory"] = [
         entry
@@ -111,7 +110,7 @@ def _make_pre_agent_target_project(tmp_path: Path) -> Path:
         if entry["path"] not in {"AGENTS.md", "CLAUDE.md"}
         and not entry["path"].startswith(retired_prefixes)
     ]
-    for path in ("CLAUDE.md", ".claude/skills/project-orientation/SKILL.md"):
+    for path in ("CLAUDE.md", ".claude/skills/caveman/SKILL.md"):
         data["inventory"].append(
             {"path": path, "sha256": hashlib.sha256((project / path).read_bytes()).hexdigest()}
         )
@@ -148,7 +147,7 @@ def test_user_modified_file_is_left_unchanged(tmp_path: Path) -> None:
 
 def test_missing_unrecorded_file_is_added(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
-    skill = project / ".claude" / "skills" / "project-orientation" / "SKILL.md"
+    skill = project / ".claude" / "skills" / "caveman" / "SKILL.md"
     skill.unlink()
     stamp_path = project / ".dev-ready.json"
     data = json.loads(stamp_path.read_text(encoding="utf-8"))
@@ -213,7 +212,7 @@ def test_parent_mkdir_failure_removes_partial_directories(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project = _make_project(tmp_path)
-    skill_dir = project / ".claude" / "skills" / "project-orientation"
+    skill_dir = project / ".claude" / "skills" / "caveman"
     for path in sorted(skill_dir.rglob("*"), reverse=True):
         if path.is_file():
             path.unlink()
@@ -223,7 +222,7 @@ def test_parent_mkdir_failure_removes_partial_directories(
     data["inventory"] = [
         entry
         for entry in data["inventory"]
-        if entry["path"] != ".claude/skills/project-orientation/SKILL.md"
+        if entry["path"] != ".claude/skills/caveman/SKILL.md"
     ]
     stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     before = _snapshot(project)
@@ -346,7 +345,7 @@ def test_upgrade_advances_overlay_currency_without_adding_new_defaults(
 
     upgraded = load_stamp(project)
     assert upgraded.dev_ready_version == "0.7.0"
-    assert {item.id for item in upgraded.skills_items} == {"project-orientation"}
+    assert {item.id for item in upgraded.skills_items} == {"caveman"}
     assert not (project / ".claude" / "skills" / "spec-loop").exists()
 
 
@@ -382,6 +381,25 @@ def test_modified_obsolete_managed_file_is_preserved_and_reported(tmp_path: Path
     assert obsolete.read_bytes() == b"user notes"
     assert "Preserved (obsolete, user-modified) (1):" in report
     assert "docs/handoffs/phase-N/02-implementation.md" in report
+
+
+def test_modified_retired_project_orientation_skill_is_preserved_and_reported(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    retired_path = ".agents/skills/project-orientation/SKILL.md"
+    retired = _add_obsolete_managed_file(
+        project,
+        retired_path,
+        recorded_content=b"generated project orientation",
+        current_content=b"user-edited project orientation",
+    )
+
+    report = upgrade_project(project)
+
+    assert retired.read_bytes() == b"user-edited project orientation"
+    assert "Preserved (obsolete, user-modified) (1):" in report
+    assert retired_path in report
 
 
 def test_dry_run_reports_obsolete_deletion_without_mutating(tmp_path: Path) -> None:
@@ -441,8 +459,8 @@ def test_pre_target_stamp_migrates_to_canonical_claude_layout(tmp_path: Path) ->
 
     report = upgrade_project(project)
 
-    canonical = project / ".agents/skills/project-orientation/SKILL.md"
-    stub = project / ".claude/skills/project-orientation/SKILL.md"
+    canonical = project / ".agents/skills/caveman/SKILL.md"
+    stub = project / ".claude/skills/caveman/SKILL.md"
     assert (project / "AGENTS.md").is_file()
     assert (project / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n"
     assert canonical.is_file()
@@ -465,16 +483,16 @@ def test_pre_target_stamp_migrates_to_canonical_claude_layout(tmp_path: Path) ->
 
 def test_migration_preserves_edited_skill_and_reports_divergence(tmp_path: Path) -> None:
     project = _make_pre_agent_target_project(tmp_path)
-    legacy_skill = project / ".claude/skills/project-orientation/SKILL.md"
+    legacy_skill = project / ".claude/skills/caveman/SKILL.md"
     legacy_skill.write_bytes(b"user-edited skill")
 
     report = upgrade_project(project)
 
     assert legacy_skill.read_bytes() == b"user-edited skill"
-    assert (project / ".agents/skills/project-orientation/SKILL.md").is_file()
+    assert (project / ".agents/skills/caveman/SKILL.md").is_file()
     assert "Skipped (user-modified)" in report
     assert "Divergence" in report
-    assert ".claude/skills/project-orientation/SKILL.md" in report
+    assert ".claude/skills/caveman/SKILL.md" in report
 
 
 def test_migration_preserves_edited_rules_and_reports_reconciliation(tmp_path: Path) -> None:
@@ -497,7 +515,7 @@ def test_migration_dry_run_reports_full_plan_without_mutation(tmp_path: Path) ->
 
     assert _snapshot(project) == before
     assert "would AGENTS.md" in report
-    assert "would .agents/skills/project-orientation/SKILL.md" in report
+    assert "would .agents/skills/caveman/SKILL.md" in report
     assert "would CLAUDE.md" in report
 
 

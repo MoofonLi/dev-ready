@@ -5,9 +5,9 @@ description: Release a new version of the dev-ready repo (MoofonLi/dev-ready) en
 
 # dev-ready Release Workflow
 
-Ship a dev-ready version from finished code to a published PyPI release. Follow the steps in order; each step gates the next. The CEO (Moofon) runs the terminal commands unless he has explicitly asked otherwise - the default job is to prepare everything, verify state, and hand him the exact commands.
+Ship a dev-ready version from finished code to a published PyPI release. Follow the steps in order; each step gates the next. Moofon runs the terminal commands unless he has explicitly asked otherwise - the default job is to prepare everything, verify state, and hand him the exact commands.
 
-This skill is the single source of truth for the release process. It is invoked either directly by the CEO, or by the Release Engineer (the Senior Engineer role) acting on `07-release.md` at the close of a release phase (the one document that carries a scoped git-authority exemption, ADR-007/ADR-011).
+This skill is the single source of truth for the release process. Release is the one place where state-changing git is unavoidable, and it carries no standing exemption (ADR-021): every `git commit`, `git push`, and `git tag` below needs Moofon's explicit permission for that specific action, asked for at the moment it is due.
 
 Repo layout facts this workflow depends on: version lives in BOTH `src/dev_ready/__init__.py` (`__version__`) and `pyproject.toml` (`version`); `release.yml` refuses to publish if the pushed tag does not match `pyproject.toml`; handoff working files live in `docs/handoff/<version>/phase-N/` (gitignored - never commit them, ADR-011); Conventional Commits are mandatory.
 
@@ -45,21 +45,20 @@ Then the integration/e2e tests (excluded by default via the `not network` marker
 uv run pytest -m network
 ```
 
-Every command must pass before continuing. If anything fails, stop the release: fix (or route the bug through the ADR-007 workflow - junior implements, senior reviews), and restart from this step. Do not "release now, fix later" - the release pipeline publishes to PyPI, which cannot be unpublished.
+Every command must pass before continuing. If anything fails, stop the release: fix it through the Spec Loop (ADR-021), and restart from this step. Do not "release now, fix later" - the release pipeline publishes to PyPI, which cannot be unpublished.
 
 ## Step 3 - Generate the phase overview report
 
-Only after all tests pass. Read everything under `docs/handoff/<version>/phase-N/` for the phase(s) this release completes - the six handoff docs plus the junior's outputs in `reports/` (execution report, `problems.md`).
+Only after all tests pass. Reconstruct what the phase(s) this release completes actually did, from: the phase section of `docs/handoff/<version>/<version>-plan.md`, the accepted specs in `docs/specs/<version>/`, the ticket files under `docs/handoff/<version>/phase-N/tickets/`, and `git log` since the previous release tag.
 
 Write `docs/handoff/<version>/reports/phase-N-overview.md` (one per completed phase, e.g. `phase-1-overview.md`) with:
 
 - **Scope**: which FRs/ADRs this phase implemented (cite requirements.md / architecture.md / decisions/ numbers)
-- **What was built**: modules touched, behavior changes, from the execution report
-- **Problems encountered**: from `problems.md` and escalations - what happened, how it was resolved, by whom (junior / senior)
-- **Review outcomes**: verdicts from the senior review and the reviewer's QA / security / SRE passes
+- **What was built**: modules touched, behavior changes, per ticket
+- **Deviations**: anything the commits did that the spec did not ask for, or asked for and did not get
 - **Test evidence**: unit / lint / integration results from Step 2
 
-This file stays in the gitignored handoff tree - it is the CEO's record, not a repo doc. Show it to the user and get an explicit OK before moving on: this is the "confirm it's fine" gate.
+This file stays in the gitignored handoff tree - it is Moofon's record, not a repo doc. Show it to him and get an explicit OK before moving on: this is the "confirm it's fine" gate.
 
 ## Step 4 - Doc status sweep, then staged commits
 

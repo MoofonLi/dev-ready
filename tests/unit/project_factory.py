@@ -43,8 +43,6 @@ def materialize_project_structure(
 
     if selection.docs:
         (root / "docs").mkdir(exist_ok=True)
-    if selection.handoff:
-        (root / "docs" / "handoffs").mkdir(parents=True, exist_ok=True)
 
     for name in ("skills", "mcp"):
         selected = selection.items(name)

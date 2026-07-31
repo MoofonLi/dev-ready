@@ -85,7 +85,7 @@ def _partial(
     if components_explicit and selection is None:
         selection = ProjectSelection.from_items(
             CATALOG,
-            skills=frozenset({"project-orientation"}),
+            skills=frozenset({"caveman"}),
             mcp=frozenset({"mcp-config"}),
         )
     if not components_explicit:
@@ -110,16 +110,11 @@ def _answers(
         selection=selection
         or ProjectSelection.from_items(
             CATALOG,
-            skills=frozenset({"project-orientation"}),
+            skills=frozenset({"caveman"}),
             mcp=frozenset({"mcp-config"}),
         ),
     )
 
-
-
-def test_answers_default_has_include_handoff() -> None:
-    answers = Answers(project_name="my-app", target_dir=Path("/tmp/my-app"))
-    assert answers.include_handoff is True
 
 
 # --- name prompt ---
@@ -151,8 +146,8 @@ def test_name_prompt_result_lands_in_answers() -> None:
 def test_component_prompt_fires_only_when_no_explicit_flag() -> None:
     asker = FakeAsker(
         checkboxes=[
-            ["skills", "mcp", "docs", "handoff"],
-            ["project-orientation"],
+            ["skills", "mcp", "docs"],
+            ["caveman"],
             ["mcp-config"],
             ALL_AGENT_LABELS,
         ]
@@ -160,17 +155,17 @@ def test_component_prompt_fires_only_when_no_explicit_flag() -> None:
     answers = collect_answers(
         _partial(components_explicit=False), catalog=CATALOG, asker=asker
     )
-    assert (answers.include_skills, answers.include_mcp, answers.include_docs, answers.include_handoff) == (
-        True,
+    assert (answers.include_skills, answers.include_mcp, answers.include_docs) == (
         True,
         True,
         True,
     )
+    assert asker.checkbox_choices[0] == ["skills", "mcp", "docs"]
     assert len(asker.checkbox_calls) == 4
 
 
 def test_component_prompt_skipped_when_flag_explicit() -> None:
-    asker = FakeAsker(checkboxes=[["skills", "mcp", "docs", "handoff"]])
+    asker = FakeAsker(checkboxes=[["skills", "mcp", "docs"]])
     answers = collect_answers(
         _partial(
             components_explicit=True,
@@ -190,27 +185,25 @@ def test_component_prompt_selection_can_disable_some() -> None:
     answers = collect_answers(
         _partial(components_explicit=False), catalog=CATALOG, asker=asker
     )
-    assert (answers.include_skills, answers.include_mcp, answers.include_docs, answers.include_handoff) == (
+    assert (answers.include_skills, answers.include_mcp, answers.include_docs) == (
         False,
         True,
-        False,
         False,
     )
 
 
 @pytest.mark.parametrize(
-    ("selected", "expected_skills", "expected_mcp", "expected_docs", "expected_handoff"),
+    ("selected", "expected_skills", "expected_mcp", "expected_docs"),
     [
-        (["skills", "mcp", "docs", "handoff"], True, True, True, True),
-        (["skills", "mcp", "docs"], True, True, True, False),
-        (["docs", "handoff"], False, False, True, True),
-        ([], False, False, False, False),
+        (["skills", "mcp", "docs"], True, True, True),
+        (["docs"], False, False, True),
+        ([], False, False, False),
     ]
 )
-def test_component_matrix(selected, expected_skills, expected_mcp, expected_docs, expected_handoff) -> None:
+def test_component_matrix(selected, expected_skills, expected_mcp, expected_docs) -> None:
     item_responses = []
     if "skills" in selected:
-        item_responses.append(["project-orientation"])
+        item_responses.append(["caveman"])
     if "mcp" in selected:
         item_responses.append(["mcp-config"])
     asker = FakeAsker(checkboxes=[selected, *item_responses, ALL_AGENT_LABELS])
@@ -220,20 +213,19 @@ def test_component_matrix(selected, expected_skills, expected_mcp, expected_docs
     assert answers.include_skills is expected_skills
     assert answers.include_mcp is expected_mcp
     assert answers.include_docs is expected_docs
-    assert answers.include_handoff is expected_handoff
 
 
 def test_interactive_level2_item_prompts() -> None:
     asker = FakeAsker(
         checkboxes=[
-            ["skills", "mcp", "docs", "handoff"],
-            ["project-orientation"],
+            ["skills", "mcp", "docs"],
+            ["caveman"],
             ["mcp-config"],
             ALL_AGENT_LABELS,
         ]
     )
     answers = collect_answers(_partial(components_explicit=False), catalog=CATALOG, asker=asker)
-    assert answers.skills_items == frozenset({"project-orientation"})
+    assert answers.skills_items == frozenset({"caveman"})
     assert answers.mcp_items == frozenset({"mcp-config"})
     assert answers.include_skills is True
     assert answers.include_mcp is True
@@ -263,12 +255,12 @@ def test_interactive_level1_drops_mcp_skips_level2_mcp_prompt() -> None:
     asker = FakeAsker(
         checkboxes=[
             ["skills", "docs"],
-            ["project-orientation"],
+            ["caveman"],
             ALL_AGENT_LABELS,
         ]
     )
     answers = collect_answers(_partial(components_explicit=False), catalog=CATALOG, asker=asker)
-    assert answers.skills_items == frozenset({"project-orientation"})
+    assert answers.skills_items == frozenset({"caveman"})
     assert answers.mcp_items == frozenset()
     assert answers.include_mcp is False
     assert len(asker.checkbox_calls) == 3
@@ -306,12 +298,12 @@ def test_flags_explicit_path_no_prompts() -> None:
         components_explicit=True,
         selection=ProjectSelection.from_items(
             CATALOG,
-            skills=frozenset({"project-orientation"}),
+            skills=frozenset({"caveman"}),
         ),
     )
     asker = FakeAsker()
     answers = collect_answers(partial, catalog=CATALOG, asker=asker)
-    assert answers.skills_items == frozenset({"project-orientation"})
+    assert answers.skills_items == frozenset({"caveman"})
     assert answers.mcp_items == frozenset()
     assert answers.include_skills is True
     assert answers.include_mcp is False
@@ -355,7 +347,7 @@ def test_non_tty_missing_components_raises_invalid_arguments(
     with pytest.raises(InvalidArgumentsError) as excinfo:
         collect_answers(_partial(components_explicit=False))
     assert "component selection requires an interactive terminal" in str(excinfo.value)
-    assert "--no-handoff" in str(excinfo.value)
+    assert "--no-handoff" not in str(excinfo.value)
 
 
 # --- interactive/flag path convergence (ADR-004) ---
@@ -379,7 +371,7 @@ def test_interactive_and_flag_paths_produce_identical_answers(tmp_path: Path) ->
 
     asker = FakeAsker(
         texts=["my-app"],
-        checkboxes=[["mcp", "docs", "handoff"], ["mcp-config"], ALL_AGENT_LABELS],
+        checkboxes=[["mcp", "docs"], ["mcp-config"], ALL_AGENT_LABELS],
     )
     prompt_answers = collect_answers(
         _partial(
@@ -470,24 +462,12 @@ def test_confirm_non_tty_without_injected_asker_raises_invalid_arguments(
         confirm_generation(_answers(), PIN)
 
 
-def test_render_confirmation_summary_includes_handoff() -> None:
+def test_render_confirmation_summary_omits_removed_handoff() -> None:
     from dev_ready.prompts.collect import _render_confirmation_summary
-    # when handoff is True
-    summary_on = _render_confirmation_summary(_answers(), PIN)
-    assert "handoff" in summary_on
-    # when handoff is False
-    summary_off = _render_confirmation_summary(
-        _answers(
-            selection=ProjectSelection.from_items(
-                CATALOG,
-                skills=frozenset({"project-orientation"}),
-                mcp=frozenset({"mcp-config"}),
-                handoff=False,
-            )
-        ),
-        PIN,
-    )
-    assert "handoff" not in summary_off
+
+    summary = _render_confirmation_summary(_answers(), PIN)
+
+    assert "handoff" not in summary
 
 
 def test_render_confirmation_summary_includes_resolved_agent_targets() -> None:

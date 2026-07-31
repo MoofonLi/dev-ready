@@ -41,6 +41,8 @@ _STAGE_POSITION = {
     GenerationStage.FINALIZE: 4,
 }
 
+_REMOVED_HANDOFF_FLAGS = frozenset({"--no-handoff", "--no-agents"})
+
 
 class ProgressRenderer:
     """Render generation progress at the terminal boundary."""
@@ -191,17 +193,6 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument(
         "--no-docs", action="store_true", help="Skip design-doc templates overlay"
     )
-    init_parser.add_argument(
-        "--no-handoff",
-        action="store_true",
-        help="Exclude the Handoff Protocol scaffold (docs/handoffs/).",
-    )
-    init_parser.add_argument(
-        "--no-agents",
-        action="store_true",
-        help="Deprecated alias for --no-handoff.",
-    )
-
     check_parser = subparsers.add_parser(
         "check", help="Inspect an existing project for structural or pin drift"
     )
@@ -256,7 +247,6 @@ def build_answers(
         no_skills=args.no_skills,
         no_mcp=args.no_mcp,
         no_docs=args.no_docs,
-        no_handoff=args.no_handoff or args.no_agents,
         agents=args.agents,
     ) or ProjectSelection.all(catalog)
 
@@ -283,7 +273,6 @@ def _build_partial_answers(
         no_skills=args.no_skills,
         no_mcp=args.no_mcp,
         no_docs=args.no_docs,
-        no_handoff=args.no_handoff or args.no_agents,
         agents=args.agents,
     )
 
@@ -298,9 +287,6 @@ def _build_partial_answers(
 def _run_init(args: argparse.Namespace) -> int:
     manifest = load_default_manifest()
     pin = manifest.upstream["base_template"]
-
-    if args.no_agents:
-        print("warning: --no-agents is deprecated; use --no-handoff.", file=sys.stderr)
 
     if args.yes:
         answers = build_answers(args, manifest.components)
@@ -339,13 +325,25 @@ def _run_upgrade(args: argparse.Namespace) -> int:
     return 0
 
 
+def _reject_removed_handoff_flags(argv: list[str]) -> None:
+    for argument in argv:
+        flag = argument.partition("=")[0]
+        if flag in _REMOVED_HANDOFF_FLAGS:
+            raise InvalidArgumentsError(
+                f"{flag} was removed because dev-ready no longer generates "
+                "the Handoff Protocol"
+            )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
-    if args.command is None:
-        parser.print_help()
-        return 0
+    resolved_argv = sys.argv[1:] if argv is None else argv
     try:
+        _reject_removed_handoff_flags(resolved_argv)
+        args = parser.parse_args(resolved_argv)
+        if args.command is None:
+            parser.print_help()
+            return 0
         if args.command == "init":
             return _run_init(args)
         if args.command == "check":

@@ -22,7 +22,7 @@ Meanwhile the cost is continuous. The scaffold carries a configuration schema, s
 
 Stop generating it. Generated projects receive no protocol configuration, no review-gate templates, no ticket directory, and no execution-report skeleton, and the selectable unit that produced them is removed along with its Component and its flag.
 
-dev-ready's own process is untouched. The role definitions in this repository's agent rules, its four-layer loop, and its per-version working directories continue exactly as they are. What ends is productization, not practice.
+This spec touches only what is generated; it changes nothing about how this repository develops. (Note added 2026-07-31: the practice did change, separately — ADR-021 retires the four-layer loop and its gate documents here too, leaving the Spec Loop and the per-version working directories. That is out of scope for this FR, which remains exactly as accepted.)
 
 Existing projects are migrated rather than stranded. The generated files retire through the established obsolete-file rules in the same transaction as this version's other retirements: untouched files are deleted, files the user edited are kept with their deletion skipped, and both outcomes are reported. Nothing smaller stands in for the removed capability — no reduced scaffold, no optional preset, no documentation stub.
 

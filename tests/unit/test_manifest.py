@@ -34,14 +34,14 @@ VALID = {
         "skills": {
             "items": [
                 {
-                    "id": "project-orientation",
-                    "description": "Skill that orients an AI agent to the generated project's layout, stack, and dev workflow.",
+                    "id": "sample-skill",
+                    "description": "Sample skill for manifest parsing.",
                     "mode": "builtin",
                     "license": "MIT",
                     "paths": [
                         {
-                            "src": "claude/skills/project-orientation",
-                            "dest": ".agents/skills/project-orientation",
+                            "src": "claude/skills/sample-skill",
+                            "dest": ".agents/skills/sample-skill",
                         }
                     ],
                 }
@@ -78,11 +78,11 @@ def test_parse_valid_manifest() -> None:
     assert pin.license == "MIT"
     assert len(manifest.components["skills"]) == 1
     skill = manifest.components["skills"][0]
-    assert skill.id == "project-orientation"
+    assert skill.id == "sample-skill"
     assert skill.mode == "builtin"
     assert skill.license == "MIT"
-    assert skill.paths[0].src == "claude/skills/project-orientation"
-    assert skill.paths[0].dest == ".agents/skills/project-orientation"
+    assert skill.paths[0].src == "claude/skills/sample-skill"
+    assert skill.paths[0].dest == ".agents/skills/sample-skill"
     assert len(manifest.components["mcp"]) == 1
     mcp = manifest.components["mcp"][0]
     assert mcp.id == "mcp-config"
@@ -165,11 +165,11 @@ def _add_required_skill(
 def test_catalog_item_requirements_are_parsed_in_manifest_order() -> None:
     data = json.loads(json.dumps(VALID))
     _add_required_skill(data, item_id="tdd")
-    _add_required_skill(data, item_id="spec-loop", requires=["tdd", "project-orientation"])
+    _add_required_skill(data, item_id="spec-loop", requires=["tdd", "sample-skill"])
 
     manifest = parse_manifest(json.dumps(data))
 
-    assert manifest.components["skills"][-1].requires == ("tdd", "project-orientation")
+    assert manifest.components["skills"][-1].requires == ("tdd", "sample-skill")
 
 
 @pytest.mark.parametrize(
@@ -210,7 +210,8 @@ def test_default_manifest_contains_complete_spec_loop_bundle() -> None:
     manifest = load_default_manifest()
     skills = {item.id: item for item in manifest.components["skills"]}
 
-    assert len(skills) == 10
+    assert len(skills) == 9
+    assert "project-orientation" not in skills
     assert skills["spec-loop"].requires == (
         "tdd",
         "diagnosing-bugs",
@@ -223,6 +224,7 @@ def test_default_manifest_contains_complete_spec_loop_bundle() -> None:
         ".agents/skills/domain-modeling",
         ".agents/skills/to-spec",
         ".agents/skills/to-tickets",
+        ".agents/skills/implement",
         ".agents/skills/improve-codebase-architecture",
         ".agents/skills/codebase-design",
         "docs/agents",
@@ -236,6 +238,7 @@ def test_default_manifest_contains_complete_spec_loop_bundle() -> None:
         "skills/engineering/domain-modeling",
         "skills/engineering/to-spec",
         "skills/engineering/to-tickets",
+        "skills/engineering/implement",
         "skills/engineering/improve-codebase-architecture",
         "skills/engineering/codebase-design",
     }

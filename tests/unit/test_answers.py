@@ -15,12 +15,11 @@ CATALOG = load_default_manifest().components
 def test_flag_and_prompt_adapters_share_one_canonical_selection() -> None:
     selection = ProjectSelection.from_flags(
         catalog=CATALOG,
-        skills="project-orientation, tdd",
+        skills="caveman, tdd",
         mcp="none",
         no_skills=False,
         no_mcp=False,
         no_docs=True,
-        no_handoff=False,
     )
 
     assert selection is not None
@@ -29,12 +28,19 @@ def test_flag_and_prompt_adapters_share_one_canonical_selection() -> None:
         target_dir=Path("my-app"),
         selection=selection,
     )
-    assert answers.items("skills") == frozenset({"project-orientation", "tdd"})
+    assert answers.items("skills") == frozenset({"caveman", "tdd"})
     assert answers.items("mcp") == frozenset()
     assert answers.includes("skills") is True
     assert answers.includes("mcp") is False
     assert answers.includes("docs") is False
-    assert answers.includes("handoff") is True
+
+
+def test_handoff_is_not_a_generation_selection_axis() -> None:
+    selection = ProjectSelection.all(CATALOG)
+
+    with pytest.raises(ValueError, match="unknown selection"):
+        selection.includes("handoff")
+    assert not hasattr(selection, "handoff")
 
 
 def test_no_selection_flags_leave_selection_unresolved() -> None:
@@ -46,7 +52,6 @@ def test_no_selection_flags_leave_selection_unresolved() -> None:
             no_skills=False,
             no_mcp=False,
             no_docs=False,
-            no_handoff=False,
         )
         is None
     )
@@ -104,7 +109,6 @@ def test_flag_selection_exposes_resolved_requirements() -> None:
         no_skills=False,
         no_mcp=False,
         no_docs=False,
-        no_handoff=False,
     )
 
     assert selection is not None
@@ -119,7 +123,6 @@ def test_explicit_none_has_an_empty_dependency_closure() -> None:
         no_skills=False,
         no_mcp=False,
         no_docs=False,
-        no_handoff=False,
     )
 
     assert selection is not None
@@ -143,7 +146,6 @@ def test_agent_target_flag_selection(raw: str, expected: frozenset[str]) -> None
         no_skills=False,
         no_mcp=False,
         no_docs=False,
-        no_handoff=False,
     )
 
     assert selection is not None
@@ -160,7 +162,6 @@ def test_unknown_agent_target_lists_valid_ids() -> None:
             no_skills=False,
             no_mcp=False,
             no_docs=False,
-            no_handoff=False,
         )
 
     message = str(excinfo.value)

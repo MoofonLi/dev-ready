@@ -46,8 +46,6 @@ def _init_args(**overrides) -> argparse.Namespace:
         "no_skills": False,
         "no_mcp": False,
         "no_docs": False,
-        "no_handoff": False,
-        "no_agents": False,
     }
     defaults.update(overrides)
     return argparse.Namespace(**defaults)
@@ -276,7 +274,6 @@ def test_init_success_omits_disabled_components_from_summary(
                 "--no-skills",
                 "--no-mcp",
                 "--no-docs",
-                "--no-handoff",
             ]
         )
         == 0
@@ -340,7 +337,6 @@ def test_init_flags_reach_generate_via_answers(
     assert answers.include_skills is False
     assert answers.include_mcp is False
     assert answers.include_docs is True
-    assert answers.include_handoff is True
     assert answers.assume_yes is True
 
 
@@ -352,7 +348,6 @@ def test_build_answers_defaults() -> None:
     assert answers.include_mcp is True
     assert answers.skills_items == frozenset(
         {
-            "project-orientation",
             "react-doctor",
             "caveman",
                 "security-audit",
@@ -366,13 +361,12 @@ def test_build_answers_defaults() -> None:
     )
     assert answers.mcp_items == frozenset({"mcp-config", "code-memory"})
     assert answers.include_docs is True
-    assert answers.include_handoff is True
     assert answers.assume_yes is False
 
 
 def test_build_answers_respects_flags(tmp_path) -> None:
     answers = build_answers(
-        _init_args(yes=True, target_dir=tmp_path / "out", no_skills=True, no_mcp=True, no_handoff=True),
+        _init_args(yes=True, target_dir=tmp_path / "out", no_skills=True, no_mcp=True),
         CATALOG,
     )
     assert answers.target_dir == tmp_path / "out"
@@ -381,7 +375,6 @@ def test_build_answers_respects_flags(tmp_path) -> None:
     assert answers.skills_items == frozenset()
     assert answers.mcp_items == frozenset()
     assert answers.include_docs is True
-    assert answers.include_handoff is False
     assert answers.assume_yes is True
 
 
@@ -394,41 +387,46 @@ def test_parser_accepts_all_documented_flags() -> None:
             "--dir",
             "x",
             "--skills",
-            "project-orientation",
+            "caveman",
             "--mcp",
             "none",
             "--agents",
             "claude,windsurf",
             "--no-docs",
-            "--no-handoff",
         ]
     )
     assert args.command == "init"
     assert args.yes is True
     assert args.target_dir == Path("x")
-    assert args.skills == "project-orientation"
+    assert args.skills == "caveman"
     assert args.mcp == "none"
     assert args.agents == "claude,windsurf"
     assert args.no_docs is True
-    assert args.no_handoff is True
+    assert not hasattr(args, "no_handoff")
+    assert not hasattr(args, "no_agents")
 
 
-def test_deprecated_no_agents_alias_warns_and_disables_handoff(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize("removed_flag", ["--no-handoff", "--no-agents"])
+def test_removed_handoff_flags_exit_2_before_generation(
+    removed_flag: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    captured: dict[str, Answers] = {}
+    called = False
 
-    def _capture(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
-        captured["answers"] = answers
+    def _capture(*args, **kwargs) -> list[Path]:
+        nonlocal called
+        called = True
         return []
 
     monkeypatch.setattr(cli_module, "generate", _capture)
 
-    assert main(["init", "my-app", "--yes", "--dir", str(tmp_path / "out"), "--no-agents"]) == 0
-    assert captured["answers"].include_handoff is False
-    stderr = capsys.readouterr().err
-    assert "deprecated" in stderr
-    assert "--no-handoff" in stderr
+    assert main(["init", "my-app", "--yes", removed_flag]) == 2
+    assert called is False
+    error = capsys.readouterr().err
+    assert removed_flag in error
+    assert "removed" in error
+    assert "Handoff Protocol" in error
 
 
 def test_agents_flag_reaches_generation_as_resolved_target_selection(
@@ -476,31 +474,6 @@ def test_unknown_agents_flag_fails_before_generation(
     assert "windsurf" in error
 
 
-def test_no_handoff_and_deprecated_alias_are_accepted_together(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    captured: dict[str, Answers] = {}
-
-    def _capture(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
-        captured["answers"] = answers
-        return []
-
-    monkeypatch.setattr(cli_module, "generate", _capture)
-
-    assert main(
-        [
-            "init",
-            "my-app",
-            "--yes",
-            "--dir",
-            str(tmp_path / "out"),
-            "--no-handoff",
-            "--no-agents",
-        ]
-    ) == 0
-    assert captured["answers"].include_handoff is False
-
-
 def test_upgrade_parser_accepts_path_and_dry_run() -> None:
     args = build_parser().parse_args(["upgrade", "project", "--dry-run"])
     assert args.command == "upgrade"
@@ -535,7 +508,6 @@ def test_skills_and_mcp_item_flag_variations() -> None:
     ans = build_answers(_init_args(skills="all", mcp="none"), CATALOG)
     assert ans.skills_items == frozenset(
         {
-            "project-orientation",
             "react-doctor",
             "caveman",
                 "security-audit",
@@ -551,9 +523,9 @@ def test_skills_and_mcp_item_flag_variations() -> None:
     assert ans.include_skills is True
     assert ans.include_mcp is False
 
-    # --skills project-orientation / --mcp mcp-config
-    ans2 = build_answers(_init_args(skills="project-orientation", mcp="mcp-config"), CATALOG)
-    assert ans2.skills_items == frozenset({"project-orientation"})
+    # --skills caveman / --mcp mcp-config
+    ans2 = build_answers(_init_args(skills="caveman", mcp="mcp-config"), CATALOG)
+    assert ans2.skills_items == frozenset({"caveman"})
     assert ans2.mcp_items == frozenset({"mcp-config"})
 
 
@@ -561,13 +533,26 @@ def test_unknown_item_id_exits_2(capsys) -> None:
     assert main(["init", "my-app", "--yes", "--skills", "bogus"]) == 2
     err = capsys.readouterr().err
     assert "unknown skills item ids: ['bogus']" in err
-    assert "valid ids: ['caveman', 'code-review', 'diagnosing-bugs', 'frontend-design', 'project-orientation', 'react-doctor', 'security-audit', 'spec-loop', 'tdd', 'webapp-testing']" in err
+    assert "valid ids: ['caveman', 'code-review', 'diagnosing-bugs', 'frontend-design', 'react-doctor', 'security-audit', 'spec-loop', 'tdd', 'webapp-testing']" in err
+
+
+def test_removed_project_orientation_id_uses_standard_unknown_item_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["init", "my-app", "--yes", "--skills", "project-orientation"]) == 2
+    error = capsys.readouterr().err
+    assert "unknown skills item ids: ['project-orientation']" in error
+    assert (
+        "valid ids: ['caveman', 'code-review', 'diagnosing-bugs', "
+        "'frontend-design', 'react-doctor', 'security-audit', 'spec-loop', "
+        "'tdd', 'webapp-testing']"
+    ) in error
 
 
 def test_conflicting_flags_exits_2(capsys) -> None:
-    assert main(["init", "my-app", "--yes", "--no-skills", "--skills", "project-orientation"]) == 2
+    assert main(["init", "my-app", "--yes", "--no-skills", "--skills", "caveman"]) == 2
     err = capsys.readouterr().err
-    assert "--no-skills conflicts with --skills 'project-orientation'" in err
+    assert "--no-skills conflicts with --skills 'caveman'" in err
 
 
 def test_no_skills_with_skills_none_is_allowed() -> None:

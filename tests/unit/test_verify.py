@@ -22,7 +22,7 @@ PIN = MANIFEST.upstream["base_template"]
 def _answers(
     tmp_path: Path,
     *,
-    skills_items: frozenset[str] = frozenset({"project-orientation"}),
+    skills_items: frozenset[str] = frozenset({"caveman"}),
     mcp_items: frozenset[str] = frozenset({"mcp-config"}),
 ) -> Answers:
     return Answers(
@@ -111,18 +111,18 @@ def test_verify_raises_when_stamp_file_is_missing(tmp_path: Path) -> None:
 
 
 def test_verify_raises_when_selected_item_path_is_missing(tmp_path: Path) -> None:
-    ans = _answers(tmp_path, skills_items=frozenset({"project-orientation"}))
+    ans = _answers(tmp_path, skills_items=frozenset({"caveman"}))
     _make_complete_project(tmp_path, ans)
-    shutil.rmtree(tmp_path / ".agents" / "skills" / "project-orientation")
+    shutil.rmtree(tmp_path / ".agents" / "skills" / "caveman")
 
-    with pytest.raises(VerificationError, match="selected skills item 'project-orientation' is missing"):
+    with pytest.raises(VerificationError, match="selected skills item 'caveman' is missing"):
         verify_project(tmp_path, ans, CATALOG)
 
 
 def test_verify_rejects_missing_selected_agent_target_stub(tmp_path: Path) -> None:
-    ans = _answers(tmp_path, skills_items=frozenset({"project-orientation"}))
+    ans = _answers(tmp_path, skills_items=frozenset({"caveman"}))
     _make_complete_project(tmp_path, ans)
-    (tmp_path / ".claude" / "skills" / "project-orientation" / "SKILL.md").unlink()
+    (tmp_path / ".claude" / "skills" / "caveman" / "SKILL.md").unlink()
 
     with pytest.raises(VerificationError, match="agent target 'claude'.*is missing"):
         verify_project(tmp_path, ans, CATALOG)
@@ -158,7 +158,7 @@ def test_verify_always_applied_files_with_unselected_item_still_passes(tmp_path:
 def test_verify_selection_matrix_all_on(tmp_path: Path) -> None:
     ans = _answers(
         tmp_path,
-        skills_items=frozenset({"project-orientation", "react-doctor"}),
+        skills_items=frozenset({"caveman", "react-doctor"}),
         mcp_items=frozenset({"mcp-config", "code-memory"}),
     )
     _make_complete_project(tmp_path, ans)

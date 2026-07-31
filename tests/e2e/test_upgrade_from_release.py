@@ -15,7 +15,8 @@ import pytest
 
 pytestmark = pytest.mark.network
 
-_RELEASED_VERSION = "0.7.0"
+_RELEASED_VERSION = "0.8.0"
+_RETIRED_SKILL_IDS = frozenset({"project-orientation"})
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PROBE_PREFIX = "__DEV_READY_PROBE__="
 _PROBE_AND_RUN = f"""
@@ -194,9 +195,11 @@ def _selection_arguments(stamp: dict[str, Any]) -> list[str]:
         assert all(isinstance(item_id, str) for item_id in item_ids), (
             f"released stamp has an invalid {component} item id"
         )
+        if component == "skills":
+            item_ids = [item_id for item_id in item_ids if item_id not in _RETIRED_SKILL_IDS]
         selection = ",".join(item_ids) if selected.get("included") else "none"
         arguments.extend((f"--{component}", selection))
-    for component in ("docs", "agents"):
+    for component in ("docs", "handoff"):
         selected = components.get(component)
         if not isinstance(selected, dict) or not selected.get("included"):
             arguments.append(f"--no-{component}")
@@ -283,13 +286,18 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert (target / ".dev-ready.json").is_file(), "old generation did not write its stamp"
     assert (target / "backend").is_dir(), "old generation omitted the backend application"
     assert (target / "frontend").is_dir(), "old generation omitted the frontend application"
-    assert not (target / "AGENTS.md").exists(), "released project already has canonical rules"
-    assert not (target / ".agents/skills/project-orientation/SKILL.md").exists(), (
-        "released project already has dev-ready canonical skills"
+    canonical_skill = target / ".agents/skills/project-orientation/SKILL.md"
+    claude_stub = target / ".claude/skills/project-orientation/SKILL.md"
+    windsurf_stub = target / ".windsurf/skills/project-orientation/SKILL.md"
+    assert (target / "AGENTS.md").is_file(), "released project omitted canonical rules"
+    assert canonical_skill.is_file(), "released project omitted canonical skill content"
+    assert (target / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n", (
+        "released project omitted the Claude rules pointer"
     )
-    assert (target / "CLAUDE.md").is_file(), "released project omitted Claude rules"
-    assert (target / ".claude/skills/project-orientation/SKILL.md").is_file(), (
-        "released project omitted its Claude skill content"
+    assert claude_stub.is_file(), "released project omitted the Claude Pointer Stub"
+    assert windsurf_stub.is_file(), "released project omitted the Windsurf Pointer Stub"
+    assert canonical_skill.read_bytes() != claude_stub.read_bytes(), (
+        "released project duplicated canonical skill bytes into the Claude target"
     )
 
     before_upgrade = _snapshot(target)
@@ -343,6 +351,7 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
             "missing required path",
             "missing overlay file",
             "missing item path",
+            "missing agent target artifact",
         )
         unexpected_drifts = [
             drift
@@ -354,21 +363,12 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
             "pre-upgrade check reported non-overlay drift: " + repr(unexpected_drifts)
         )
 
-    dry_run, _ = _checkout_stage(
+    _checkout_stage(
         "dry-run upgrade",
         ["upgrade", str(target), "--dry-run"],
         cwd=tmp_path,
     )
     assert _snapshot(target) == before_upgrade, "dry-run upgrade mutated generated project bytes"
-    for planned_path in (
-        "AGENTS.md",
-        "CLAUDE.md",
-        ".agents/skills/project-orientation/SKILL.md",
-        ".claude/skills/project-orientation/SKILL.md",
-    ):
-        assert planned_path in dry_run.stdout, (
-            f"dry-run omitted migration action for {planned_path}"
-        )
 
     _, checkout_probe = _checkout_stage(
         "real upgrade",
@@ -378,25 +378,18 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     after_upgrade = _snapshot(target)
     new_stamp = _load_stamp(target, "real upgrade")
 
-    canonical_skill = target / ".agents/skills/project-orientation/SKILL.md"
-    claude_stub = target / ".claude/skills/project-orientation/SKILL.md"
-    assert (target / "AGENTS.md").is_file(), "migration omitted canonical rules"
+    assert (target / "AGENTS.md").is_file(), "upgrade omitted canonical rules"
     assert (target / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n", (
-        "migration did not replace clean Claude rules with the canonical pointer"
+        "upgrade omitted the Claude rules pointer"
     )
-    assert canonical_skill.is_file(), "migration omitted canonical skill content"
-    assert claude_stub.is_file(), "migration omitted the Claude Pointer Stub"
-    assert canonical_skill.read_bytes() != claude_stub.read_bytes(), (
-        "migration duplicated canonical skill bytes into the Claude target"
-    )
-    assert not (target / ".windsurf").exists(), (
-        "migration added a target that could not have been selected by the released version"
-    )
+    assert not canonical_skill.exists(), "upgrade retained retired canonical skill content"
+    assert not claude_stub.exists(), "upgrade retained the retired Claude Pointer Stub"
+    assert not windsurf_stub.exists(), "upgrade retained the retired Windsurf Pointer Stub"
     for path in target.rglob("*"):
-        assert not path.is_symlink(), f"migration produced a symbolic link: {path}"
-    assert new_stamp.get("stamp_version") == 4, "migration did not advance the stamp"
-    assert new_stamp.get("agent_targets") == ["claude"], (
-        "migration did not record the inferred Claude Agent Target"
+        assert not path.is_symlink(), f"upgrade produced a symbolic link: {path}"
+    assert new_stamp.get("stamp_version") == 4, "upgrade changed the stamp version"
+    assert new_stamp.get("agent_targets") == old_stamp.get("agent_targets"), (
+        "upgrade changed the released project's Agent Target selection"
     )
 
     old_managed_files = _inventory_paths(old_stamp, "old generation")

@@ -6,19 +6,19 @@ disable-model-invocation: true
 
 This skill takes the current conversation context and codebase understanding and produces a spec (you may know this document as a PRD). Do NOT interview the user — just synthesize what you already know.
 
-## dev-ready conventions (ADR-013)
+## dev-ready conventions (ADR-021)
 
-This is the Planning-layer output of the internal four-phase process. In this
-repo the "tracker" is the filesystem:
+This is the second step of the internal Spec Loop — grill-with-docs → **to-spec**
+→ to-tickets → implement. In this repo the "tracker" is the filesystem:
 
 - Specs are **durable, committed docs**: write to `docs/specs/<version>/fr-NN-<slug>.md`
   (e.g. `docs/specs/v0.7/fr-28-spec-loop.md`), aligned with the FR numbering in
-  requirements.md / version-plan.md. A spec replaces the old `01-plan.md`
-  handoff document.
+  requirements.md / version-plan.md. The spec is the only durable record of the
+  phase — nothing else survives it, so it carries the whole "what and why".
 - Use the vocabulary in the root `CONTEXT.md` glossary and respect the ADRs in
   `docs/decisions/`.
-- No triage labels here; the spec's Status line (`Draft` → `Accepted by CEO`)
-  is the gate to the Dispatch layer (`to-tickets`).
+- No triage labels here; the spec's Status line (`Draft` → `Accepted`) is the
+  gate to `to-tickets`. Moofon accepts it — do not move on without that.
 
 ## Process
 

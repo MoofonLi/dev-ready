@@ -24,9 +24,9 @@ def test_init_real_end_to_end(
     agents_md = (target_dir / "AGENTS.md").read_text(encoding="utf-8")
     assert "my-app" in agents_md
     assert (target_dir / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n"
-    canonical_skill = target_dir / ".agents/skills/project-orientation/SKILL.md"
-    claude_stub = target_dir / ".claude/skills/project-orientation/SKILL.md"
-    windsurf_stub = target_dir / ".windsurf/skills/project-orientation/SKILL.md"
+    canonical_skill = target_dir / ".agents/skills/caveman/SKILL.md"
+    claude_stub = target_dir / ".claude/skills/caveman/SKILL.md"
+    windsurf_stub = target_dir / ".windsurf/skills/caveman/SKILL.md"
     assert canonical_skill.is_file()
     assert claude_stub.is_file()
     assert windsurf_stub.is_file()

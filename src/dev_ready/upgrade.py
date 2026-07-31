@@ -131,7 +131,6 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
             agent_targets=frozenset(stamp.agent_targets)
             & frozenset(manifest.agent_targets),
             docs=stamp.docs_included,
-            handoff=stamp.handoff_included,
         ),
     )
     new_content = build_overlay_content(answers, manifest.components)

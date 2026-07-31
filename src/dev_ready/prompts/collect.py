@@ -17,7 +17,7 @@ from dev_ready.prompts.asker import Asker
 
 __all__ = ["collect_answers", "confirm_generation"]
 
-_COMPONENT_CHOICES = ("skills", "mcp", "docs", "handoff")
+_COMPONENT_CHOICES = ("skills", "mcp", "docs")
 
 
 def _is_interactive() -> bool:
@@ -54,7 +54,7 @@ def collect_answers(
     if needs_components and asker is None and not _is_interactive():
         raise InvalidArgumentsError(
             "component selection requires an interactive terminal — pass "
-            "--no-skills/--no-mcp/--no-docs/--no-handoff explicitly, or use --yes"
+            "--no-skills/--no-mcp/--no-docs explicitly, or use --yes"
         )
 
     resolved_asker = asker
@@ -68,7 +68,7 @@ def collect_answers(
 
     if needs_components:
         assert resolved_asker is not None
-        skills_on, mcp_on, include_docs, include_handoff = _prompt_components(resolved_asker)
+        skills_on, mcp_on, include_docs = _prompt_components(resolved_asker)
         if catalog is not None:
             if skills_on and "skills" in catalog and catalog["skills"]:
                 skills_items = _prompt_items(
@@ -96,7 +96,6 @@ def collect_answers(
             mcp=mcp_items if mcp_on else frozenset(),
             agent_targets=agent_targets,
             docs=include_docs,
-            handoff=include_handoff,
         )
     else:
         assert partial.selection is not None
@@ -149,9 +148,6 @@ def _render_confirmation_summary(answers: Answers, pin: UpstreamPin) -> str:
         comp_parts.append(f"mcp ({mcp_str})")
     if answers.includes("docs"):
         comp_parts.append("docs")
-    if answers.includes("handoff"):
-        comp_parts.append("handoff")
-
     components_line = ", ".join(comp_parts) if comp_parts else "(none)"
     targets_line = ", ".join(sorted(answers.agent_targets)) or "(none)"
     return "\n".join(
@@ -187,7 +183,7 @@ def _prompt_project_name(asker: Asker) -> str:
         )
 
 
-def _prompt_components(asker: Asker) -> tuple[bool, bool, bool, bool]:
+def _prompt_components(asker: Asker) -> tuple[bool, bool, bool]:
     try:
         selected = asker.checkbox("Select components to include:", _COMPONENT_CHOICES)
     except KeyboardInterrupt:
@@ -199,7 +195,6 @@ def _prompt_components(asker: Asker) -> tuple[bool, bool, bool, bool]:
         "skills" in selected_set,
         "mcp" in selected_set,
         "docs" in selected_set,
-        "handoff" in selected_set,
     )
 
 

@@ -8,24 +8,30 @@ disable-model-invocation: true
 
 Break a plan, spec, or conversation into a set of **tickets** — tracer-bullet vertical slices, each declaring the tickets that **block** it.
 
-## dev-ready conventions (ADR-013)
+## dev-ready conventions (ADR-021)
 
-This is the Dispatch-layer step of the internal four-phase process, run by the
-Senior role from an accepted spec in `docs/specs/<version>/`:
+This is the third step of the internal Spec Loop — grill-with-docs → to-spec →
+**to-tickets** → implement — run wearing the Tech Lead hat, from an accepted spec
+in `docs/specs/<version>/`:
 
 - Tickets are **working files, never committed**: one file per ticket under
   `docs/handoff/<version>/phase-N/tickets/<NN>-<slug>.md` (the handoff tree is
-  gitignored, ADR-011). They replace the old `02-implementation.md` document.
+  gitignored, ADR-011).
+- A ticket is the **only file the Engineer needs to run it cold**. There are no
+  gate documents any more (ADR-021), so the standing rules ride in the ticket
+  header — reproduce the `<standing-rules>` block below verbatim in every ticket.
 - **Every ticket MUST declare its expected file footprint** (the paths it will
   create or modify) and an independence marker:
   - `parallel-safe: yes` only when its footprint is provably disjoint from
     every other open ticket's footprint. Anything shared (`cli.py`,
     `manifest/loader.py`, …) means `parallel-safe: no`.
-- **Execution is sequential by default** — one Junior, one ticket at a time, in
-  the main working tree. Parallel dispatch is the controlled exception: only
-  `parallel-safe: yes` tickets, each Junior in its **own git worktree**,
-  delivering a diff/patch back; the CEO applies and commits in order. Juniors
-  never run state-changing git either way.
+- **Execution is sequential by default** — one ticket at a time, in the main
+  working tree. Parallel dispatch is the controlled exception: only
+  `parallel-safe: yes` tickets, each session in its **own git worktree**,
+  delivering a diff/patch back for Moofon to apply in order. No session runs
+  state-changing git without explicit per-action permission either way.
+- Give each ticket heading a **Conventional Commit message**, so the work can be
+  committed straight from the ticket once Moofon approves it.
 
 ## Process
 
@@ -84,6 +90,8 @@ Do NOT close or modify any parent issue.
 
 # <NN> — <Ticket title>
 
+**Commit:** `<type>(<scope>): <conventional commit message for this ticket>`
+
 **What to build:** the end-to-end behaviour this ticket makes work, from the user's perspective — not a layer-by-layer implementation list.
 
 **Blocked by:** the numbers/titles of the tickets that gate this one, or "None — can start immediately".
@@ -92,10 +100,25 @@ Do NOT close or modify any parent issue.
 
 **Parallel-safe:** yes/no — yes only if the footprint is disjoint from every other open ticket (see dev-ready conventions above).
 
+**Spec:** `docs/specs/<version>/fr-NN-<slug>.md` — the durable record this work is reviewed against.
+
 **Status:** ready-for-agent
 
 - [ ] Acceptance criterion 1
 - [ ] Acceptance criterion 2
+
+<standing-rules>
+
+## Standing rules (ADR-021)
+
+- Follow the `implement` skill (`.agents/skills/implement/SKILL.md`). TDD is mandatory: red → green → refactor.
+- Stay inside the file footprint above. Need a path outside it? Stop and say so.
+- Verify in order before calling this done: `uv sync --dev` → `uv run pytest` → `uv run ruff check .` (→ `uv run pytest -m network` if this ticket touches fetch/pins). Any failure: fix, restart from the top.
+- No state-changing git without explicit permission for that action (no commit/push/branch/merge/reset). Read-only git is fine.
+- Hard bug: STOP, report it in the session, move to the next unblocked ticket. Do not grind.
+- Run `/code-review` when the work is green. No gate documents, no reports.
+
+</standing-rules>
 
 </local-ticket-template>
 

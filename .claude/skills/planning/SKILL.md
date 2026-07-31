@@ -1,6 +1,6 @@
 ---
 name: planning
-description: Cut a dev-ready version into an ordered set of implementation phases and write the version plan (docs/handoff/<version>/<version>-plan.md) that the handoff skill consumes. Use when starting a new version or breaking a version's FRs into phases - e.g. "plan v0.4", "break v0.4 into phases".
+description: Cut a dev-ready version into an ordered set of implementation phases and write the version plan (docs/handoff/<version>/<version>-plan.md) that each phase's Spec Loop runs over. Use when starting a new version or breaking a version's FRs into phases - e.g. "plan v0.4", "break v0.4 into phases".
 ---
 
 # planning (pointer)

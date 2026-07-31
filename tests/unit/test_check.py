@@ -10,6 +10,7 @@ from dev_ready.cli import main
 from dev_ready import __version__
 from dev_ready.manifest import load_default_manifest
 from dev_ready.prompts import ProjectSelection
+from dev_ready.stamp import load_stamp
 from project_factory import materialize_project_structure
 
 
@@ -31,7 +32,6 @@ def _create_minimal_valid_project(project_dir: Path, stamp_version: int = 2) -> 
         skills=frozenset({skill_item.id}),
         mcp=frozenset({mcp_item.id}),
         docs=False,
-        handoff=False,
     )
     materialize_project_structure(project_dir, manifest.components, selection)
 
@@ -106,16 +106,23 @@ def test_check_fresh_v1_project(tmp_path: Path, capsys: pytest.CaptureFixture[st
     assert "Status: CLEAN" in captured.out
 
 
-def test_check_fresh_v3_project(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    _create_minimal_valid_project(tmp_path, stamp_version=3)
-    assert main(["check", str(tmp_path)]) == 0
-    assert "Status: CLEAN" in capsys.readouterr().out
-
-
-def test_check_fresh_v4_project_uses_handoff_component(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    ("stamp_version", "component_key"),
+    [(3, "agents"), (4, "handoff")],
+)
+def test_check_legacy_stamp_with_handoff_state_stays_clean(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    stamp_version: int,
+    component_key: str,
 ) -> None:
-    _create_minimal_valid_project(tmp_path, stamp_version=4)
+    _create_minimal_valid_project(tmp_path, stamp_version=stamp_version)
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["components"][component_key]["included"] = True
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    assert load_stamp(tmp_path).handoff_included is True
     assert main(["check", str(tmp_path)]) == 0
     assert "Status: CLEAN" in capsys.readouterr().out
 
@@ -128,13 +135,14 @@ def test_check_reports_missing_selected_agent_target_artifact(
     data = json.loads(stamp_path.read_text(encoding="utf-8"))
     data["agent_targets"] = ["windsurf"]
     stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    missing = tmp_path / ".windsurf/skills/project-orientation/SKILL.md"
+    selected_skill_id = data["components"]["skills"]["items"][0]["id"]
+    missing = tmp_path / f".windsurf/skills/{selected_skill_id}/SKILL.md"
     missing.unlink()
 
     assert main(["check", str(tmp_path)]) == 7
     error = capsys.readouterr().err
     assert "missing agent target artifact" in error
-    assert ".windsurf/skills/project-orientation/SKILL.md" in error
+    assert f".windsurf/skills/{selected_skill_id}/SKILL.md" in error
 
 
 def test_check_reports_removed_recorded_agent_target(

@@ -106,7 +106,6 @@ def test_skill_documents_safe_failure_and_verification_behavior() -> None:
         "--no-skills",
         "--no-mcp",
         "--no-docs",
-        "--no-agents",
         "unknown item",
         "conflicting flags",
         "nonzero",
@@ -119,6 +118,9 @@ def test_skill_documents_safe_failure_and_verification_behavior() -> None:
         "do not delete",
     ):
         assert required in text
+    assert "--no-handoff" not in text
+    assert "--no-agents" not in text
+    assert "handoff protocol" not in text
 
 
 def test_distribution_skill_is_not_a_catalog_or_generated_overlay_asset(tmp_path: Path) -> None:

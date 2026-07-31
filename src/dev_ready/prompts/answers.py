@@ -34,7 +34,6 @@ class ProjectSelection:
     mcp: frozenset[str] = frozenset()
     agent_targets: frozenset[str] = frozenset()
     docs: bool = True
-    handoff: bool = True
 
     @classmethod
     def _create(
@@ -44,14 +43,12 @@ class ProjectSelection:
         mcp: frozenset[str],
         agent_targets: frozenset[str],
         docs: bool,
-        handoff: bool,
     ) -> ProjectSelection:
         selection = object.__new__(cls)
         object.__setattr__(selection, "skills", skills)
         object.__setattr__(selection, "mcp", mcp)
         object.__setattr__(selection, "agent_targets", agent_targets)
         object.__setattr__(selection, "docs", docs)
-        object.__setattr__(selection, "handoff", handoff)
         return selection
 
     @classmethod
@@ -61,7 +58,6 @@ class ProjectSelection:
             mcp=frozenset(),
             agent_targets=frozenset({"claude"}),
             docs=True,
-            handoff=True,
         )
 
     @classmethod
@@ -71,7 +67,6 @@ class ProjectSelection:
             mcp=frozenset(),
             agent_targets=frozenset(),
             docs=False,
-            handoff=False,
         )
 
     @classmethod
@@ -83,8 +78,9 @@ class ProjectSelection:
         mcp: frozenset[str] = frozenset(),
         agent_targets: frozenset[str] | None = None,
         docs: bool = True,
-        handoff: bool = True,
+        handoff: bool = False,
     ) -> ProjectSelection:
+        _ = handoff  # Compatibility for internal v0.8 lifecycle fixtures only.
         _validate_items("skills", skills, catalog)
         _validate_items("mcp", mcp, catalog)
         resolved_targets = _all_agent_target_ids(catalog) if agent_targets is None else agent_targets
@@ -94,7 +90,6 @@ class ProjectSelection:
             mcp=_resolve_requirements("mcp", mcp, catalog),
             agent_targets=resolved_targets,
             docs=docs,
-            handoff=handoff,
         )
 
     @classmethod
@@ -104,7 +99,6 @@ class ProjectSelection:
             mcp=frozenset(item.id for item in catalog.get("mcp", ())),
             agent_targets=_all_agent_target_ids(catalog),
             docs=True,
-            handoff=True,
         )
 
     @classmethod
@@ -117,7 +111,6 @@ class ProjectSelection:
         no_skills: bool,
         no_mcp: bool,
         no_docs: bool,
-        no_handoff: bool,
         agents: str | None = None,
     ) -> ProjectSelection | None:
         """Resolve CLI selection flags, or return ``None`` when unspecified."""
@@ -125,7 +118,6 @@ class ProjectSelection:
             no_skills
             or no_mcp
             or no_docs
-            or no_handoff
             or skills is not None
             or mcp is not None
             or agents is not None
@@ -141,7 +133,6 @@ class ProjectSelection:
             mcp=_resolve_items("mcp", mcp, no_mcp, all_mcp),
             agent_targets=_resolve_agent_targets(agents, _all_agent_target_ids(catalog)),
             docs=not no_docs,
-            handoff=not no_handoff,
         )
 
     def items(self, name: str) -> frozenset[str]:
@@ -156,8 +147,6 @@ class ProjectSelection:
             return bool(self.items(name))
         if name == "docs":
             return self.docs
-        if name == "handoff":
-            return self.handoff
         raise ValueError(f"unknown selection {name!r}")
 
 
@@ -292,10 +281,6 @@ class Answers:
     @property
     def include_docs(self) -> bool:
         return self.includes("docs")
-
-    @property
-    def include_handoff(self) -> bool:
-        return self.includes("handoff")
 
     @property
     def agent_targets(self) -> frozenset[str]:

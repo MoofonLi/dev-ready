@@ -59,7 +59,6 @@ def render_stamp(
                 "items": _stamp_items("mcp", answers.items("mcp")),
             },
             "docs": {"included": answers.includes("docs")},
-            "handoff": {"included": answers.includes("handoff")},
         },
         "upstream": {"repo": pin.repo, "commit": pin.commit},
         "inventory": [{"path": path, "sha256": digest} for path, digest in sorted(inventory)],
@@ -142,8 +141,6 @@ def build_overlay_content(
 
     if answers.includes("docs"):
         collect(templates_root.joinpath("docs"), Path("docs"))
-    if answers.includes("handoff"):
-        collect(templates_root.joinpath("agents"), Path("docs") / "handoffs")
     return content
 
 

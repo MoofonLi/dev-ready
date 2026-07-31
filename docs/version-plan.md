@@ -587,9 +587,9 @@ becomes the structure every generated project has; the catalog stays freely
 composable but is presented, selected, and reasoned about along Categories that
 match how a user thinks rather than how the overlay writes files.
 
-The half-turn is deliberate. The four-layer loop is the only part of dev-ready
-with real usage evidence — this repository has run v0.7 and v0.8 through it —
-which is why it earns the default. Locking the catalog shut is what was
+The half-turn is deliberate. The Spec Loop is the only part of dev-ready with
+real usage evidence — this repository has run v0.7 and v0.8 through it, and
+since ADR-021 runs on it alone — which is why it earns the default. Locking the catalog shut is what was
 rejected: a user who wants only `caveman` and `security-audit` is legitimate,
 and with the v1.0 real-users gate still open those users are the likeliest
 source of the evidence the gate demands.
@@ -639,9 +639,10 @@ seven-role, four-layer scaffold — protocol configuration, four gate templates,
 ticket directory, execution-report skeleton — is removed from the overlay along
 with its Component, its flag, and the deprecated alias kept from v0.8. It
 presumes a team of agents where an ordinary user has one, and it arrives before
-the work it governs exists. **dev-ready's own process is untouched** — ADR-007
-is scoped to internal practice, not superseded; ADR-013, the role definitions in
-`AGENTS.md`, and `docs/handoff/<version>/` all continue. Existing projects
+the work it governs exists. **This FR touches only what is generated** — it does
+not change how this repo develops. (That changed separately: ADR-021 retires the
+Handoff Protocol as internal practice too, leaving the Spec Loop and
+`docs/handoff/<version>/` working files.) Existing projects
 retire the files through ADR-014's obsolete-file rules in the same transaction
 as the version's other retirements; edited files are preserved and reported.
 Nothing replaces it — no reduced scaffold, no preset, no stub.
