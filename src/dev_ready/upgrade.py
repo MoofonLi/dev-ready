@@ -7,7 +7,7 @@ from pathlib import Path
 
 from dev_ready import __version__
 from dev_ready.catalog_effects import classify_shared_targets
-from dev_ready.errors import UpgradeError, UpgradeNotSupportedError
+from dev_ready.errors import StampInvalidError, UpgradeError, UpgradeNotSupportedError
 from dev_ready.manifest import load_default_manifest
 from dev_ready.overlay import build_overlay_content, content_inventory, render_stamp
 from dev_ready.prompts import Answers, ProjectSelection
@@ -78,13 +78,23 @@ def _format_report(
                 action = path
             lines.append(f"  - {action}")
     action_word = "would change" if dry_run else "changed"
+    change_count = len(groups["upgraded"]) + len(groups["added"]) + len(groups["deleted"])
     lines.append("")
     lines.append(
         f"Summary: {len(groups['upgraded'])} upgraded, {len(groups['added'])} added, "
         f"{len(groups['deleted'])} deleted; {action_word} "
-        f"{len(groups['upgraded']) + len(groups['added']) + len(groups['deleted'])} "
+        f"{change_count} "
         "overlay-managed files."
     )
+    unresolved_keys = (
+        "skipped_modified",
+        "skipped_missing",
+        "preserved_obsolete_modified",
+        "divergence",
+        "conflict",
+    )
+    if change_count == 0 and not any(groups[key] for key in unresolved_keys):
+        lines.append("No changes were needed.")
     return "\n".join(lines) + "\n"
 
 
@@ -103,6 +113,20 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         )
 
     manifest = load_default_manifest()
+    recorded_skills = frozenset(item.id for item in stamp.skills_items)
+    if (
+        stamp.stamp_version >= 5
+        and stamp.development_loop not in manifest.components.development_loop_ids
+    ):
+        raise StampInvalidError(
+            ".dev-ready.json records unknown development_loop "
+            f"{stamp.development_loop!r}"
+        )
+    if stamp.stamp_version >= 5 and stamp.development_loop not in recorded_skills:
+        raise StampInvalidError(
+            ".dev-ready.json development_loop must also appear in "
+            "components.skills.items"
+        )
     manifest_pin = manifest.upstream["base_template"]
     pin = type(manifest_pin)(
         repo=stamp.upstream.repo,
@@ -116,6 +140,9 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
     known_skills = frozenset(item.id for item in manifest.components.get("skills", ()))
     known_mcp = frozenset(item.id for item in manifest.components.get("mcp", ()))
     known_docs = frozenset(item.id for item in manifest.components.get("docs", ()))
+    selected_skills = recorded_skills & known_skills
+    if stamp.stamp_version < 5:
+        selected_skills |= frozenset({manifest.default_set.development_loop})
     removed_agent_targets = sorted(set(stamp.agent_targets) - set(manifest.agent_targets))
     if removed_agent_targets:
         raise UpgradeError(
@@ -127,7 +154,7 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         target_dir=resolved,
         selection=ProjectSelection.from_recorded_items(
             manifest.components,
-            skills=frozenset(item.id for item in stamp.skills_items) & known_skills,
+            skills=selected_skills,
             mcp=frozenset(item.id for item in stamp.mcp_items) & known_mcp,
             docs_items=(
                 frozenset(item.id for item in stamp.docs_items) & known_docs
@@ -232,7 +259,13 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
             continue
         current_hash = hashlib.sha256(target.read_bytes()).hexdigest()
         if current_hash != recorded[path]:
-            groups["preserved_obsolete_modified"].append(path)
+            groups["preserved_obsolete_modified"].append(
+                f"{path}: preserved; review it and remove it manually "
+                "if it is no longer needed"
+            )
+            groups["divergence"].append(
+                f"{path}: retained outside the current managed inventory"
+            )
             continue
         groups["deleted"].append(path)
         deletions.append(target)
@@ -252,7 +285,7 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         manifest.components,
         manifest.vendored,
         content_inventory(new_content),
-        stamp_version=max(stamp.stamp_version, 4),
+        stamp_version=5,
     ).encode("utf-8")
     stamp_path = resolved / ".dev-ready.json"
     if not _is_within(resolved, stamp_path) or _has_symlink_component(resolved, stamp_path):
@@ -261,6 +294,8 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         stamp_changed = new_stamp != stamp_path.read_bytes()
     except OSError as error:
         raise UpgradeError(f"failed to read .dev-ready.json during upgrade: {error}") from error
+    if stamp_changed:
+        groups["upgraded"].append(".dev-ready.json")
 
     report = _format_report(resolved, stamp.dev_ready_version, stamp.stamp_version, groups, dry_run)
     has_writes = bool(upgrades or adds or deletions) or stamp_changed
@@ -314,9 +349,16 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
             except OSError:
                 # Existing/non-empty parents are deliberately retained.
                 pass
-        message = f"upgrade failed and was rolled back: {error}"
         if rollback_errors:
-            message += f" (rollback encountered {len(rollback_errors)} error(s))"
+            message = (
+                f"upgrade failed: {error}; rollback encountered "
+                f"{len(rollback_errors)} error(s), so manual recovery may be required"
+            )
+        else:
+            message = (
+                "upgrade failed and was rolled back; the original project was restored: "
+                f"{error}. Retry the upgrade; if it fails again, report this error."
+            )
         raise UpgradeError(message) from error
     finally:
         shutil.rmtree(backup_root, ignore_errors=True)

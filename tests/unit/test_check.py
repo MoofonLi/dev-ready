@@ -80,6 +80,7 @@ def _create_minimal_valid_project(project_dir: Path, stamp_version: int = 2) -> 
             stamp_data["agent_targets"] = sorted(selection.agent_targets)
         if stamp_version >= 5:
             stamp_data["categories"] = sorted(selection.categories)
+            stamp_data["development_loop"] = selection.development_loop
 
     (project_dir / ".dev-ready.json").write_text(json.dumps(stamp_data, indent=2) + "\n", encoding="utf-8")
 
@@ -218,6 +219,17 @@ def test_malformed_v5_categories_raise_typed_stamp_error(tmp_path: Path) -> None
     stamp_path.write_text(json.dumps(data), encoding="utf-8")
 
     with pytest.raises(StampInvalidError, match="categories.*list of identifiers"):
+        load_stamp(tmp_path)
+
+
+def test_v5_stamp_requires_a_development_loop(tmp_path: Path) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=5)
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data.pop("development_loop")
+    stamp_path.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(StampInvalidError, match="development_loop"):
         load_stamp(tmp_path)
 
 

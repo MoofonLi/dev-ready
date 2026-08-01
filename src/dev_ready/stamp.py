@@ -54,6 +54,7 @@ class Stamp:
     upstream: UpstreamStampInfo
     project_name: str | None = None
     categories: tuple[str, ...] = ()
+    development_loop: str = ""
     inventory: tuple[InventoryEntry, ...] = ()
 
 
@@ -179,6 +180,16 @@ def load_stamp(project_dir: Path) -> Stamp:
     if len(set(categories_raw)) != len(categories_raw):
         raise StampInvalidError(".dev-ready.json 'categories' must not contain duplicates")
 
+    if version < 5:
+        development_loop = ""
+    else:
+        development_loop_raw = data.get("development_loop")
+        if not isinstance(development_loop_raw, str) or not development_loop_raw:
+            raise StampInvalidError(
+                ".dev-ready.json is missing a valid 'development_loop' identifier"
+            )
+        development_loop = development_loop_raw
+
     inventory_raw = data.get("inventory", [])
     if not isinstance(inventory_raw, list):
         raise StampInvalidError(".dev-ready.json 'inventory' must be a list")
@@ -206,5 +217,6 @@ def load_stamp(project_dir: Path) -> Stamp:
         upstream=UpstreamStampInfo(repo=repo, commit=commit),
         project_name=project_name,
         categories=tuple(categories_raw),
+        development_loop=development_loop,
         inventory=tuple(inventory),
     )

@@ -20,6 +20,17 @@ pytestmark = pytest.mark.network
 _RELEASED_VERSION = "0.8.0"
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PROBE_PREFIX = "__DEV_READY_PROBE__="
+_HANDOFF_PATHS = (
+    "docs/handoffs/.gitignore",
+    "docs/handoffs/README.md",
+    "docs/handoffs/phase-N/03-review.md",
+    "docs/handoffs/phase-N/04-qa-review.md",
+    "docs/handoffs/phase-N/05-security-review.md",
+    "docs/handoffs/phase-N/06-sre-review.md",
+    "docs/handoffs/phase-N/reports/execution-report.md",
+    "docs/handoffs/phase-N/tickets/README.md",
+    "docs/handoffs/protocol.yaml",
+)
 _PROBE_AND_RUN = f"""
 import json
 import sys
@@ -325,6 +336,13 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert canonical_skill.read_bytes() != claude_stub.read_bytes(), (
         "released project duplicated canonical skill bytes into the Claude target"
     )
+    for path in _HANDOFF_PATHS:
+        assert (target / path).is_file(), f"released project omitted Handoff file {path}"
+    implement_skill = target / ".agents/skills/implement/SKILL.md"
+    assert not implement_skill.exists(), "released v0.8 project unexpectedly contains implement"
+
+    edited_protocol = target / "docs/handoffs/protocol.yaml"
+    edited_protocol.write_text("user-edited retired protocol\n", encoding="utf-8")
 
     before_upgrade = _snapshot(target)
     old_stamp = _load_stamp(target, "old generation")
@@ -389,14 +407,18 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
             "pre-upgrade check reported non-overlay drift: " + repr(unexpected_drifts)
         )
 
-    _checkout_stage(
+    dry_run_result, _ = _checkout_stage(
         "dry-run upgrade",
         ["upgrade", str(target), "--dry-run"],
         cwd=tmp_path,
     )
     assert _snapshot(target) == before_upgrade, "dry-run upgrade mutated generated project bytes"
+    assert "would .dev-ready.json" in dry_run_result.stdout
+    assert "would .agents/skills/implement/SKILL.md" in dry_run_result.stdout
+    assert "would delete .agents/skills/project-orientation/SKILL.md" in dry_run_result.stdout
+    assert "docs/handoffs/protocol.yaml: preserved" in dry_run_result.stdout
 
-    _, checkout_probe = _checkout_stage(
+    real_upgrade_result, checkout_probe = _checkout_stage(
         "real upgrade",
         ["upgrade", str(target)],
         cwd=tmp_path,
@@ -411,9 +433,41 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert not canonical_skill.exists(), "upgrade retained retired canonical skill content"
     assert not claude_stub.exists(), "upgrade retained the retired Claude Pointer Stub"
     assert not windsurf_stub.exists(), "upgrade retained the retired Windsurf Pointer Stub"
+    for path in _HANDOFF_PATHS:
+        retired = target / path
+        if retired == edited_protocol:
+            assert retired.read_text(encoding="utf-8") == "user-edited retired protocol\n"
+        else:
+            assert not retired.exists(), f"upgrade retained untouched Handoff file {path}"
+    assert "docs/handoffs/protocol.yaml: preserved" in real_upgrade_result.stdout
+    assert (
+        "docs/handoffs/protocol.yaml: retained outside the current managed inventory"
+        in real_upgrade_result.stdout
+    )
+    assert implement_skill.is_file(), "upgrade did not add canonical implement content"
+    assert (target / ".claude/skills/implement/SKILL.md").is_file(), (
+        "upgrade did not add the Claude implement Pointer Stub"
+    )
+    assert (target / ".windsurf/skills/implement/SKILL.md").is_file(), (
+        "upgrade did not add the Windsurf implement Pointer Stub"
+    )
     for path in target.rglob("*"):
         assert not path.is_symlink(), f"upgrade produced a symbolic link: {path}"
-    assert new_stamp.get("stamp_version") == 4, "upgrade changed the stamp version"
+    assert new_stamp.get("stamp_version") == 5, "upgrade did not migrate to stamp version 5"
+    assert new_stamp.get("categories") == [
+        "design",
+        "dev",
+        "quality",
+        "security",
+        "token-optimize",
+    ], "upgrade did not derive the released selection's Categories"
+    assert new_stamp.get("development_loop") == "spec-loop", (
+        "upgrade did not record the mandatory development loop"
+    )
+    components = new_stamp.get("components")
+    assert isinstance(components, dict) and "handoff" not in components, (
+        "upgrade retained the retired Handoff component state"
+    )
     assert new_stamp.get("agent_targets") == old_stamp.get("agent_targets"), (
         "upgrade changed the released project's Agent Target selection"
     )
@@ -491,6 +545,7 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert action_counts and not any(action_counts.values()), (
         "second upgrade reported a nonzero action plan: " + repr(action_counts)
     )
+    assert "No changes were needed." in idempotence_result.stdout
 
     _checkout_stage(
         "idempotence real upgrade",

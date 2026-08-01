@@ -10,7 +10,7 @@ import pytest
 import dev_ready.upgrade as upgrade_module
 import dev_ready.overlay.stamp_rendering as stamp_rendering_module
 from dev_ready.cli import main
-from dev_ready.errors import UpgradeError, UpgradeNotSupportedError
+from dev_ready.errors import StampInvalidError, UpgradeError, UpgradeNotSupportedError
 from dev_ready.inspection import REQUIRED_UPSTREAM_PATHS
 from dev_ready.manifest import load_default_manifest
 from dev_ready.overlay import apply_overlay
@@ -21,6 +21,46 @@ from dev_ready.upgrade import upgrade_project
 MANIFEST = load_default_manifest()
 PIN = MANIFEST.upstream["base_template"]
 CATALOG = MANIFEST.components
+
+_HANDOFF_PATHS = (
+    "docs/handoffs/.gitignore",
+    "docs/handoffs/README.md",
+    "docs/handoffs/phase-N/03-review.md",
+    "docs/handoffs/phase-N/04-qa-review.md",
+    "docs/handoffs/phase-N/05-security-review.md",
+    "docs/handoffs/phase-N/06-sre-review.md",
+    "docs/handoffs/phase-N/reports/execution-report.md",
+    "docs/handoffs/phase-N/tickets/README.md",
+    "docs/handoffs/protocol.yaml",
+)
+_PROJECT_ORIENTATION_PATHS = (
+    ".agents/skills/project-orientation/SKILL.md",
+    ".claude/skills/project-orientation/SKILL.md",
+    ".windsurf/skills/project-orientation/SKILL.md",
+)
+_RETIRED_PATH_CASES = (
+    pytest.param("handoff", _HANDOFF_PATHS, id="handoff-protocol"),
+    pytest.param(
+        "project-orientation",
+        _PROJECT_ORIENTATION_PATHS,
+        id="project-orientation-and-stubs",
+    ),
+    pytest.param("mcp-config", (".mcp.json",), id="unused-base-mcp-config"),
+)
+_REQUIRED_LOOP_STEPS = (
+    "grill-with-docs",
+    "grilling",
+    "domain-modeling",
+    "to-spec",
+    "to-tickets",
+    "implement",
+    "tdd",
+    "diagnosing-bugs",
+    "code-review",
+    "improve-codebase-architecture",
+    "codebase-design",
+)
+_LOOP_TARGET_SKILLS_DIRS = (Path(".claude/skills"), Path(".windsurf/skills"))
 
 
 def _snapshot(root: Path) -> dict[str, str]:
@@ -38,7 +78,7 @@ def _make_project(tmp_path: Path, *, code_memory: bool = False) -> Path:
     answers = Answers(
         project_name="upgrade-app",
         target_dir=project,
-        selection=ProjectSelection.from_recorded_items(
+        selection=ProjectSelection.from_items(
                 CATALOG,
                 skills=frozenset({"caveman"}),
                 mcp=mcp_items,
@@ -81,15 +121,19 @@ def _add_obsolete_managed_file(
     return target
 
 
-def _make_pre_agent_target_project(tmp_path: Path) -> Path:
-    """Rewrite a current fixture into the v3 Claude-only layout."""
-    project = _make_project(tmp_path)
+def _materialize_required_upstream_paths(project: Path) -> None:
     for relative in REQUIRED_UPSTREAM_PATHS:
         path = project / relative
         if relative in {"backend", "frontend"}:
             path.mkdir(parents=True, exist_ok=True)
         else:
             path.write_text("upstream", encoding="utf-8")
+
+
+def _make_pre_agent_target_project(tmp_path: Path) -> Path:
+    """Rewrite a current fixture into the v3 Claude-only layout."""
+    project = _make_project(tmp_path)
+    _materialize_required_upstream_paths(project)
     canonical_skill = project / ".agents/skills/caveman/SKILL.md"
     legacy_skill = project / ".claude/skills/caveman/SKILL.md"
     legacy_skill.write_bytes(canonical_skill.read_bytes())
@@ -119,12 +163,139 @@ def _make_pre_agent_target_project(tmp_path: Path) -> Path:
     return project
 
 
+def _loop_roots() -> tuple[Path, ...]:
+    roots = [Path(".agents/skills") / step for step in _REQUIRED_LOOP_STEPS]
+    roots.append(Path("docs/agents"))
+    roots.extend(
+        skills_dir / step
+        for skills_dir in _LOOP_TARGET_SKILLS_DIRS
+        for step in _REQUIRED_LOOP_STEPS
+    )
+    return tuple(roots)
+
+
+def _remove_loop_from_v4_project(project: Path) -> None:
+    _rewrite_stamp_as_v4(project)
+    roots = _loop_roots()
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["components"]["skills"]["items"] = [
+        item
+        for item in data["components"]["skills"]["items"]
+        if item["id"] != MANIFEST.default_set.development_loop
+    ]
+    data["inventory"] = [
+        entry
+        for entry in data["inventory"]
+        if not any(
+            Path(entry["path"]) == root or root in Path(entry["path"]).parents
+            for root in roots
+        )
+    ]
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    for root in roots:
+        target = project / root
+        if target.is_dir():
+            shutil.rmtree(target)
+        elif target.exists():
+            target.unlink()
+
+
+def _assert_complete_loop_tree(project: Path) -> None:
+    for step in _REQUIRED_LOOP_STEPS:
+        assert (project / ".agents" / "skills" / step / "SKILL.md").is_file()
+        for skills_dir in _LOOP_TARGET_SKILLS_DIRS:
+            assert (project / skills_dir / step / "SKILL.md").is_file()
+    assert (project / "docs" / "agents" / "issue-tracker.md").is_file()
+
+
 def test_fresh_project_is_a_byte_identical_noop(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
     before = _snapshot(project)
     report = upgrade_project(project)
     assert _snapshot(project) == before
     assert "Upgraded (0):" in report
+
+
+def test_malformed_v5_record_fails_before_upgrade_mutates_the_project(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data.pop("development_loop")
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    before = _snapshot(project)
+
+    with pytest.raises(StampInvalidError, match="development_loop"):
+        upgrade_project(project)
+
+    assert _snapshot(project) == before
+
+
+def _rewrite_stamp_as_v4(project: Path) -> None:
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["stamp_version"] = 4
+    data.pop("categories")
+    data.pop("development_loop")
+    data["components"]["docs"].pop("items", None)
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _record_retired_selection(project: Path, retirement: str) -> None:
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    if retirement == "handoff":
+        data["components"]["handoff"] = {"included": True}
+    elif retirement == "project-orientation":
+        data["components"]["skills"]["items"].append(
+            {"id": "project-orientation", "pin": None}
+        )
+    elif retirement == "mcp-config":
+        data["components"]["mcp"] = {
+            "included": True,
+            "items": [{"id": "mcp-config", "pin": None}],
+        }
+    else:
+        raise AssertionError(f"unknown retirement fixture {retirement!r}")
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def test_unknown_v5_development_loop_fails_before_upgrade_mutates_the_project(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["development_loop"] = "unknown-loop"
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    before = _snapshot(project)
+
+    with pytest.raises(StampInvalidError, match="unknown development_loop"):
+        upgrade_project(project)
+
+    assert _snapshot(project) == before
+
+
+def test_v5_development_loop_missing_from_items_fails_before_mutation(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["components"]["skills"]["items"] = [
+        item
+        for item in data["components"]["skills"]["items"]
+        if item["id"] != data["development_loop"]
+    ]
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    before = _snapshot(project)
+
+    with pytest.raises(StampInvalidError, match="development_loop.*skills"):
+        upgrade_project(project)
+
+    assert _snapshot(project) == before
 
 
 def test_hash_matched_old_file_is_upgraded(tmp_path: Path) -> None:
@@ -207,6 +378,26 @@ def test_symlinked_managed_path_is_conflict_and_never_followed(tmp_path: Path) -
     assert non_overlay.read_bytes() == old
     assert claude.is_symlink()
     assert "Conflict (1):" in report
+
+
+def test_symlinked_obsolete_path_is_refused_instead_of_followed(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    obsolete = _add_obsolete_managed_file(
+        project,
+        "docs/handoffs/protocol.yaml",
+        recorded_content=b"released protocol",
+    )
+    non_overlay = project / "application-note.txt"
+    non_overlay.write_bytes(b"user application content")
+    obsolete.unlink()
+    obsolete.symlink_to(Path("../..") / non_overlay.name, target_is_directory=False)
+
+    report = upgrade_project(project)
+
+    assert non_overlay.read_bytes() == b"user application content"
+    assert obsolete.is_symlink()
+    assert "Conflict (1):" in report
+    assert "docs/handoffs/protocol.yaml" in report
 
 
 def test_parent_mkdir_failure_removes_partial_directories(
@@ -322,7 +513,9 @@ def test_upgrade_rewrites_v3_stamp_inventory(tmp_path: Path) -> None:
     assert inventory["CLAUDE.md"] == hashlib.sha256((project / "CLAUDE.md").read_bytes()).hexdigest()
 
 
-def test_upgrade_keeps_a_v4_record_at_v4(tmp_path: Path) -> None:
+def test_upgrade_migrates_a_v4_record_to_v5_with_derived_categories(
+    tmp_path: Path,
+) -> None:
     project = _make_project(tmp_path)
     stamp_path = project / ".dev-ready.json"
     data = json.loads(stamp_path.read_text(encoding="utf-8"))
@@ -333,7 +526,69 @@ def test_upgrade_keeps_a_v4_record_at_v4(tmp_path: Path) -> None:
 
     upgrade_project(project)
 
-    assert load_stamp(project).stamp_version == 4
+    migrated = load_stamp(project)
+    assert migrated.stamp_version == 5
+    assert migrated.categories == ("dev", "token-optimize")
+
+
+@pytest.mark.parametrize(
+    "retired_id",
+    ["spec-loop", "tdd", "diagnosing-bugs", "code-review"],
+)
+def test_upgrade_maps_each_retired_loop_item_to_the_development_loop(
+    tmp_path: Path,
+    retired_id: str,
+) -> None:
+    project = _make_project(tmp_path)
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["stamp_version"] = 4
+    data.pop("categories")
+    data.pop("development_loop")
+    data["components"]["skills"]["items"] = [{"id": retired_id, "pin": None}]
+    data["components"]["docs"].pop("items", None)
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    upgrade_project(project)
+
+    migrated = json.loads(stamp_path.read_text(encoding="utf-8"))
+    assert migrated["development_loop"] == "spec-loop"
+    assert [item["id"] for item in migrated["components"]["skills"]["items"]] == [
+        "spec-loop"
+    ]
+    assert migrated["categories"] == ["dev"]
+
+
+def test_v4_project_that_declined_the_loop_gains_the_complete_loop_tree(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    _remove_loop_from_v4_project(project)
+    assert not (project / ".agents/skills/implement/SKILL.md").exists()
+
+    upgrade_project(project)
+
+    _assert_complete_loop_tree(project)
+    migrated = load_stamp(project)
+    assert migrated.development_loop == "spec-loop"
+    assert "spec-loop" in {item.id for item in migrated.skills_items}
+
+
+def test_v4_project_that_selected_the_loop_keeps_the_complete_loop_tree(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    _rewrite_stamp_as_v4(project)
+    implement = project / ".agents/skills/implement/SKILL.md"
+    before_implement = implement.read_bytes()
+
+    upgrade_project(project)
+
+    _assert_complete_loop_tree(project)
+    assert implement.read_bytes() == before_implement
+    migrated = load_stamp(project)
+    assert migrated.development_loop == "spec-loop"
+    assert "spec-loop" in {item.id for item in migrated.skills_items}
 
 
 def test_upgrade_preserves_recorded_base_provenance(tmp_path: Path) -> None:
@@ -350,7 +605,7 @@ def test_upgrade_preserves_recorded_base_provenance(tmp_path: Path) -> None:
     assert upgraded.upstream.commit == "0" * 40
 
 
-def test_upgrade_advances_overlay_currency_without_adding_new_defaults(
+def test_upgrade_advances_overlay_currency_without_adding_new_enhancements(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project = _make_project(tmp_path)
@@ -360,8 +615,7 @@ def test_upgrade_advances_overlay_currency_without_adding_new_defaults(
 
     upgraded = load_stamp(project)
     assert upgraded.dev_ready_version == "0.7.0"
-    assert {item.id for item in upgraded.skills_items} == {"caveman"}
-    assert not (project / ".agents" / "skills" / "implement").exists()
+    assert {item.id for item in upgraded.skills_items} == {"caveman", "spec-loop"}
 
 
 def test_untouched_obsolete_managed_file_is_deleted(tmp_path: Path) -> None:
@@ -396,6 +650,12 @@ def test_modified_obsolete_managed_file_is_preserved_and_reported(tmp_path: Path
     assert obsolete.read_bytes() == b"user notes"
     assert "Preserved (obsolete, user-modified) (1):" in report
     assert "docs/handoffs/phase-N/02-implementation.md" in report
+    assert (
+        "  - docs/handoffs/phase-N/02-implementation.md: preserved; "
+        "review it and remove it manually if it is no longer needed"
+    ) in report
+    assert "Divergence (1):" in report
+    assert "remove it manually" in report
 
 
 def test_modified_retired_project_orientation_skill_is_preserved_and_reported(
@@ -417,6 +677,67 @@ def test_modified_retired_project_orientation_skill_is_preserved_and_reported(
     assert retired_path in report
 
 
+@pytest.mark.parametrize(("retirement", "paths"), _RETIRED_PATH_CASES)
+def test_each_selected_untouched_retirement_is_deleted_from_recorded_inventory(
+    tmp_path: Path,
+    retirement: str,
+    paths: tuple[str, ...],
+) -> None:
+    project = _make_project(tmp_path)
+    _rewrite_stamp_as_v4(project)
+    _record_retired_selection(project, retirement)
+    for path in paths:
+        _add_obsolete_managed_file(project, path, recorded_content=b"released bytes")
+
+    report = upgrade_project(project)
+
+    for path in paths:
+        assert not (project / path).exists()
+        assert path in report
+
+
+@pytest.mark.parametrize(("retirement", "paths"), _RETIRED_PATH_CASES)
+def test_each_selected_edited_retirement_is_preserved_with_divergence(
+    tmp_path: Path,
+    retirement: str,
+    paths: tuple[str, ...],
+) -> None:
+    project = _make_project(tmp_path)
+    _rewrite_stamp_as_v4(project)
+    _record_retired_selection(project, retirement)
+    edited_path = paths[0]
+    for path in paths:
+        _add_obsolete_managed_file(
+            project,
+            path,
+            recorded_content=b"released bytes",
+            current_content=b"user edit" if path == edited_path else None,
+        )
+
+    report = upgrade_project(project)
+
+    assert (project / edited_path).read_bytes() == b"user edit"
+    assert f"{edited_path}: retained outside the current managed inventory" in report
+    for path in paths[1:]:
+        assert not (project / path).exists()
+
+
+@pytest.mark.parametrize(("retirement", "paths"), _RETIRED_PATH_CASES)
+def test_each_never_selected_retirement_is_not_reported(
+    tmp_path: Path,
+    retirement: str,
+    paths: tuple[str, ...],
+) -> None:
+    _ = retirement
+    project = _make_project(tmp_path)
+    _rewrite_stamp_as_v4(project)
+
+    report = upgrade_project(project)
+
+    for path in paths:
+        assert path not in report
+
+
 def test_dry_run_reports_obsolete_deletion_without_mutating(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
     _add_obsolete_managed_file(project, "obsolete.md", recorded_content=b"old")
@@ -428,13 +749,74 @@ def test_dry_run_reports_obsolete_deletion_without_mutating(tmp_path: Path) -> N
     assert "would delete obsolete.md" in report
 
 
+def test_v4_dry_run_reports_replacement_addition_and_deletion_without_mutation(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    _remove_loop_from_v4_project(project)
+    old_rules = b"released v0.8 rules"
+    (project / "CLAUDE.md").write_bytes(old_rules)
+    _set_inventory_hash(project, "CLAUDE.md", old_rules)
+    _add_obsolete_managed_file(
+        project,
+        "docs/handoffs/protocol.yaml",
+        recorded_content=b"released protocol",
+    )
+    before = _snapshot(project)
+
+    report = upgrade_project(project, dry_run=True)
+
+    assert _snapshot(project) == before
+    assert "would CLAUDE.md" in report
+    assert "would .agents/skills/implement/SKILL.md" in report
+    assert "would delete docs/handoffs/protocol.yaml" in report
+
+
+def test_v4_stamp_only_dry_run_reports_the_record_replacement(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    _rewrite_stamp_as_v4(project)
+    before = _snapshot(project)
+
+    report = upgrade_project(project, dry_run=True)
+
+    assert _snapshot(project) == before
+    assert "would .dev-ready.json" in report
+    assert "No changes were needed." not in report
+
+
+def test_migrated_v4_project_passes_check_cleanly(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    project = _make_project(tmp_path)
+    _materialize_required_upstream_paths(project)
+    _remove_loop_from_v4_project(project)
+    _add_obsolete_managed_file(
+        project,
+        "docs/handoffs/protocol.yaml",
+        recorded_content=b"released protocol",
+    )
+
+    upgrade_project(project)
+
+    assert main(["check", str(project)]) == 0
+    assert "clean" in capsys.readouterr().out.lower()
+
+
 def test_failure_after_obsolete_deletion_rolls_it_back(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     project = _make_project(tmp_path)
     obsolete = _add_obsolete_managed_file(
         project, "docs/handoffs/phase-N/01-plan.md", recorded_content=b"legacy"
     )
+    old_rules = b"old rules"
+    (project / "CLAUDE.md").write_bytes(old_rules)
+    _set_inventory_hash(project, "CLAUDE.md", old_rules)
     before = _snapshot(project)
     original = upgrade_module._write_target
     failed = False
@@ -447,9 +829,14 @@ def test_failure_after_obsolete_deletion_rolls_it_back(
         original(path, data)
 
     monkeypatch.setattr(upgrade_module, "_write_target", fail_write)
-    with pytest.raises(UpgradeError, match="rolled back"):
-        upgrade_project(project)
+    exit_code = main(["upgrade", str(project)])
 
+    captured = capsys.readouterr()
+    assert exit_code == 9
+    assert "injected failure after deletion" in captured.err
+    assert "rolled back" in captured.err
+    assert "original project was restored" in captured.err
+    assert "retry the upgrade" in captured.err.lower()
     assert obsolete.read_bytes() == b"legacy"
     assert _snapshot(project) == before
 
@@ -465,6 +852,7 @@ def test_obsolete_deletion_is_idempotent(tmp_path: Path) -> None:
     assert _snapshot(project) == before
     assert "Deleted (obsolete) (0):" in report
     assert "would delete" not in report
+    assert "No changes were needed." in report
 
 
 def test_pre_target_stamp_migrates_to_canonical_claude_layout(tmp_path: Path) -> None:
@@ -485,7 +873,9 @@ def test_pre_target_stamp_migrates_to_canonical_claude_layout(tmp_path: Path) ->
     assert not stub.is_symlink()
     assert not (project / ".windsurf").exists()
     migrated = load_stamp(project)
-    assert migrated.stamp_version == 4
+    assert migrated.stamp_version == 5
+    assert migrated.categories == ("dev", "token-optimize")
+    assert migrated.development_loop == "spec-loop"
     assert migrated.agent_targets == ("claude",)
     assert migrated.upstream == old_provenance
     assert main(["check", str(project)]) == 0
