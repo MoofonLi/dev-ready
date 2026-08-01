@@ -1,6 +1,6 @@
 # CLI Specification — dev-ready
 
-Status: Current through unreleased v0.9 Phase 3. This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
+Status: Current for v0.9.0. This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
 
 ## Commands
 
@@ -136,18 +136,22 @@ Fresh stamps no longer record Handoff Protocol inclusion. Stamp versions 1–5
 remain readable, including version 3 and version 4 projects that do not carry
 Categories; legacy version 4 `components.handoff` and version 3
 `components.agents` entries are accepted for compatibility. Version 3 stamps
-can be upgraded without new input, but Phase 2 does not migrate existing
-version 3 or version 4 records to version 5: version 3 first advances to version
-4, and version 4 remains version 4. Versions 1 and 2 remain checkable but cannot
-be upgraded. Across an overlay-only upgrade, the stamped upstream
+and version 4 stamps upgrade to version 5 without new input. The migration
+derives Categories from recorded items, maps retired loop identifiers to the
+mandatory development loop, and records that loop in the new stamp. Version 3
+projects retain the existing Agent Target inference before reaching the same
+version 5 result. Versions 1 and 2 remain checkable but cannot be upgraded.
+Across an overlay-only upgrade, the stamped upstream
 repository and commit are immutable Base Provenance; the dev-ready version,
-selected-item pins, selected Agent Targets, and managed-file inventory are
-Overlay Currency and advance to the running CLI. A newer manifest base pin is a
-non-blocking advisory because `upgrade` does not rewrite upstream application
-content. Untouched obsolete managed files may be deleted transactionally;
-modified obsolete files are preserved and reported. Exit codes: 0 success; 6
-invalid or missing stamp; 8 pre-v3 stamp cannot be upgraded; 9 upgrade failure
-after rollback.
+Categories, resolved development loop, selected-item pins, selected Agent
+Targets, and managed-file inventory are Overlay Currency and advance to the
+running CLI. A newer manifest base pin is a non-blocking advisory because
+`upgrade` does not rewrite upstream application content. Untouched obsolete
+managed files are deleted transactionally; modified obsolete files are
+preserved and reported. Dry run reports the complete plan without mutation,
+failure rolls writes and deletions back together, and repeating a successful
+upgrade plans no further changes. Exit codes: 0 success; 6 invalid or missing
+stamp; 8 pre-v3 stamp cannot be upgraded; 9 upgrade failure after rollback.
 
 ### `dev-ready --version` / `dev-ready --help`
 

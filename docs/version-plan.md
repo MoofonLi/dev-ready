@@ -1,4 +1,4 @@
-# Version Plan — dev-ready v0.3 → v0.8 (+ post-v0.8 roadmap)
+# Version Plan — dev-ready v0.3 → v0.9 (+ post-v0.9 roadmap)
 
 Status: Accepted (2026-07-17). Decided by CEO + Tech Lead as the final pre-agreed roadmap.
 Amended 2026-07-24 (afternoon): v0.7 scope expanded — see "2026-07-24 (PM) amendment" below.
@@ -7,6 +7,7 @@ Amended 2026-07-26: v0.8 scope, ordering, and decisions settled — see "2026-07
 Amended 2026-07-26 (later the same day): FR-25 (CLI i18n) withdrawn before implementation and D-3 rejected. v0.8 is FR-26 only — see "FR-25 — withdrawn" in the amendment.
 Close-out 2026-07-27: v0.8 is released. FR-26 is shipped in `v0.8.0`, which is tagged and published to PyPI; Phase 4 documentation, review, release, and distribution verification are complete. FR-25 remains withdrawn settled history.
 Amended 2026-07-27: v0.9 and v0.10 added between v0.8 and v1.0 — see "2026-07-27 amendment" at the end of this document (ADR-017, ADR-018, ADR-019). v1.0 is unchanged.
+Close-out 2026-08-01: v0.9 is released. FR-30, FR-31, and FR-35 are shipped in `v0.9.0`; the Category selection model, lean Default Set, and generated Handoff Protocol retirement are complete. ADR-020 changed generated projects only; ADR-021 separately retired this repository's internal Handoff Protocol.
 Numbering continues from requirements.md (FR-1..FR-10 shipped in v0.1/v0.2).
 
 ## End goal
@@ -14,19 +15,21 @@ Numbering continues from requirements.md (FR-1..FR-10 shipped in v0.1/v0.2).
 `uvx dev-ready init my-app` produces, in one command, a full-stack FastAPI + React
 project that is AI-assisted-development-ready on day one:
 
-- **Context**: a tuned CLAUDE.md (project commands, guardrails, agent roles) and
-  design-doc templates.
-- **Tools**: MCP servers pre-configured (`.mcp.json`), starting with codebase memory.
-- **Capabilities**: a curated set of Claude Code skills (token discipline, security
-  audit, React quality, engineering practice) — individually selectable.
+- **Context**: canonical `AGENTS.md` project instructions, the mandatory Spec
+  Loop, optional Agent Target Pointer Stubs, and design-document templates.
+- **Tools**: selected MCP servers are pre-configured in `.mcp.json`, starting
+  with codebase memory; projects that select none omit the file.
+- **Capabilities**: a curated set of coding-agent Enhancements (token discipline,
+  security audit, React quality, engineering practice) selected by Category.
 - **Quality gates**: skills that teach the agent to run linters/analyzers
   (react-doctor) and audits before claiming work is done.
-- **Collaboration protocol**: the multi-agent handoff scaffold (`docs/handoffs/`,
-  ADR-007).
+- **Development method**: one mandatory Spec Loop, with optional Enhancements
+  around it (ADR-018). Generated projects no longer receive the Handoff Protocol
+  (ADR-020); ADR-021 retired that internal practice separately.
 
-The user composes their project freely: component-level choice (skills / mcp /
-docs / agents) plus item-level choice inside skills and mcp (e.g. react-doctor
-without codebase-memory) — see FR-14 / ADR-010. Everything the generator itself
+The user composes Enhancements by Category while Component remains an internal
+write-location grouping; Agent Targets are selected independently — see
+FR-30 / ADR-017. Everything the generator itself
 materializes is pinned to CI-verified commits (ADR-002); nothing is fetched
 "latest" at generation time.
 
@@ -38,7 +41,7 @@ Two mechanisms deliver this, chosen by content type — not by preference:
 
 | Mode | Used for | What ships | How Day-1 works |
 |---|---|---|---|
-| **Vendor** | All text content: skills, CLAUDE.md guidance, design-doc templates, handoff templates | Snapshot committed into `src/dev_ready/templates/`, pinned in the manifest `vendored` section (ADR-009), THIRD_PARTY_NOTICES + NOTICE propagation | The files are simply there after `init` |
+| **Vendor** | Redistributable text content: skills, canonical rules, and design-document templates | Snapshot committed into `src/dev_ready/templates/`, pinned in the manifest `vendored` section (ADR-009), THIRD_PARTY_NOTICES + NOTICE propagation | The files are simply there after `init` |
 | **Pinned dependency** | Executable tools (MCP server binaries, npm CLI tools) | Pinned launcher/dependency entries in generated config: `.mcp.json` launches `uvx codebase-memory-mcp==<pin>`; `react-doctor@<pin>` is a devDependency in the frontend `package.json` | The package manager the user already runs (uv for the agent, `npm install` for the frontend) materializes the exact pinned version on first use — zero manual steps |
 
 Direct binary vendoring into the dev-ready wheel was evaluated and rejected as
@@ -66,13 +69,11 @@ of the MIT declaration in its README (see Curation principles).
 ## Curation principles
 
 - Every vendored skill must answer "what does the user lose if we drop it?" — no
-  answer, no inclusion. Hard cap: **10 skills** in the skill catalog.
-  (Amended 2026-07-24, ADR-012: a workflow *bundle* — multiple asset directories
-  whose value only exists as a whole cycle, selected as one unit — counts as one
-  item against the cap. First instance: `spec-loop`.)
-- The cap governs the *catalog*; the user picks any subset of it per project
-  (FR-14), so catalog discipline is about maintenance cost and default quality,
-  not about forcing content on users.
+  answer, no inclusion. The former ten-item catalog cap is retired in v0.9.
+- The **Default Set** is limited to three declared entries: one development loop
+  plus the project's two documentation skeletons. Enhancements remain unbounded
+  and off by default; the limit protects the lean default path without closing
+  the catalog (FR-31, ADR-018).
 - Subsets, not whole repos: vendor only the files that earn their context-window cost
   in a generated project.
 - Vendor everything that can legally be vendored; never vendor anything that is
@@ -208,9 +209,9 @@ required/forbidden paths still hold. It is read-only and exits 0 when clean, 6
 for a missing or invalid stamp, and 7 when drift is detected.
 
 FR-22. **`dev-ready upgrade`.** Re-applies a newer overlay onto an existing project.
-Scope deliberately conservative: overlay-managed whole files only (skills,
-handoff templates, CLAUDE.md sections we own — per the stamp's item selection),
-never upstream application code — that path was closed when `.copier/` was pruned
+Scope deliberately conservative: overlay-managed whole files only, including
+transactional retirement of obsolete managed files, never upstream application
+code — that path was closed when `.copier/` was pruned
 (ADR-005 amendment). Conflict rule: never overwrite user-modified files silently;
 report and skip. Requires FR-21's stamp reading plus a recorded file inventory
 (added to the stamp in this version).
@@ -407,7 +408,7 @@ it?" — the same test as the curation principle.
 |---|---|---|
 | v0.7 (DONE; v0.7.0 released) | FR-23 Handoff Protocol config, FR-28 Spec Loop, FR-24 generate skill, FR-29 progress reporting | FR-23×FR-28 share the generated rules surface; FR-29 landed before FR-25, which was subsequently withdrawn (D-3 rejected) |
 | v0.8 (DONE; v0.8.0 released) | FR-26 multi-agent render targets | Canonical Content, Agent Target Pointer Stubs, stamp v4, and the v0.7 migration are complete; FR-25 remains withdrawn and Traditional Chinese is served by repository documentation instead |
-| v0.9 (added 2026-07-27) | FR-30 Category-first selection, FR-31 Spec Loop always generated + Default Set, FR-35 retire the generated Handoff Protocol | Every breaking change on one theme — how a user chooses and what a default project contains — so an upgrading user pays once |
+| v0.9 (DONE; v0.9.0 released) | FR-30 Category-first selection, FR-31 Spec Loop always generated + Default Set, FR-35 retire the generated Handoff Protocol | Category selection, the lean Default Set, stamp v5, and the v0.8 migration are complete; ADR-020 changed generated projects only, while ADR-021 separately retired the internal protocol |
 | v0.10 (added 2026-07-27) | FR-32 Mount Points, FR-33 Agent Target Map, FR-34 interview-driven generation skill | Assembly and reach, all non-breaking, and all downstream of v0.9's contract |
 | v1.0 | FR-27 second template (Next.js — selected 2026-07-24, see D-5); Web UI decision revisited | Platform step; gated on real-user feedback and the D-5 hard gates |
 
@@ -594,7 +595,7 @@ rejected: a user who wants only `caveman` and `security-audit` is legitimate,
 and with the v1.0 real-users gate still open those users are the likeliest
 source of the evidence the gate demands.
 
-### v0.9 — Selection model (FR-30, FR-31, FR-35)
+### v0.9 — Selection model (FR-30, FR-31, FR-35) — DONE (v0.9.0 released)
 
 One theme: **how a user chooses, and what they get by default.** Every breaking
 change lands together so an upgrading user pays once.

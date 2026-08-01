@@ -5,18 +5,18 @@ This file is the single source of truth for agent rules; `CLAUDE.md` imports it 
 
 ## What this project is
 
-dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus Canonical Content for coding agents, optional Agent Target Pointer Stubs, MCP config, and design docs.
+dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus Canonical Content for coding agents, optional Agent Target Pointer Stubs and MCP configuration, and design docs.
 
-Current phase: v0.8 is released (`v0.8.0` tagged and published to PyPI). v0.9 and v0.10 are scoped with accepted decisions and draft specs, but not yet planned into phases — v0.9 is the selection-model break (FR-30 Category-first selection, FR-31 Spec Loop always generated + Default Set, FR-35 retire the generated Handoff Protocol; ADR-017, ADR-018, ADR-020), v0.10 is assembly and reach (FR-32 Mount Points, FR-33 Agent Target Map, FR-34 interview-driven generation skill; ADR-019). Roadmap in `docs/version-plan.md`; per-version plans in `docs/handoff/<version>/<version>-plan.md`. Domain glossary: `CONTEXT.md`.
+Current phase: v0.9 is released (`v0.9.0`). It shipped Category-first selection (FR-30), the mandatory Spec Loop and lean Default Set (FR-31), and retirement of the generated Handoff Protocol (FR-35; ADR-017, ADR-018, ADR-020). v0.10 is next: assembly and reach through Mount Points (FR-32), the Agent Target Map (FR-33), and the interview-driven generation skill (FR-34; ADR-019). v1.0 remains gated on the real-users evidence defined in `docs/version-plan.md`. Per-version plans live in `docs/handoff/<version>/<version>-plan.md`; the domain glossary is `CONTEXT.md`.
 
 **Process note:** v0.9 stops *generating* the Handoff Protocol into user projects (ADR-020), and ADR-021 retires it here too — this repo now develops on the Spec Loop and nothing else. See "How this repo is developed" below.
 
-The v0.8 release surface is fixed: Canonical Content is always written to
-`.agents/skills/` and `AGENTS.md`; manifest-declared Agent Targets render Pointer
-Stubs selected by `--agents`; the Handoff Protocol component is named `handoff`
-with `--no-agents` retained as a deprecated alias for one version; stamp version
-4 records Agent Targets; and upgrades from v0.7 infer Claude Code, preserve
-edited obsolete files, and migrate untouched content transactionally.
+The v0.9 release surface is fixed: Category is the user-facing selection axis;
+the Spec Loop is always generated; `--yes` accepts the lean Default Set; stamp
+version 5 records Categories and the resolved development loop; the generated
+Handoff Protocol and its flags are retired; and upgrades from v0.8 migrate
+untouched managed content transactionally while preserving edited obsolete
+files.
 
 ## Read before writing code
 

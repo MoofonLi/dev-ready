@@ -1,6 +1,6 @@
 [project]
 name = "dev-ready"
-version = "0.8.0"
+version = "0.9.0"
 description = "Scaffold AI-development-ready FastAPI projects with canonical agent guidance, Agent Targets, MCP config, and design docs"
 readme = "README-pypi.md"
 license = { file = "LICENSE" }

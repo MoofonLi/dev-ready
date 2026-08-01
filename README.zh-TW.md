@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > 本頁是給中文讀者的導覽，說明 dev-ready 是什麼、產出什麼、怎麼跑第一次。
-> 完整的旗標、退出碼與開發說明請見 [English README](README.md)。
+> 完整的命令列參考與開發說明請見 [English README](README.md)。
 > dev-ready 本身的介面與產生的專案內容一律為英文（[ADR-016](docs/decisions/adr-016-language-boundary.md)）。
 
 一行指令，產生一個已為 AI 協作開發配置好的 FastAPI + React 專案：
@@ -21,11 +21,13 @@ uvx dev-ready init my-app
 一個以 [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) 為基底的專案（FastAPI、React、SQLModel、PostgreSQL、Docker Compose），外加一層 AI 工具疊加內容，讓 coding agent 一開箱就能順利工作：
 
 - **專案指示與開發護欄** — 共用內容只寫一份在標準位置；支援標準的 agent 可直接讀取，另有需要的 agent 則透過指向共用內容的普通檔案使用同一份指示
-- **技能目錄（skills）** — 技能只在標準位置保存一份並可逐項挑選。`spec-loop` 這組會帶入規劃、可留存的規格、tracer-bullet 工單、TDD、審查、除錯與架構改善的完整流程
-- **MCP 伺服器設定** — 包含可選的 codebase-memory 伺服器（版本已固定）
-- **設計文件範本** — 架構與需求文件的起始骨架
-- **可設定的交接協議（Handoff Protocol）** — 七個穩定角色、交接順序、升級路徑、審查關卡與提交權限，全部是可編輯的設定資料，執行時以該設定為準
-- **產生戳記 `.dev-ready.json`** — 記錄基底來源、選取的元件與版本固定值，以及受管理檔案的清單
+- **必備的 Spec Loop** — 每個專案都會帶入釐清需求、可留存的規格、tracer-bullet 工單、實作、TDD、除錯、審查與架構改善的完整循環
+- **精簡的預設內容** — 接受預設值時，只產生 Spec Loop 加上專案自己的架構與需求文件骨架；其他強化項目預設都不加入
+- **依用途挑選的強化項目** — 可依開發、安全、品質、設計與 token 最佳化等類別，選擇安全稽核、React 分析、瀏覽器測試、前端設計參考、精簡 agent 回應與 codebase-memory 等能力
+- **按需產生的 MCP 設定** — 只有選到需要專案層級 MCP 設定的強化項目時才會寫入設定檔，工具版本仍然固定
+- **產生戳記 `.dev-ready.json`** — 記錄不可變的基底來源，以及目前選取的類別、開發循環、強化項目、agent 目標、版本固定值與受管理檔案清單
+
+v0.9 不再把七角色的多 agent 交接協議、角色設定、審查關卡、工單骨架與執行報告放進新專案。產生的專案只描述 Spec Loop，不會再多帶一套流程。
 
 每個產生的專案也會有自己的 `README.md`。上游範本自身的 repo 維護檔案（`CONTRIBUTING.md`、發布說明、部署 workflow、截圖等）會被清掉，不會有範本 repo 專屬的東西滲進你的專案。
 
@@ -51,28 +53,18 @@ pip install dev-ready
 dev-ready init my-app
 ```
 
-直接執行 `uvx dev-ready init` 會進入互動模式，逐項詢問；命令列上已經給過的就不再問。想要完全不互動、全用預設值，加上 `--yes`。
+直接執行時會進入互動模式，依序詢問專案需要的強化項目與 agent 目標；一路接受預設值會得到上面描述的精簡內容。
 
 產生過程中，stderr 會顯示「取得範本 → 疊加內容 → 驗證 → 完成」四個階段的進度；在終端機是動態指示器，被重導向時則是穩定的純文字行。
-
-### 讓你的 agent 直接呼叫
-
-這個 repo 也提供一個跨 agent 的技能，可直接安裝：
-
-```bash
-npx skills add MoofonLi/dev-ready --skill dev-ready
-```
-
-裝好之後直接跟你的 agent 說：「用 dev-ready 建一個叫 my-app 的 FastAPI 專案。」它會檢查目標位置、決定要選哪些元件、以單一非互動指令產生專案，並驗證產出的戳記。
 
 ## 專案建立之後
 
 dev-ready 不是產生完就結束。已產生的專案可以檢查與升級：
 
 - **檢查（check）** — 唯讀、離線，比對專案現況與它的戳記，列出偏移
-- **升級（upgrade）** — 只更新疊加層管理的檔案，且是交易式的：可先預覽、失敗會整批回滾、你手動改過的檔案一律保留不覆蓋，上游應用程式碼與基底來源記錄不會被更動
+- **升級（upgrade）** — 只更新疊加層管理的檔案，且是交易式的：可先預覽、失敗會把寫入與刪除一起回滾、已淘汰且未修改的受管理檔案會刪除、你手動改過的檔案會保留並列入報告，上游應用程式碼與基底來源記錄不會被更動
 
-指令與旗標的完整說明請見 [English README](README.md) 與 [CLI 規格](docs/cli-spec.md)。
+完整用法請見 [English README](README.md) 與 [CLI 規格](docs/cli-spec.md)。
 
 ## 運作方式
 
