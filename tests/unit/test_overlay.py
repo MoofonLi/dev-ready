@@ -89,6 +89,59 @@ def test_happy_path_writes_every_component_with_substitution(tmp_path: Path) -> 
     assert "`CLAUDE.md` — guidance" not in readme
 
 
+def test_default_set_tree_contains_structure_and_no_enhancements(tmp_path: Path) -> None:
+    project_dir = tmp_path / "default-set"
+    project_dir.mkdir()
+    answers = Answers(
+        "my-app",
+        project_dir,
+        ProjectSelection.default_set(CATALOG),
+    )
+
+    apply_overlay(answers, project_dir, CATALOG, PIN)
+
+    assert (project_dir / ".agents" / "skills" / "implement" / "SKILL.md").is_file()
+    assert (project_dir / "docs" / "architecture.md").is_file()
+    assert (project_dir / "docs" / "requirements.md").is_file()
+    assert not (project_dir / ".agents" / "skills" / "caveman").exists()
+    assert not (project_dir / ".mcp.json").exists()
+    assert not (project_dir / "docs" / "design-stripe.md").exists()
+    assert not (project_dir / "docs" / "design-linear.md").exists()
+
+    generated_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in project_dir.rglob("*")
+        if path.is_file() and path.suffix in {".md", ".json", ".yaml"}
+    )
+    assert "setup-matt-pocock-skills" not in generated_text
+
+
+def test_setup_all_can_be_selected_without_becoming_a_generation_prerequisite(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "setup-selected"
+    project_dir.mkdir()
+    selection = ProjectSelection.from_items(
+        CATALOG,
+        skills=frozenset({"setup-all"}),
+        mcp=frozenset(),
+        docs_items=frozenset(),
+        docs=True,
+    )
+
+    apply_overlay(Answers("my-app", project_dir, selection), project_dir, CATALOG, PIN)
+
+    assert (
+        project_dir
+        / ".agents"
+        / "skills"
+        / "setup-matt-pocock-skills"
+        / "SKILL.md"
+    ).is_file()
+    assert (project_dir / "docs" / "agents" / "issue-tracker.md").is_file()
+    assert (project_dir / "docs" / "agents" / "domain.md").is_file()
+
+
 @pytest.mark.parametrize("selection_name", ["everything", "nothing", "mixed"])
 def test_no_selection_writes_handoff_protocol_paths(
     tmp_path: Path, selection_name: str
@@ -100,7 +153,7 @@ def test_no_selection_writes_handoff_protocol_paths(
     else:
         selection = ProjectSelection.from_items(
             CATALOG,
-            skills=frozenset({"tdd"}),
+            skills=frozenset({"spec-loop"}),
             mcp=frozenset(),
             agent_targets=frozenset({"claude"}),
             docs=True,
@@ -266,7 +319,7 @@ def test_component_flag_skips_exactly_its_component(
         assert (project_dir / sibling).exists()
 
 
-def test_claude_md_always_present_even_with_all_components_disabled(tmp_path: Path) -> None:
+def test_mandatory_loop_is_present_with_all_enhancements_disabled(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
 
@@ -277,34 +330,28 @@ def test_claude_md_always_present_even_with_all_components_disabled(tmp_path: Pa
         PIN,
     )
 
-    assert written == [
-        Path("AGENTS.md"),
-        Path("CLAUDE.md"),
-        Path("README.md"),
-        Path(".dev-ready.json"),
-    ]
+    assert Path(".agents/skills/implement/SKILL.md") in written
     assert (project_dir / "AGENTS.md").exists()
     assert (project_dir / "CLAUDE.md").exists()
     assert (project_dir / "README.md").exists()
     assert (project_dir / ".dev-ready.json").exists()
-    assert not (project_dir / ".claude").exists()
-    assert not (project_dir / ".agents" / "skills").exists()
+    assert (project_dir / ".claude" / "skills" / "implement" / "SKILL.md").is_file()
+    assert (project_dir / ".agents" / "skills" / "implement" / "SKILL.md").is_file()
     assert not (project_dir / ".mcp.json").exists()
-    assert not (project_dir / "docs").exists()
+    assert not (project_dir / "docs" / "architecture.md").exists()
+    assert not (project_dir / "docs" / "requirements.md").exists()
 
 
-@pytest.mark.parametrize("include_spec_loop", [False, True])
 @pytest.mark.parametrize("include_docs", [False, True])
-def test_spec_loop_and_documentation_render_independently(
+def test_mandatory_spec_loop_renders_independently_of_documentation(
     tmp_path: Path,
-    include_spec_loop: bool,
     include_docs: bool,
 ) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
     answers = _answers(
         tmp_path,
-        skills_items=frozenset({"spec-loop"}) if include_spec_loop else frozenset(),
+        skills_items=frozenset(),
         include_mcp=False,
         include_docs=include_docs,
     )
@@ -315,21 +362,20 @@ def test_spec_loop_and_documentation_render_independently(
     assert claude_md == "@AGENTS.md\n"
     agents_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
     assert not (project_dir / "docs" / "handoffs").exists()
-    assert ((project_dir / ".claude" / "skills" / "to-spec" / "SKILL.md").is_file()) is include_spec_loop
-    assert ((project_dir / "docs" / "agents" / "issue-tracker.md").is_file()) is include_spec_loop
+    assert (project_dir / ".claude" / "skills" / "to-spec" / "SKILL.md").is_file()
+    assert (project_dir / "docs" / "agents" / "issue-tracker.md").is_file()
     assert ((project_dir / "docs" / "architecture.md").is_file()) is include_docs
     assert "## Handoff Protocol" not in agents_md
-    assert ("## Spec Loop" in agents_md) is include_spec_loop
+    assert "## Spec Loop" in agents_md
     assert ("docs/architecture.md" in agents_md) is include_docs
     assert "## Process-v2 role mapping" not in agents_md
 
-    if include_spec_loop:
-        tracker = (project_dir / "docs" / "agents" / "issue-tracker.md").read_text(
-            encoding="utf-8"
-        )
-        assert "docs/specs/" not in tracker
-        assert "docs/handoffs/" not in tracker
-        assert ".scratch/" in tracker
+    tracker = (project_dir / "docs" / "agents" / "issue-tracker.md").read_text(
+        encoding="utf-8"
+    )
+    assert "docs/specs/" not in tracker
+    assert "docs/handoffs/" not in tracker
+    assert ".scratch/" in tracker
 
     if include_docs:
         architecture = (project_dir / "docs" / "architecture.md").read_text(
@@ -446,7 +492,7 @@ def test_render_stamp_structure(tmp_path: Path) -> None:
     stamp_text = render_stamp(ans, PIN, CATALOG)
     data = json.loads(stamp_text)
     assert data["stamp_version"] == 5
-    assert data["categories"] == ["design", "quality", "token-optimize"]
+    assert data["categories"] == ["design", "dev", "quality", "token-optimize"]
     assert data["project_name"] == "my-app"
     assert data["inventory"] == []
     assert data["dev_ready_version"] == __version__
@@ -454,7 +500,9 @@ def test_render_stamp_structure(tmp_path: Path) -> None:
     assert data["components"]["skills"]["items"] == [
         {"id": "caveman", "pin": None},
         {"id": "react-doctor", "pin": "0.8.1"},
+        {"id": "spec-loop", "pin": None},
     ]
+    assert data["development_loop"] == "spec-loop"
     assert data["components"]["mcp"]["included"] is True
     assert data["components"]["mcp"]["items"] == [{"id": "code-memory", "pin": "0.9.0"}]
     assert data["components"]["docs"]["included"] is True
@@ -611,22 +659,24 @@ def test_apply_overlay_writes_vendored_skills_and_docs(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
 
-    skills_to_test = frozenset(
+    selected_items = frozenset(
         {
             "caveman",
             "security-audit",
-            "tdd",
-            "diagnosing-bugs",
-            "code-review",
             "webapp-testing",
             "frontend-design",
         }
     )
-    answers = _answers(tmp_path, skills_items=skills_to_test, include_docs=True)
+    expected_skill_dirs = selected_items | {
+        "tdd",
+        "diagnosing-bugs",
+        "code-review",
+    }
+    answers = _answers(tmp_path, skills_items=selected_items, include_docs=True)
 
     written = apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
 
-    for skill in skills_to_test:
+    for skill in expected_skill_dirs:
         assert (project_dir / ".claude" / "skills" / skill / "SKILL.md").exists()
 
     assert (project_dir / "docs" / "design-stripe.md").exists()
@@ -671,18 +721,17 @@ def test_apply_overlay_deselected_vendored_skills_are_absent(tmp_path: Path) -> 
 
     written = apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
 
-    all_vendored_skills = {
+    optional_vendored_skills = {
         "caveman",
         "security-audit",
-        "tdd",
-        "diagnosing-bugs",
-        "code-review",
         "webapp-testing",
         "frontend-design",
     }
-    for skill in all_vendored_skills:
+    for skill in optional_vendored_skills:
         assert not (project_dir / ".claude" / "skills" / skill).exists()
         assert Path(f".claude/skills/{skill}/SKILL.md") not in written
+    for skill in {"tdd", "diagnosing-bugs", "code-review"}:
+        assert (project_dir / ".claude" / "skills" / skill / "SKILL.md").is_file()
 
 
 def test_apply_overlay_mixed_vendored_skills_selection(tmp_path: Path) -> None:
@@ -701,9 +750,6 @@ def test_apply_overlay_mixed_vendored_skills_selection(tmp_path: Path) -> None:
 
     deselected_vendored = {
         "security-audit",
-        "tdd",
-        "diagnosing-bugs",
-        "code-review",
         "webapp-testing",
         "frontend-design",
     }
@@ -819,7 +865,7 @@ def test_standalone_spec_loop_is_complete_and_role_neutral(tmp_path: Path) -> No
     assert "setup-matt-pocock-skills" not in claude_md
 
 
-def test_deselected_spec_loop_emits_no_bundle_configuration_or_guidance(
+def test_declining_every_enhancement_keeps_bundle_configuration_and_guidance(
     tmp_path: Path,
 ) -> None:
     project_dir = tmp_path / "project"
@@ -833,9 +879,9 @@ def test_deselected_spec_loop_emits_no_bundle_configuration_or_guidance(
 
     apply_overlay(answers, project_dir, CATALOG, PIN)
 
-    assert not (project_dir / "docs").exists()
+    assert (project_dir / "docs" / "agents" / "issue-tracker.md").is_file()
     claude_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
-    assert "Spec Loop" not in claude_md
+    assert "Spec Loop" in claude_md
     assert "Handoff Protocol" not in claude_md
 
 
@@ -854,11 +900,9 @@ def test_spec_loop_stamp_records_the_resolved_selection_and_complete_inventory(
     apply_overlay(answers, project_dir, CATALOG, PIN, load_default_manifest().vendored)
 
     stamp = json.loads((project_dir / ".dev-ready.json").read_text(encoding="utf-8"))
+    assert stamp["development_loop"] == "spec-loop"
     assert {item["id"] for item in stamp["components"]["skills"]["items"]} == {
-        "spec-loop",
-        "tdd",
-        "diagnosing-bugs",
-        "code-review",
+        "spec-loop"
     }
     inventory_paths = {entry["path"] for entry in stamp["inventory"]}
     assert ".agents/skills/domain-modeling/ADR-FORMAT.md" in inventory_paths

@@ -1,15 +1,41 @@
 """Behavior tests for the canonical generation-intent seam."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from dev_ready.errors import InvalidArgumentsError
-from dev_ready.manifest import CatalogItem, ItemPath, load_default_manifest
+from dev_ready.manifest import CatalogItem, ComponentCatalog, ItemPath, load_default_manifest
 from dev_ready.prompts import Answers, ProjectSelection
 
 
 CATALOG = load_default_manifest().components
+
+
+def _catalog_with_second_loop() -> ComponentCatalog:
+    current = next(
+        item for item in CATALOG["skills"] if item.kind == "development-loop"
+    )
+    alternate = replace(
+        current,
+        id="alternate-loop",
+        steps=("alternate-step",),
+        paths=(
+            ItemPath(
+                src="claude/skills/alternate-loop",
+                dest=".agents/skills/alternate-loop",
+            ),
+        ),
+    )
+    components = dict(CATALOG)
+    components["skills"] = (*CATALOG["skills"], alternate)
+    return ComponentCatalog(
+        components,
+        CATALOG.agent_targets,
+        CATALOG.categories,
+        CATALOG.default_set,
+    )
 
 
 def test_flag_and_prompt_adapters_share_one_canonical_selection() -> None:
@@ -17,7 +43,7 @@ def test_flag_and_prompt_adapters_share_one_canonical_selection() -> None:
         catalog=CATALOG,
         categories="all",
         category_items={
-            "dev": "tdd",
+            "dev": "none",
             "security": "none",
             "quality": "none",
             "design": "none",
@@ -31,7 +57,9 @@ def test_flag_and_prompt_adapters_share_one_canonical_selection() -> None:
         target_dir=Path("my-app"),
         selection=selection,
     )
-    assert answers.items("skills") == frozenset({"caveman", "tdd"})
+    assert answers.items("skills") == frozenset(
+        {"caveman", "spec-loop"}
+    )
     assert answers.items("mcp") == frozenset()
     assert answers.includes("skills") is True
     assert answers.includes("mcp") is False
@@ -44,6 +72,67 @@ def test_handoff_is_not_a_generation_selection_axis() -> None:
     with pytest.raises(ValueError, match="unknown selection"):
         selection.includes("handoff")
     assert not hasattr(selection, "handoff")
+
+
+def test_default_set_is_the_loop_and_documentation_without_enhancements() -> None:
+    selection = ProjectSelection.default_set(CATALOG)
+
+    assert selection.development_loop == "spec-loop"
+    assert selection.items("skills") == frozenset({"spec-loop"})
+    assert selection.items("mcp") == frozenset()
+    assert selection.items("docs") == frozenset()
+    assert selection.includes("docs") is True
+    assert selection.categories == frozenset({"dev"})
+
+
+def test_second_loop_is_a_data_addition_with_one_resolved_default() -> None:
+    catalog = _catalog_with_second_loop()
+
+    default_selection = ProjectSelection.default_set(catalog)
+    all_selection = ProjectSelection.all(catalog)
+    empty_enhancements = ProjectSelection.from_flags(
+        catalog=catalog,
+        categories="none",
+        category_items={},
+    )
+    alternate_selection = ProjectSelection.from_items(
+        catalog,
+        skills=frozenset({"alternate-loop"}),
+        docs=False,
+    )
+    alternate_flag_selection = ProjectSelection.from_flags(
+        catalog=catalog,
+        categories="none",
+        category_items={},
+        development_loop="alternate-loop",
+    )
+
+    for selection in (default_selection, all_selection, empty_enhancements):
+        assert selection is not None
+        assert selection.development_loop == "spec-loop"
+        assert "spec-loop" in selection.skills
+        assert "alternate-loop" not in selection.skills
+    assert alternate_selection.development_loop == "alternate-loop"
+    assert alternate_flag_selection is not None
+    assert alternate_flag_selection.development_loop == "alternate-loop"
+
+    with pytest.raises(InvalidArgumentsError, match="unknown development loop"):
+        ProjectSelection.from_flags(
+            catalog=catalog,
+            categories="none",
+            category_items={},
+            development_loop="unknown-loop",
+        )
+
+
+def test_explicit_whole_catalog_selection_still_includes_every_enhancement() -> None:
+    selection = ProjectSelection.all(CATALOG)
+
+    assert selection.items("skills") == frozenset(
+        item.id for item in CATALOG["skills"]
+    )
+    assert selection.items("mcp") == frozenset(item.id for item in CATALOG["mcp"])
+    assert selection.items("docs") == frozenset(item.id for item in CATALOG["docs"])
 
 
 def test_no_selection_flags_leave_selection_unresolved() -> None:
@@ -66,7 +155,12 @@ def test_no_selection_flags_leave_selection_unresolved() -> None:
             frozenset(item.id for item in CATALOG["mcp"]),
             True,
         ),
-        ("none", frozenset(), frozenset(), False),
+        (
+            "none",
+            frozenset({"spec-loop"}),
+            frozenset(),
+            False,
+        ),
     ],
 )
 def test_category_level_all_and_none(
@@ -85,6 +179,34 @@ def test_category_level_all_and_none(
     assert selection.items("skills") == expected_skills
     assert selection.items("mcp") == expected_mcp
     assert selection.includes("docs") is expected_docs
+
+
+def test_declining_every_category_still_resolves_the_development_loop() -> None:
+    selection = ProjectSelection.from_flags(
+        catalog=CATALOG,
+        categories="none",
+        category_items={},
+    )
+
+    assert selection is not None
+    assert selection.development_loop == "spec-loop"
+    assert selection.items("skills") == frozenset({"spec-loop"})
+    assert selection.categories == frozenset({"dev"})
+
+
+def test_recorded_selection_does_not_apply_the_phase_4_loop_migration() -> None:
+    selection = ProjectSelection.from_recorded_items(
+        CATALOG,
+        skills=frozenset({"caveman"}),
+        mcp=frozenset(),
+        docs_items=frozenset(),
+        agent_targets=frozenset({"claude"}),
+        docs=False,
+    )
+
+    assert selection.development_loop == ""
+    assert selection.items("skills") == frozenset({"caveman"})
+    assert "dev" not in selection.categories
 
 
 def test_unknown_category_lists_valid_ids() -> None:
@@ -167,20 +289,7 @@ def test_selection_resolves_transitive_requirements() -> None:
     assert selection.skills == frozenset({"spec-loop", "tdd", "review"})
 
 
-def test_category_flag_selection_exposes_resolved_requirements() -> None:
-    selection = ProjectSelection.from_flags(
-        catalog=CATALOG,
-        categories="dev",
-        category_items={"dev": "spec-loop"},
-    )
-
-    assert selection is not None
-    assert selection.skills == frozenset(
-        {"spec-loop", "tdd", "diagnosing-bugs", "code-review"}
-    )
-
-
-def test_explicit_none_has_an_empty_dependency_closure() -> None:
+def test_category_flag_selection_exposes_the_named_development_loop() -> None:
     selection = ProjectSelection.from_flags(
         catalog=CATALOG,
         categories="dev",
@@ -188,7 +297,18 @@ def test_explicit_none_has_an_empty_dependency_closure() -> None:
     )
 
     assert selection is not None
-    assert selection.skills == frozenset()
+    assert selection.skills == frozenset({"spec-loop"})
+
+
+def test_explicit_none_keeps_the_mandatory_loop_dependency_closure() -> None:
+    selection = ProjectSelection.from_flags(
+        catalog=CATALOG,
+        categories="dev",
+        category_items={"dev": "none"},
+    )
+
+    assert selection is not None
+    assert selection.skills == frozenset({"spec-loop"})
 
 
 @pytest.mark.parametrize(

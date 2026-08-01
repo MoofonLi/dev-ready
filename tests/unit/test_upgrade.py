@@ -38,11 +38,12 @@ def _make_project(tmp_path: Path, *, code_memory: bool = False) -> Path:
     answers = Answers(
         project_name="upgrade-app",
         target_dir=project,
-        selection=ProjectSelection.from_items(
-            CATALOG,
-            skills=frozenset({"caveman"}),
-            mcp=mcp_items,
-            docs=False,
+        selection=ProjectSelection.from_recorded_items(
+                CATALOG,
+                skills=frozenset({"caveman"}),
+                mcp=mcp_items,
+                docs_items=frozenset(),
+                docs=False,
         ),
     )
     apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
@@ -360,7 +361,7 @@ def test_upgrade_advances_overlay_currency_without_adding_new_defaults(
     upgraded = load_stamp(project)
     assert upgraded.dev_ready_version == "0.7.0"
     assert {item.id for item in upgraded.skills_items} == {"caveman"}
-    assert not (project / ".claude" / "skills" / "spec-loop").exists()
+    assert not (project / ".agents" / "skills" / "implement").exists()
 
 
 def test_untouched_obsolete_managed_file_is_deleted(tmp_path: Path) -> None:

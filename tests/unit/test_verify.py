@@ -213,8 +213,25 @@ def test_verify_rejects_missing_selected_spec_loop_configuration(tmp_path: Path)
     _make_complete_project(tmp_path, ans)
     shutil.rmtree(tmp_path / "docs" / "agents")
 
-    with pytest.raises(VerificationError, match="selected skills item 'spec-loop' is missing"):
+    with pytest.raises(
+        VerificationError,
+        match="selected development loop item 'spec-loop' is missing",
+    ):
         verify_project(tmp_path, ans, CATALOG)
+
+
+def test_verify_rejects_a_project_record_missing_the_mandatory_loop(
+    tmp_path: Path,
+) -> None:
+    selection = ProjectSelection.empty()
+    materialize_project_structure(tmp_path, CATALOG, selection)
+    answers = Answers("my-app", tmp_path, selection)
+
+    with pytest.raises(
+        VerificationError,
+        match="development loop item 'spec-loop'.*missing",
+    ):
+        verify_project(tmp_path, answers, CATALOG)
 
 
 def _make_generated_project(root: Path, answers: Answers) -> None:
@@ -235,19 +252,25 @@ def test_verify_detects_a_missing_nested_spec_loop_asset(tmp_path: Path) -> None
 
     with pytest.raises(
         VerificationError,
-        match="selected skills item 'spec-loop'.*ADR-FORMAT.md.*missing",
+        match="selected development loop item 'spec-loop'.*ADR-FORMAT.md.*missing",
     ):
         verify_project(tmp_path, ans, CATALOG)
 
 
-def test_verify_rejects_a_deselected_spec_loop_asset(tmp_path: Path) -> None:
-    ans = _answers(tmp_path, skills_items=frozenset(), mcp_items=frozenset())
-    _make_generated_project(tmp_path, ans)
+def test_verify_rejects_a_partial_loop_for_a_malformed_empty_selection(
+    tmp_path: Path,
+) -> None:
+    selection = ProjectSelection.empty()
+    ans = Answers("my-app", tmp_path, selection)
+    _make_complete_project(tmp_path, ans)
     leaked = tmp_path / ".agents" / "skills" / "to-spec"
     leaked.mkdir(parents=True)
     (leaked / "SKILL.md").write_text("leaked", encoding="utf-8")
 
-    with pytest.raises(VerificationError, match="unselected skills item 'spec-loop'"):
+    with pytest.raises(
+        VerificationError,
+        match="development loop item 'spec-loop'.*missing",
+    ):
         verify_project(tmp_path, ans, CATALOG)
 
 

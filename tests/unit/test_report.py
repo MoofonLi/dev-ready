@@ -103,3 +103,33 @@ def test_report_states_when_no_agent_targets_were_selected() -> None:
 
     assert "agent targets: (none)" in report
     assert "AGENTS.md" in report
+
+
+def test_report_distinguishes_required_loop_from_selected_enhancements() -> None:
+    default_answers = Answers(
+        project_name="my-app",
+        target_dir=Path("/does/not/exist/my-app"),
+        selection=ProjectSelection.default_set(CATALOG),
+    )
+
+    default_report = render_report(default_answers, PIN, [], CATALOG)
+
+    assert "development loop (required): spec-loop" in default_report
+    assert "documentation skeletons: architecture, requirements" in default_report
+    assert "enhancements: (none)" in default_report
+
+    enhanced_answers = Answers(
+        project_name="my-app",
+        target_dir=Path("/does/not/exist/my-app"),
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            skills=frozenset({"security-audit"}),
+            docs_items=frozenset(),
+            docs=False,
+        ),
+    )
+    enhanced_report = render_report(enhanced_answers, PIN, [], CATALOG)
+
+    assert "development loop (required): spec-loop" in enhanced_report
+    assert "documentation skeletons: (none)" in enhanced_report
+    assert "enhancements: security-audit" in enhanced_report

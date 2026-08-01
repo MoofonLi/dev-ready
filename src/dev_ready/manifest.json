@@ -1,5 +1,13 @@
 {
   "manifest_version": 1,
+  "default_set": {
+    "development_loop": "spec-loop",
+    "documentation": [
+      "architecture",
+      "requirements"
+    ],
+    "enhancements": []
+  },
   "categories": {
     "dev": {
       "description": "Development methods for planning, implementation, and review."
@@ -128,6 +136,10 @@
         {
           "src": "skills/engineering/codebase-design",
           "dest": "src/dev_ready/templates/claude/skills/codebase-design"
+        },
+        {
+          "src": "skills/engineering/setup-matt-pocock-skills",
+          "dest": "src/dev_ready/templates/claude/skills/setup-matt-pocock-skills"
         }
       ]
     },
@@ -227,60 +239,39 @@
           ]
         },
         {
-          "id": "tdd",
-          "category": "dev",
-          "description": "TDD workflow and test-first mindset guidance for AI pair programming.",
-          "mode": "vendor",
-          "license": "MIT",
-          "vendored_repo": "mattpocock/skills",
-          "paths": [
-            {
-              "src": "claude/skills/tdd",
-              "dest": ".agents/skills/tdd"
-            }
-          ]
-        },
-        {
-          "id": "diagnosing-bugs",
-          "category": "dev",
-          "description": "Systematic root-cause analysis workflow for debugging complex software issues.",
-          "mode": "vendor",
-          "license": "MIT",
-          "vendored_repo": "mattpocock/skills",
-          "paths": [
-            {
-              "src": "claude/skills/diagnosing-bugs",
-              "dest": ".agents/skills/diagnosing-bugs"
-            }
-          ]
-        },
-        {
-          "id": "code-review",
-          "category": "dev",
-          "description": "Rigorous code review protocol evaluating logic, safety, and architectural fit.",
-          "mode": "vendor",
-          "license": "MIT",
-          "vendored_repo": "mattpocock/skills",
-          "paths": [
-            {
-              "src": "claude/skills/code-review",
-              "dest": ".agents/skills/code-review"
-            }
-          ]
-        },
-        {
           "id": "spec-loop",
+          "kind": "development-loop",
           "category": "dev",
           "description": "Complete Spec Loop for grilling, durable specs, tracer-bullet tickets, TDD, review, diagnosis, and architecture improvement.",
           "mode": "vendor",
           "license": "MIT",
           "vendored_repo": "mattpocock/skills",
-          "requires": [
+          "steps": [
+            "grill-with-docs",
+            "grilling",
+            "domain-modeling",
+            "to-spec",
+            "to-tickets",
+            "implement",
             "tdd",
             "diagnosing-bugs",
-            "code-review"
+            "code-review",
+            "improve-codebase-architecture",
+            "codebase-design"
           ],
           "paths": [
+            {
+              "src": "claude/skills/tdd",
+              "dest": ".agents/skills/tdd"
+            },
+            {
+              "src": "claude/skills/diagnosing-bugs",
+              "dest": ".agents/skills/diagnosing-bugs"
+            },
+            {
+              "src": "claude/skills/code-review",
+              "dest": ".agents/skills/code-review"
+            },
             {
               "src": "claude/skills/grill-with-docs",
               "dest": ".agents/skills/grill-with-docs"
@@ -316,6 +307,21 @@
             {
               "src": "claude/spec-loop",
               "dest": "docs/agents"
+            }
+          ]
+        },
+        {
+          "id": "setup-all",
+          "kind": "enhancement",
+          "category": "dev",
+          "description": "Interactive post-generation setup for changing the Spec Loop's tracker and documentation conventions.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "mattpocock/skills",
+          "paths": [
+            {
+              "src": "claude/skills/setup-matt-pocock-skills",
+              "dest": ".agents/skills/setup-matt-pocock-skills"
             }
           ]
         },

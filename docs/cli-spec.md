@@ -1,6 +1,6 @@
 # CLI Specification — dev-ready
 
-Status: Current through unreleased v0.9 Phase 2. This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
+Status: Current through unreleased v0.9 Phase 3. This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
 
 ## Commands
 
@@ -10,10 +10,11 @@ Generate a new project.
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
-| `--yes` / `-y` | bool | false | Accept all defaults, no prompts |
+| `--yes` / `-y` | bool | false | Accept the lean Default Set, no prompts |
 | `--dir PATH` | path | `./PROJECT_NAME` | Target directory (must not exist or be empty) |
-| `--categories IDS` | string | interactive; `all` with `--yes` | Category selection: comma-separated ids, `all`, or `none` |
-| `--dev IDS` | string | `all` when Dev is selected | Dev items: `tdd`, `diagnosing-bugs`, `code-review`, `spec-loop`, `all`, or `none` |
+| `--categories IDS` | string | Default Set; `all` when another selection flag is supplied | Category selection: comma-separated ids, `all`, or `none` |
+| `--development-loop ID` | string | `spec-loop` | Mandatory development-loop single-select; valid ids come from the manifest |
+| `--dev IDS` | string | `all` when Dev is explicitly selected | Dev Enhancements: `setup-all`, `all`, or `none`; the development loop is mandatory |
 | `--security IDS` | string | `all` when Security is selected | Security items: `security-audit`, `all`, or `none` |
 | `--quality IDS` | string | `all` when Quality is selected | Quality items: `react-doctor`, `webapp-testing`, `all`, or `none` |
 | `--design IDS` | string | `all` when Design is selected | Design items: `frontend-design`, `design-stripe`, `design-linear`, `all`, or `none` |
@@ -26,10 +27,28 @@ another selection flag is supplied, all Categories are selected and each
 per-Category flag narrows only its named Category. A per-Category flag
 conflicts with an explicit `--categories` value that omits that Category.
 
+Dev is mandatory and currently has one development-loop option: `spec-loop`.
+It is resolved for every generation, including `--categories none` and
+`--dev none`. The `setup-all` item is an optional Dev Enhancement, not part of
+the loop. `--development-loop` is the structural single-select and remains
+data-driven if the manifest adds another loop; development-loop ids are never
+Dev Enhancement ids.
+
 Unknown Category ids, unknown item ids, empty comma-separated selections, and
 conflicting Category/item flags fail before generation with an
 invalid-arguments error (exit 2). Unknown errors list the valid identifiers.
 Unknown Agent Target identifiers in `--agents` follow the same exit-2 policy.
+
+The former selectable loop identifiers are retired. Supplying any of them to
+`--dev` fails with an invalid-arguments error (exit 2) naming the mandatory Dev
+development loop, `spec-loop`, as its replacement:
+
+| Retired identifier |
+|---|
+| `spec-loop` |
+| `tdd` |
+| `diagnosing-bugs` |
+| `code-review` |
 
 The old Component-shaped flags are removed and always exit 2 with these
 replacements named:
@@ -42,12 +61,16 @@ replacements named:
 | `--no-docs` | `--design none` |
 | `--no-handoff`, `--no-agents` | No replacement; dev-ready no longer generates the Handoff Protocol |
 
-Selections are resolved before confirmation, rendering, reporting, verification,
-and stamping. Selecting
-`spec-loop` automatically includes its required existing items: `tdd`,
-`diagnosing-bugs`, and `code-review`. The resolved set is shown to the user and
-recorded in `.dev-ready.json`. Explicit `none` leaves the named Category or the
-whole Category selection empty.
+Selections are resolved before confirmation, rendering, reporting,
+verification, and stamping. The resolved development loop and Enhancement set
+are shown to the user and recorded in `.dev-ready.json`. Explicit `none`
+declines the named optional Enhancements; it never removes the development
+loop.
+
+Accepting every default, including `--yes` with no selection flags, produces
+the lean Default Set: the Spec Loop plus the project's `architecture` and
+`requirements` documentation skeletons, with no Enhancements. Use the explicit
+whole-catalog selection `--categories all` to select every Enhancement.
 
 Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification; 6 stamp missing or unparseable/invalid; 7 drift detected; 8 upgrade not supported (pre-v3 stamp); 9 upgrade failed (rolled back).
 
@@ -105,9 +128,10 @@ inventory is added. All planned writes and deletions commit all-or-nothing.
 | `--dry-run` | bool | false | Report planned changes without modifying the project |
 
 Fresh projects use `stamp_version` 5. The record stores the selected Category
-identifiers in the top-level `categories` list, plus the project name, a
-managed-file inventory, selected Agent Target identifiers in the top-level
-`agent_targets` list, and the skills, MCP, and docs selection under `components`.
+identifiers in the top-level `categories` list and the resolved loop identifier
+in top-level `development_loop`, plus the project name, a managed-file
+inventory, selected Agent Target identifiers in the top-level `agent_targets`
+list, and the skills, MCP, and docs selection under `components`.
 Fresh stamps no longer record Handoff Protocol inclusion. Stamp versions 1–5
 remain readable, including version 3 and version 4 projects that do not carry
 Categories; legacy version 4 `components.handoff` and version 3
@@ -135,12 +159,15 @@ This flow applies only to `init`. `check` and `upgrade` are non-interactive by
 construction and dispatch directly to their respective operations.
 
 1. Project name (if not given as argument)
-2. Category selection (`dev`, `security`, `quality`, `design`, and `token-optimize`; described multi-select, all on by default)
-3. Item selection across the chosen Categories (described multi-select, all on by default; plain Enter accepts all items)
-4. Agent Target selection (described multi-select, all on by default; plain Enter accepts all targets)
-5. Confirmation summary naming the resolved Categories, Catalog Items, and Agent Targets before writing anything
+2. Default Set offer, naming its resolved `spec-loop` development loop plus `architecture` and `requirements` documentation (yes by default)
+3. If the Default Set is accepted, an offer to add Enhancements (no by default); accepting that offer opens Category and Enhancement selection layered onto the Default Set
+4. If the Default Set is declined and the manifest offers multiple development loops, mandatory development-loop single-selection (the Default Set loop is listed first)
+5. If the Default Set is declined, Category selection (`dev`, `security`, `quality`, `design`, and `token-optimize`; Dev remains selected because its development loop is mandatory)
+6. If the Default Set is declined, Enhancement selection across the chosen Categories (`setup-all` is offered under Dev; the loop is not an optional item)
+7. Agent Target selection (described multi-select, all on by default; plain Enter accepts all targets)
+8. Confirmation summary naming the resolved Categories, Catalog Items, and Agent Targets before writing anything
 
-Steps 2–4 are skipped as a unit if any selection flag (`--categories`, any
+Steps 2–7 are skipped as a unit if any selection flag (`--development-loop`, `--categories`, any
 per-Category item flag, or `--agents`) was passed. An omitted project name is
 still prompted for, and confirmation still occurs.
 

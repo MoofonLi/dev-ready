@@ -125,7 +125,7 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
     answers = Answers(
         project_name=stamp.project_name,
         target_dir=resolved,
-        selection=ProjectSelection.from_items(
+        selection=ProjectSelection.from_recorded_items(
             manifest.components,
             skills=frozenset(item.id for item in stamp.skills_items) & known_skills,
             mcp=frozenset(item.id for item in stamp.mcp_items) & known_mcp,

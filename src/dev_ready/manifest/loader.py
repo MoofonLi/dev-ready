@@ -17,8 +17,10 @@ from dev_ready.manifest.models import (
     CatalogItem,
     Category,
     ComponentCatalog,
+    DefaultSet,
     ItemPath,
     Manifest,
+    RETIRED_LOOP_ITEM_IDS,
     UpstreamPin,
     VendoredPin,
 )
@@ -26,9 +28,9 @@ from dev_ready.manifest.models import (
 SUPPORTED_MANIFEST_VERSION = 1
 ALLOWED_MODES = ("builtin", "vendor", "pinned-dependency")
 CATALOG_COMPONENTS = ("skills", "mcp", "docs")
+DEFAULT_SET_SIZE_LIMIT = 3
 _ITEM_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _PIN_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+.][0-9A-Za-z.-]+)?$")
-
 _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 # owner/name, GitHub-shaped: each side must start with an alphanumeric so no
 # segment can begin with '.' (blocks traversal-shaped values like '..x/y' that
@@ -84,20 +86,159 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
     components = _parse_components(data, source, vendored, categories)
     _validate_non_empty_categories(components, categories, source)
     _validate_catalog_requirements(components, source)
+    development_loop_ids = _validate_development_loops(components, source)
+    default_set = _parse_default_set(
+        data,
+        components,
+        development_loop_ids,
+        source,
+    )
 
     overlay_version = data.get("overlay_version")
     if not isinstance(overlay_version, str) or not overlay_version:
         raise ManifestError(f"{source}: 'overlay_version' must be a non-empty string")
 
+    catalog = ComponentCatalog(
+        components,
+        agent_targets,
+        categories,
+        default_set,
+    )
     return Manifest(
         manifest_version=version,
         upstream=upstream,
         overlay_version=overlay_version,
-        components=ComponentCatalog(components, agent_targets, categories),
+        components=catalog,
         agent_targets=agent_targets,
         categories=categories,
+        default_set=default_set,
         vendored=vendored,
     )
+
+
+def _validate_development_loops(
+    components: dict[str, tuple[CatalogItem, ...]],
+    source: str,
+) -> tuple[str, ...]:
+    """Validate relationships between parsed loops and Enhancements."""
+    items = tuple(item for component in components.values() for item in component)
+    loops = tuple(item for item in items if item.kind == "development-loop")
+    for item in items:
+        if item.id in RETIRED_LOOP_ITEM_IDS and not (
+            item.id == "spec-loop" and item.kind == "development-loop"
+        ):
+            raise ManifestError(
+                f"{source}: retired catalog id {item.id!r} cannot be declared selectable"
+            )
+
+    if not loops:
+        raise ManifestError(
+            f"{source}: Dev Category must declare at least one development loop"
+        )
+
+    loop_ids = {item.id for item in loops}
+    step_ids = {step for loop in loops for step in loop.steps}
+    duplicated_steps = sorted(({item.id for item in items} - loop_ids) & step_ids)
+    if duplicated_steps:
+        raise ManifestError(
+            f"{source}: catalog item {duplicated_steps[0]!r} duplicates development "
+            f"loop step {duplicated_steps[0]!r}"
+        )
+    return tuple(item.id for item in loops)
+
+
+def _parse_default_set(
+    data: dict,
+    components: dict[str, tuple[CatalogItem, ...]],
+    development_loop_ids: tuple[str, ...],
+    source: str,
+) -> DefaultSet:
+    raw = data.get("default_set")
+    if not isinstance(raw, dict):
+        raise ManifestError(f"{source}: 'default_set' must be an object")
+
+    development_loop = raw.get("development_loop")
+    if not isinstance(development_loop, str) or development_loop not in development_loop_ids:
+        raise ManifestError(
+            f"{source}: Default Set 'development_loop' must name one of "
+            f"{list(development_loop_ids)!r}"
+        )
+
+    documentation = _parse_default_set_ids(
+        raw.get("documentation"),
+        field="documentation",
+        source=source,
+    )
+    valid_documentation = {"architecture", "requirements"}
+    unknown_documentation = sorted(set(documentation) - valid_documentation)
+    if unknown_documentation:
+        raise ManifestError(
+            f"{source}: Default Set has unknown documentation ids "
+            f"{unknown_documentation!r}; valid ids: {sorted(valid_documentation)!r}"
+        )
+    if set(documentation) != valid_documentation:
+        raise ManifestError(
+            f"{source}: Default Set documentation must include exactly "
+            f"{sorted(valid_documentation)!r}"
+        )
+
+    enhancements = _parse_default_set_ids(
+        raw.get("enhancements"),
+        field="enhancements",
+        source=source,
+    )
+    item_by_id = {
+        item.id: item for component_items in components.values() for item in component_items
+    }
+    unknown_enhancements = sorted(set(enhancements) - set(item_by_id))
+    if unknown_enhancements:
+        raise ManifestError(
+            f"{source}: Default Set has unknown Enhancement ids "
+            f"{unknown_enhancements!r}"
+        )
+    non_enhancements = sorted(
+        item_id for item_id in enhancements if item_by_id[item_id].kind != "enhancement"
+    )
+    if non_enhancements:
+        raise ManifestError(
+            f"{source}: Default Set Enhancement ids must not name development loops: "
+            f"{non_enhancements!r}"
+        )
+
+    current_size = 1 + len(documentation) + len(enhancements)
+    if current_size > DEFAULT_SET_SIZE_LIMIT:
+        raise ManifestError(
+            f"{source}: Default Set size {current_size} exceeds limit "
+            f"{DEFAULT_SET_SIZE_LIMIT}; change DEFAULT_SET_SIZE_LIMIT in "
+            "dev_ready.manifest.loader.py to revise the budget"
+        )
+    return DefaultSet(
+        development_loop=development_loop,
+        documentation=documentation,
+        enhancements=enhancements,
+    )
+
+
+def _parse_default_set_ids(
+    raw: object,
+    *,
+    field: str,
+    source: str,
+) -> tuple[str, ...]:
+    if not isinstance(raw, list):
+        raise ManifestError(f"{source}: Default Set field {field!r} must be a list")
+    values: list[str] = []
+    for value in raw:
+        if not isinstance(value, str) or not value or not _ITEM_ID_PATTERN.fullmatch(value):
+            raise ManifestError(
+                f"{source}: Default Set field {field!r} entries must be identifiers"
+            )
+        if value in values:
+            raise ManifestError(
+                f"{source}: Default Set field {field!r} has duplicate id {value!r}"
+            )
+        values.append(value)
+    return tuple(values)
 
 
 def _parse_categories(data: dict, source: str) -> dict[str, Category]:
@@ -418,6 +559,14 @@ def _parse_components(
                     f"unknown category {category!r}"
                 )
 
+            kind, steps = _parse_item_kind_and_steps(
+                item_entry,
+                component=comp_name,
+                item_id=item_id,
+                category=category,
+                source=source,
+            )
+
             desc = item_entry.get("description")
             if not isinstance(desc, str) or not desc:
                 raise ManifestError(
@@ -507,6 +656,8 @@ def _parse_components(
                 CatalogItem(
                     id=item_id,
                     category=category,
+                    kind=kind,
+                    steps=steps,
                     description=desc,
                     mode=mode,
                     license=lic,
@@ -520,6 +671,55 @@ def _parse_components(
 
         result[comp_name] = tuple(parsed_items)
     return result
+
+
+def _parse_item_kind_and_steps(
+    entry: dict,
+    *,
+    component: str,
+    item_id: str,
+    category: str,
+    source: str,
+) -> tuple[str, tuple[str, ...]]:
+    kind = entry.get("kind", "enhancement")
+    if kind not in {"development-loop", "enhancement"}:
+        raise ManifestError(
+            f"{source}: component '{component}' item {item_id!r} field 'kind' "
+            "must be 'development-loop' or 'enhancement'"
+        )
+    if kind == "enhancement":
+        if "steps" in entry:
+            raise ManifestError(
+                f"{source}: component '{component}' item {item_id!r} field 'steps' "
+                "is only allowed for a development loop"
+            )
+        return kind, ()
+    if category != "dev":
+        raise ManifestError(
+            f"{source}: development loop {item_id!r} must belong to the Dev Category"
+        )
+    raw_steps = entry.get("steps")
+    if not isinstance(raw_steps, list) or not raw_steps:
+        raise ManifestError(
+            f"{source}: development loop {item_id!r} field 'steps' must be a non-empty list"
+        )
+    steps: list[str] = []
+    for step in raw_steps:
+        if (
+            not isinstance(step, str)
+            or not step
+            or not _ITEM_ID_PATTERN.fullmatch(step)
+        ):
+            raise ManifestError(
+                f"{source}: development loop {item_id!r} step ids must match "
+                f"the catalog id pattern, got {step!r}"
+            )
+        if step in steps:
+            raise ManifestError(
+                f"{source}: development loop {item_id!r} has duplicate step {step!r}"
+            )
+        steps.append(step)
+    return kind, tuple(steps)
 
 
 def _validate_non_empty_categories(

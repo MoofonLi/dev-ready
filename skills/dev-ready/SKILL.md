@@ -25,20 +25,26 @@ Inspect the destination first. If it exists and is non-empty, stop and ask the u
 
 Always use `--yes` for agent-driven, non-interactive generation.
 
-Select user-facing Categories with `--categories IDS`. Narrow the items within
+With no selection flags, `--yes` accepts the lean Default Set: the mandatory
+Spec Loop plus the project's architecture and requirements skeletons. Select
+user-facing Categories with `--categories IDS`. Narrow Enhancements within
 each selected Category with `--dev`, `--security`, `--quality`, `--design`, or
-`--token-optimize`. Select native Agent Target configuration independently with
-`--agents IDS`.
+`--token-optimize`. Choose the mandatory loop with `--development-loop ID` if
+the manifest offers more than one. Select native Agent Target configuration
+independently with `--agents IDS`.
 
 Every selection flag accepts:
 
-- Omitted or `all` selects every current item.
+- `all` selects every current Enhancement on that flag.
 - `none` selects no Category, item, or Agent Target on that flag.
 - A comma-separated list selects those ids. Do not add spaces inside the list.
 
 Current Category ids: `dev`, `security`, `quality`, `design`, `token-optimize`.
 
-Current dev item ids: `tdd`, `diagnosing-bugs`, `code-review`, `spec-loop`.
+Current development loop ids: `spec-loop` (mandatory; select on the structural
+`--development-loop` axis, not as a `--dev` Enhancement).
+
+Current dev item ids: `setup-all`.
 
 Current security item ids: `security-audit`.
 
@@ -50,7 +56,12 @@ Current token-optimize item ids: `caveman`, `code-memory`.
 
 Current Agent Target ids: `claude`, `windsurf`.
 
-Selecting `spec-loop` automatically resolves `tdd`, `diagnosing-bugs`, and `code-review`. Treat the resolved selection shown in the report and stamp as authoritative.
+Every generated project resolves `spec-loop`; `--categories none` and
+`--dev none` decline Enhancements without removing it. The former selectable
+ids `spec-loop`, `tdd`, `diagnosing-bugs`, and `code-review` now exit 2 when
+passed to `--dev`, because their content is part of the mandatory Dev
+development loop. Treat the resolved selection shown in the report and stamp
+as authoritative.
 
 Unknown Category ids, unknown item ids, unknown Agent Target ids, and conflicting
 flags are exit 2 failures; surface the error instead of guessing a replacement.
@@ -64,10 +75,16 @@ Handoff Protocol. Passing any removed flag exits 2; do not retry with an alias.
 
 ## 3. Form one command
 
-All/default selection:
+Lean Default Set:
 
 ```shell
-uvx dev-ready init my-app --yes --categories all --agents all --dir ./my-app
+uvx dev-ready init my-app --yes --dir ./my-app
+```
+
+Explicit whole-catalog selection:
+
+```shell
+uvx dev-ready init full-app --yes --categories all --agents all --dir ./full-app
 ```
 
 No optional components:
@@ -76,10 +93,10 @@ No optional components:
 uvx dev-ready init minimal-app --yes --categories none --agents none --dir ./minimal-app
 ```
 
-Mixed standalone Spec Loop selection:
+Mixed Enhancement selection:
 
 ```shell
-uvx dev-ready init focused-app --yes --categories dev,design,token-optimize --dev spec-loop --design frontend-design,design-stripe --token-optimize code-memory --agents claude --dir ./focused-app
+uvx dev-ready init focused-app --yes --development-loop spec-loop --categories dev,design,token-optimize --dev setup-all --design frontend-design,design-stripe --token-optimize code-memory --agents claude --dir ./focused-app
 ```
 
 Run exactly one selected command. Do not invent flags for language, overwriting, or cleanup.

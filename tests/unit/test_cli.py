@@ -259,7 +259,7 @@ def test_init_closes_progress_on_unexpected_interrupt_and_termination(
     assert len(closed) == 1
 
 
-def test_init_success_omits_disabled_components_from_summary(
+def test_init_success_keeps_only_the_mandatory_loop_in_disabled_summary(
     tmp_path, monkeypatch: pytest.MonkeyPatch, capsys
 ) -> None:
     monkeypatch.setattr(cli_module, "generate", lambda answers, pin, *args, **kwargs: [Path("CLAUDE.md")])
@@ -279,9 +279,9 @@ def test_init_success_omits_disabled_components_from_summary(
         == 0
     )
     out = capsys.readouterr().out
-    assert "skills" not in out
+    assert "react-doctor" not in out
+    assert "caveman" not in out
     assert "mcp" not in out
-    assert "docs" not in out
     assert "handoff" not in out
 
 
@@ -334,7 +334,8 @@ def test_init_flags_reach_generate_via_answers(
     answers = captured["answers"]
     assert answers.project_name == "my-app"
     assert answers.target_dir == target_dir
-    assert answers.include_skills is False
+    assert answers.include_skills is True
+    assert answers.selection.development_loop == "spec-loop"
     assert answers.include_mcp is False
     assert answers.include_docs is False
     assert answers.assume_yes is True
@@ -345,22 +346,11 @@ def test_build_answers_defaults() -> None:
     assert answers.project_name == "my-app"
     assert answers.target_dir == Path.cwd() / "my-app"
     assert answers.include_skills is True
-    assert answers.include_mcp is True
-    assert answers.skills_items == frozenset(
-        {
-            "react-doctor",
-            "caveman",
-                "security-audit",
-                "spec-loop",
-                "tdd",
-            "diagnosing-bugs",
-            "code-review",
-            "webapp-testing",
-            "frontend-design",
-        }
-    )
-    assert answers.mcp_items == frozenset({"code-memory"})
+    assert answers.include_mcp is False
+    assert answers.skills_items == frozenset({"spec-loop"})
+    assert answers.mcp_items == frozenset()
     assert answers.include_docs is True
+    assert answers.selection.docs_items == frozenset()
     assert answers.assume_yes is False
 
 
@@ -370,9 +360,11 @@ def test_build_answers_respects_flags(tmp_path) -> None:
         CATALOG,
     )
     assert answers.target_dir == tmp_path / "out"
-    assert answers.include_skills is False
+    assert answers.include_skills is True
     assert answers.include_mcp is False
-    assert answers.skills_items == frozenset()
+    assert answers.skills_items == frozenset(
+        {"spec-loop"}
+    )
     assert answers.mcp_items == frozenset()
     assert answers.include_docs is False
     assert answers.assume_yes is True
@@ -389,7 +381,7 @@ def test_parser_accepts_all_documented_flags() -> None:
             "--categories",
             "dev,token-optimize",
             "--dev",
-            "tdd",
+            "none",
             "--token-optimize",
             "caveman",
             "--agents",
@@ -400,7 +392,7 @@ def test_parser_accepts_all_documented_flags() -> None:
     assert args.yes is True
     assert args.target_dir == Path("x")
     assert args.categories == "dev,token-optimize"
-    assert args.dev == "tdd"
+    assert args.dev == "none"
     assert args.token_optimize == "caveman"
     assert args.agents == "claude,windsurf"
     assert not hasattr(args, "no_handoff")
@@ -467,6 +459,25 @@ def test_agents_flag_reaches_generation_as_resolved_target_selection(
     assert captured["answers"].agent_targets == frozenset({"windsurf"})
 
 
+def test_development_loop_flag_uses_the_structural_selection_axis() -> None:
+    args = build_parser().parse_args(
+        [
+            "init",
+            "my-app",
+            "--yes",
+            "--categories",
+            "none",
+            "--development-loop",
+            "spec-loop",
+        ]
+    )
+
+    answers = build_answers(args, CATALOG)
+
+    assert answers.selection.development_loop == "spec-loop"
+    assert answers.skills_items == frozenset({"spec-loop"})
+
+
 def test_unknown_agents_flag_fails_before_generation(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -527,10 +538,8 @@ def test_category_item_flag_variations() -> None:
     )
     assert ans.skills_items == frozenset(
         {
+            "setup-all",
             "spec-loop",
-            "tdd",
-            "diagnosing-bugs",
-            "code-review",
         }
     )
     assert ans.mcp_items == frozenset()
@@ -544,7 +553,9 @@ def test_category_item_flag_variations() -> None:
         ),
         CATALOG,
     )
-    assert ans2.skills_items == frozenset({"caveman"})
+    assert ans2.skills_items == frozenset(
+        {"caveman", "spec-loop"}
+    )
     assert ans2.mcp_items == frozenset({"code-memory"})
 
 
@@ -561,9 +572,25 @@ def test_removed_project_orientation_id_uses_standard_unknown_item_error(
     assert main(["init", "my-app", "--yes", "--dev", "project-orientation"]) == 2
     error = capsys.readouterr().err
     assert "unknown Dev item ids: ['project-orientation']" in error
-    assert (
-        "valid ids: ['code-review', 'diagnosing-bugs', 'spec-loop', 'tdd']"
-    ) in error
+    assert "valid ids: ['setup-all']" in error
+
+
+@pytest.mark.parametrize(
+    "retired_id",
+    ["spec-loop", "tdd", "diagnosing-bugs", "code-review"],
+)
+def test_retired_loop_item_ids_exit_2_with_their_replacement(
+    retired_id: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli_module, "generate", lambda *args, **kwargs: [])
+    assert main(["init", "my-app", "--yes", "--dev", retired_id]) == 2
+
+    error = capsys.readouterr().err
+    assert retired_id in error
+    assert "mandatory Dev development loop" in error
+    assert "'spec-loop'" in error
 
 
 def test_conflicting_flags_exits_2(capsys) -> None:

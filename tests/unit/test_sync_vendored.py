@@ -150,6 +150,8 @@ def test_sync_all_empty_vendored_returns_zero(tmp_path: Path) -> None:
     manifest_path.write_text(
         """{
   "manifest_version": 1,
+  "default_set": {"development_loop": "sample-loop", "documentation": ["architecture", "requirements"], "enhancements": []},
+  "categories": {"dev": {"description": "Development loop."}},
   "agent_targets": {"claude": {"description": "Claude Code.", "skills_dir": ".claude/skills", "rules_file": "CLAUDE.md", "mcp_file": ".mcp.json"}},
   "upstream": {
     "base_template": {
@@ -160,7 +162,7 @@ def test_sync_all_empty_vendored_returns_zero(tmp_path: Path) -> None:
     }
   },
   "vendored": [],
-  "components": {"skills": {"items": []}, "mcp": {"items": []}, "docs": {"items": []}},
+  "components": {"skills": {"items": [{"id": "sample-loop", "kind": "development-loop", "steps": ["sample-step"], "category": "dev", "description": "Sample loop.", "mode": "builtin", "license": "MIT", "paths": [{"src": "sample", "dest": ".agents/skills/sample"}]}]}, "mcp": {"items": []}, "docs": {"items": []}},
   "overlay_version": "0.1.0"
 }"""
         % ("a" * 40),
@@ -200,4 +202,5 @@ def test_spec_loop_snapshot_declares_every_support_path() -> None:
         "src/dev_ready/templates/claude/skills/implement",
         "src/dev_ready/templates/claude/skills/improve-codebase-architecture",
         "src/dev_ready/templates/claude/skills/codebase-design",
+        "src/dev_ready/templates/claude/skills/setup-matt-pocock-skills",
     }

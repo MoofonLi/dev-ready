@@ -205,7 +205,7 @@ def _selection_arguments(stamp: dict[str, Any]) -> list[str]:
         if selected.get("included"):
             for item_id in item_ids:
                 item = items_by_id.get(item_id)
-                if item is not None:
+                if item is not None and item.kind != "development-loop":
                     selected_by_category.setdefault(item.category, set()).add(item.id)
 
     docs = components.get("docs")

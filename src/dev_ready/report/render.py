@@ -27,6 +27,7 @@ def render_report(
         f"location:  {answers.target_dir}",
         f"upstream:  {pin.repo}@{pin.commit[:12]} ({pin.ref})",
         f"overlay:   {overlay_paths}",
+        *_render_selection(answers, catalog),
         *_render_agent_targets(answers, catalog),
         "",
         "next steps:",
@@ -38,6 +39,28 @@ def render_report(
         "  3. read AGENTS.md for the full picture",
     ]
     return "\n".join(lines)
+
+
+def _render_selection(
+    answers: Answers,
+    catalog: Mapping[str, tuple[CatalogItem, ...]] | None,
+) -> list[str]:
+    if not isinstance(catalog, ComponentCatalog):
+        return []
+    selected_enhancements = sorted(
+        item.id
+        for component in ("skills", "mcp", "docs")
+        for item in catalog.get(component, ())
+        if item.kind == "enhancement" and item.id in answers.items(component)
+    )
+    documentation = (
+        "architecture, requirements" if answers.includes("docs") else "(none)"
+    )
+    return [
+        f"development loop (required): {answers.selection.development_loop}",
+        f"documentation skeletons: {documentation}",
+        "enhancements: " + (", ".join(selected_enhancements) or "(none)"),
+    ]
 
 
 def _render_agent_targets(

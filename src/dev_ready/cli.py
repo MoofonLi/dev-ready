@@ -167,7 +167,7 @@ def build_parser() -> argparse.ArgumentParser:
         "project_name", nargs="?", help="Name of the project to generate"
     )
     init_parser.add_argument(
-        "-y", "--yes", action="store_true", help="Accept all defaults, no prompts"
+        "-y", "--yes", action="store_true", help="Accept the Default Set, no prompts"
     )
     init_parser.add_argument(
         "--dir",
@@ -180,6 +180,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--categories",
         default=None,
         help="Category selection: comma-separated ids, or 'all' / 'none'.",
+    )
+    init_parser.add_argument(
+        "--development-loop",
+        default=None,
+        help="Mandatory development-loop id (defaults to the manifest Default Set).",
     )
     for category in _CATEGORY_FLAGS:
         init_parser.add_argument(
@@ -248,7 +253,8 @@ def build_answers(
         categories=args.categories,
         category_items=_category_items_from_args(args),
         agents=args.agents,
-    ) or ProjectSelection.all(catalog)
+        development_loop=getattr(args, "development_loop", None),
+    ) or ProjectSelection.default_set(catalog)
 
     target_dir = args.target_dir if args.target_dir is not None else Path.cwd() / name
     return Answers(
@@ -271,6 +277,7 @@ def _build_partial_answers(
         categories=args.categories,
         category_items=_category_items_from_args(args),
         agents=args.agents,
+        development_loop=getattr(args, "development_loop", None),
     )
 
     return PartialAnswers(

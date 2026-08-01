@@ -51,7 +51,7 @@ def check_project(project_dir: Path, json_output: bool = False) -> str:
         "is no longer present in CLI manifest"
         for target_id in removed_agent_targets
     )
-    selection = ProjectSelection.from_items(
+    selection = ProjectSelection.from_recorded_items(
         manifest.components,
         skills=frozenset(item.id for item in stamp.skills_items) & known_skills,
         mcp=frozenset(item.id for item in stamp.mcp_items) & known_mcp,

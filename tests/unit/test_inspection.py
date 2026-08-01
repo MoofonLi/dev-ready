@@ -1,15 +1,41 @@
 """Behavior tests for the shared project-inspection seam."""
 
+from dataclasses import replace
 from pathlib import Path
 
 from dev_ready.inspection import ProjectExpectation, inspect_project
-from dev_ready.manifest import load_default_manifest
+from dev_ready.manifest import ComponentCatalog, ItemPath, load_default_manifest
 from dev_ready.prompts import ProjectSelection
 from project_factory import materialize_project_structure
 
 
 MANIFEST = load_default_manifest()
 CATALOG = MANIFEST.components
+
+
+def _catalog_with_second_loop() -> ComponentCatalog:
+    current = next(
+        item for item in CATALOG["skills"] if item.kind == "development-loop"
+    )
+    alternate = replace(
+        current,
+        id="alternate-loop",
+        steps=("alternate-step",),
+        paths=(
+            ItemPath(
+                src="claude/skills/alternate-loop",
+                dest=".agents/skills/alternate-loop",
+            ),
+        ),
+    )
+    components = dict(CATALOG)
+    components["skills"] = (*CATALOG["skills"], alternate)
+    return ComponentCatalog(
+        components,
+        CATALOG.agent_targets,
+        CATALOG.categories,
+        CATALOG.default_set,
+    )
 
 
 def test_lifecycle_inspection_aggregates_shared_structural_facts(tmp_path: Path) -> None:
@@ -40,6 +66,39 @@ def test_generation_inspection_rejects_unselected_catalog_paths(tmp_path: Path) 
         issue.category == "unexpected item path" and "caveman" in issue.detail
         for issue in issues
     )
+
+
+def test_generation_inspection_requires_the_development_loop_as_structure(
+    tmp_path: Path,
+) -> None:
+    selection = ProjectSelection.empty()
+    materialize_project_structure(tmp_path, CATALOG, selection)
+
+    issues = inspect_project(
+        tmp_path,
+        CATALOG,
+        ProjectExpectation.generation(selection),
+    )
+
+    assert any(
+        issue.category == "missing item path"
+        and "development loop item 'spec-loop'" in issue.detail
+        for issue in issues
+    )
+
+
+def test_generation_inspection_requires_only_the_resolved_loop(tmp_path: Path) -> None:
+    catalog = _catalog_with_second_loop()
+    selection = ProjectSelection.default_set(catalog)
+    materialize_project_structure(tmp_path, catalog, selection)
+
+    issues = inspect_project(
+        tmp_path,
+        catalog,
+        ProjectExpectation.generation(selection),
+    )
+
+    assert not any("alternate-loop" in issue.detail for issue in issues)
 
 
 def test_inspection_reports_malformed_effect_target_as_a_fact(tmp_path: Path) -> None:

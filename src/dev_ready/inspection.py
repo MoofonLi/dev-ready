@@ -81,6 +81,14 @@ def inspect_project(
     """Return every structural mismatch through one local-filesystem seam."""
     root = project_dir.resolve()
     issues: list[ProjectIssue] = []
+    required_development_loop = expectation.selection.development_loop
+    if (
+        expectation.exact_catalog_selection
+        and not required_development_loop
+        and isinstance(catalog, ComponentCatalog)
+        and catalog.default_set is not None
+    ):
+        required_development_loop = catalog.default_set.development_loop
 
     for relative in REQUIRED_UPSTREAM_PATHS:
         target = root / relative
@@ -152,13 +160,23 @@ def inspect_project(
                     issues,
                 )
                 continue
-            expected = item.id in selected
+            is_development_loop = item.kind == "development-loop"
+            expected = item.id in selected or (
+                is_development_loop and item.id == required_development_loop
+            )
             if expected or expectation.exact_catalog_selection:
-                _inspect_item_paths(root, name, item, expected, issues)
-                _inspect_item_effect(root, name, item, expected, issues)
+                item_group = "development loop" if is_development_loop else name
+                _inspect_item_paths(root, item_group, item, expected, issues)
+                _inspect_item_effect(root, item_group, item, expected, issues)
 
     if isinstance(catalog, ComponentCatalog):
-        _inspect_agent_target_artifacts(root, catalog, expectation.selection, issues)
+        _inspect_agent_target_artifacts(
+            root,
+            catalog,
+            expectation.selection,
+            required_development_loop,
+            issues,
+        )
 
     return tuple(issues)
 
@@ -194,12 +212,14 @@ def _inspect_agent_target_artifacts(
     root: Path,
     catalog: ComponentCatalog,
     selection: ProjectSelection,
+    required_development_loop: str,
     issues: list[ProjectIssue],
 ) -> None:
     skill_names = {
         Path(item_path.dest).parts[2]
         for item in catalog.get("skills", ())
         if item.id in selection.skills
+        or item.id == required_development_loop
         for item_path in item.paths
         if len(Path(item_path.dest).parts) >= 3
         and Path(item_path.dest).parts[:2] == (".agents", "skills")

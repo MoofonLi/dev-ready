@@ -67,30 +67,34 @@ def collect_answers(
         assert resolved_asker is not None
         if catalog is None:
             raise InvalidArgumentsError("catalog is required for Category selection")
-        selected_categories = _prompt_categories(resolved_asker, catalog)
-        selected_item_ids = _prompt_category_items(
-            resolved_asker,
-            catalog,
-            selected_categories,
-        )
-        selected_by_component = {
-            component: frozenset(
-                item.id
-                for item in catalog.get(component, ())
-                if item.id in selected_item_ids
-            )
-            for component in ("skills", "mcp", "docs")
-        }
+        if _prompt_use_default_set(resolved_asker, catalog):
+            base_selection = ProjectSelection.default_set(catalog)
+            if _prompt_add_enhancements(resolved_asker):
+                enhancements = _prompt_custom_selection(
+                    resolved_asker,
+                    catalog,
+                    development_loop=base_selection.development_loop,
+                )
+                base_selection = ProjectSelection.from_items(
+                    catalog,
+                    skills=base_selection.skills | enhancements.skills,
+                    mcp=base_selection.mcp | enhancements.mcp,
+                    docs_items=base_selection.docs_items | enhancements.docs_items,
+                    categories=base_selection.categories | enhancements.categories,
+                    agent_targets=frozenset(),
+                    docs=base_selection.docs or enhancements.docs,
+                )
+        else:
+            base_selection = _prompt_custom_selection(resolved_asker, catalog)
         agent_targets = _prompt_agent_targets(resolved_asker, catalog)
         selection = ProjectSelection.from_items(
             catalog,
-            skills=selected_by_component["skills"],
-            mcp=selected_by_component["mcp"],
-            docs_items=selected_by_component["docs"],
-            categories=selected_categories,
+            skills=base_selection.skills,
+            mcp=base_selection.mcp,
+            docs_items=base_selection.docs_items,
+            categories=base_selection.categories,
             agent_targets=agent_targets,
-            docs=bool(selected_by_component["docs"])
-            or ("design" in selected_categories and not catalog.get("docs")),
+            docs=base_selection.docs,
         )
     else:
         assert partial.selection is not None
@@ -189,7 +193,8 @@ def _prompt_categories(
         selected = None
     if selected is None:
         raise AbortedError("Category selection prompt cancelled")
-    return frozenset(labels[label] for label in selected)
+    selected_ids = frozenset(labels[label] for label in selected)
+    return selected_ids | (frozenset({"dev"}) if "dev" in categories else frozenset())
 
 
 def _prompt_category_items(
@@ -197,11 +202,14 @@ def _prompt_category_items(
     catalog: Mapping[str, tuple[CatalogItem, ...]],
     selected_categories: frozenset[str],
 ) -> frozenset[str]:
+    development_loop_ids = frozenset(
+        getattr(catalog, "development_loop_ids", ())
+    )
     labels = {
         f"{item.category}: {item.id} — {item.description}": item.id
         for component_items in catalog.values()
         for item in component_items
-        if item.category in selected_categories
+        if item.category in selected_categories and item.id not in development_loop_ids
     }
     try:
         selected = asker.checkbox(
@@ -213,6 +221,98 @@ def _prompt_category_items(
     if selected is None:
         raise AbortedError("Category item selection cancelled")
     return frozenset(labels[label] for label in selected)
+
+
+def _prompt_custom_selection(
+    asker: Asker,
+    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    *,
+    development_loop: str | None = None,
+) -> ProjectSelection:
+    resolved_loop = development_loop or _prompt_development_loop(asker, catalog)
+    selected_categories = _prompt_categories(asker, catalog)
+    selected_item_ids = _prompt_category_items(asker, catalog, selected_categories)
+    selected_by_component = {
+        component: frozenset(
+            item.id
+            for item in catalog.get(component, ())
+            if item.id in selected_item_ids
+        )
+        for component in ("skills", "mcp", "docs")
+    }
+    return ProjectSelection.from_items(
+        catalog,
+        skills=selected_by_component["skills"] | frozenset({resolved_loop}),
+        mcp=selected_by_component["mcp"],
+        docs_items=selected_by_component["docs"],
+        categories=selected_categories,
+        agent_targets=frozenset(),
+        docs=bool(selected_by_component["docs"])
+        or ("design" in selected_categories and not catalog.get("docs")),
+    )
+
+
+def _prompt_development_loop(
+    asker: Asker,
+    catalog: Mapping[str, tuple[CatalogItem, ...]],
+) -> str:
+    loop_ids = tuple(getattr(catalog, "development_loop_ids", ()))
+    if not loop_ids:
+        raise InvalidArgumentsError("catalog does not declare a development loop")
+    if len(loop_ids) == 1:
+        return loop_ids[0]
+    default_set = getattr(catalog, "default_set", None)
+    default_loop = getattr(default_set, "development_loop", "")
+    ordered_ids = (
+        (default_loop, *tuple(loop_id for loop_id in loop_ids if loop_id != default_loop))
+        if default_loop in loop_ids
+        else loop_ids
+    )
+    items = {
+        item.id: item
+        for component_items in catalog.values()
+        for item in component_items
+        if item.kind == "development-loop"
+    }
+    labels = {f"{loop_id}: {items[loop_id].description}": loop_id for loop_id in ordered_ids}
+    try:
+        selected = asker.select("Select one development loop:", tuple(labels))
+    except KeyboardInterrupt:
+        selected = None
+    if selected is None:
+        raise AbortedError("Development loop prompt cancelled")
+    return labels[selected]
+
+
+def _prompt_use_default_set(
+    asker: Asker,
+    catalog: Mapping[str, tuple[CatalogItem, ...]],
+) -> bool:
+    default_set = getattr(catalog, "default_set", None)
+    if default_set is None:
+        raise InvalidArgumentsError("catalog does not declare a Default Set")
+    documentation = ", ".join(default_set.documentation)
+    try:
+        selected = asker.confirm(
+            f"Use the Default Set (development loop: {default_set.development_loop}; "
+            f"documentation: {documentation})?",
+            default=True,
+        )
+    except KeyboardInterrupt:
+        selected = None
+    if selected is None:
+        raise AbortedError("Default Set prompt cancelled")
+    return selected
+
+
+def _prompt_add_enhancements(asker: Asker) -> bool:
+    try:
+        selected = asker.confirm("Add Enhancements to the Default Set?", default=False)
+    except KeyboardInterrupt:
+        selected = None
+    if selected is None:
+        raise AbortedError("Enhancement prompt cancelled")
+    return selected
 
 
 def _prompt_agent_targets(

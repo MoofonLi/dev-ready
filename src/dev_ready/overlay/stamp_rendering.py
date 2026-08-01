@@ -63,6 +63,7 @@ def render_stamp(
     }
     if stamp_version >= 5:
         data["categories"] = sorted(answers.selection.categories)
+        data["development_loop"] = answers.selection.development_loop
         data["components"]["docs"]["items"] = stamp_items(
             "docs", answers.items("docs")
         )

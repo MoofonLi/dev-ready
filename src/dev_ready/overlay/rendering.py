@@ -8,6 +8,38 @@ from dev_ready.prompts import Answers
 
 TEMPLATE_SUFFIX = ".tmpl"
 
+_UNSELECTED_SETUP_REPLACEMENTS = {
+    ".agents/skills/code-review/SKILL.md": (
+        (
+            "The issue tracker should have been provided to you — run "
+            "`/setup-matt-pocock-skills` if `docs/agents/issue-tracker.md` is missing.",
+            "Issue tracker configuration is in `docs/agents/issue-tracker.md`.",
+        ),
+    ),
+    ".agents/skills/to-spec/SKILL.md": (
+        (
+            "The issue tracker and triage label vocabulary should have been provided "
+            "to you — run `/setup-matt-pocock-skills` if not.",
+            "Issue tracker and triage conventions are in `docs/agents/`.",
+        ),
+    ),
+    ".agents/skills/to-tickets/SKILL.md": (
+        (
+            "The issue tracker and triage label vocabulary should have been provided "
+            "to you — run `/setup-matt-pocock-skills` if not.",
+            "Issue tracker and triage conventions are in `docs/agents/`.",
+        ),
+        (
+            "Publish the approved tickets. **How** depends on the tracker "
+            "`/setup-matt-pocock-skills` configured — the tickets are the same either "
+            "way, only the shape of the blocking edges changes:",
+            "Publish the approved tickets using `docs/agents/issue-tracker.md` — "
+            "the tickets are the same for every tracker; only the shape of the "
+            "blocking edges changes:",
+        ),
+    ),
+}
+
 
 def _spec_loop_guidance(answers: Answers) -> str:
     if "spec-loop" not in answers.items("skills"):
@@ -77,7 +109,28 @@ def render_asset(
                 rendered = rendered.replace(f"{{{{{name}}}}}", value)
             if "{{" in rendered or "}}" in rendered:
                 raise OverlayError(f"unresolved template marker left in {dest_rel}")
-            return rendered.encode("utf-8")
-        return source.read_bytes()
+            result = rendered.encode("utf-8")
+        else:
+            result = source.read_bytes()
     except OSError as error:
         raise OverlayError(f"failed to read overlay asset for {dest_rel}: {error}") from error
+    if isinstance(answers, Answers):
+        return _adapt_unselected_setup_references(result, dest_rel, answers)
+    return result
+
+
+def _adapt_unselected_setup_references(
+    rendered: bytes,
+    dest_rel: Path,
+    answers: Answers,
+) -> bytes:
+    """Keep loop guidance self-contained when its setup Enhancement is absent."""
+    replacements = _UNSELECTED_SETUP_REPLACEMENTS.get(dest_rel.as_posix(), ())
+    if not replacements or "setup-all" in answers.items("skills"):
+        return rendered
+    text = rendered.decode("utf-8")
+    for old, new in replacements:
+        if old not in text:
+            raise OverlayError(f"expected setup guidance is missing from {dest_rel.as_posix()}")
+        text = text.replace(old, new)
+    return text.encode("utf-8")

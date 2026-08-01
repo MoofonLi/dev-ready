@@ -13,6 +13,11 @@ from dev_ready.manifest import (
 
 VALID = {
     "manifest_version": 1,
+    "default_set": {
+        "development_loop": "sample-skill",
+        "documentation": ["architecture", "requirements"],
+        "enhancements": [],
+    },
     "categories": {
         "dev": {
             "description": "Development methods for planning, implementation, and review."
@@ -43,6 +48,8 @@ VALID = {
             "items": [
                 {
                     "id": "sample-skill",
+                    "kind": "development-loop",
+                    "steps": ["sample-step"],
                     "category": "dev",
                     "description": "Sample skill for manifest parsing.",
                     "mode": "builtin",
@@ -139,9 +146,94 @@ def test_declared_category_must_contain_an_item() -> None:
     with pytest.raises(ManifestError, match="category 'security'.*no catalog items"):
         parse_manifest(json.dumps(data))
 
-    data["components"]["skills"]["items"][0]["category"] = "security"
-    del data["categories"]["dev"]
+    security_item = json.loads(
+        json.dumps(data["components"]["skills"]["items"][0])
+    )
+    security_item["id"] = "security-item"
+    security_item["kind"] = "enhancement"
+    security_item.pop("steps")
+    security_item["category"] = "security"
+    data["components"]["skills"]["items"].append(security_item)
     assert "security" in parse_manifest(json.dumps(data)).categories
+
+
+def test_dev_category_must_declare_a_development_loop() -> None:
+    data = json.loads(json.dumps(VALID))
+    del data["components"]["skills"]["items"][0]["kind"]
+    del data["components"]["skills"]["items"][0]["steps"]
+
+    with pytest.raises(ManifestError, match="Dev Category.*development loop"):
+        parse_manifest(json.dumps(data))
+
+    data["components"]["skills"]["items"][0]["kind"] = "development-loop"
+    data["components"]["skills"]["items"][0]["steps"] = ["sample-step"]
+    assert parse_manifest(json.dumps(data)).components["skills"][0].id == "sample-skill"
+
+
+def test_second_development_loop_is_valid_manifest_data() -> None:
+    data = json.loads(json.dumps(VALID))
+    alternate = json.loads(json.dumps(data["components"]["skills"]["items"][0]))
+    alternate["id"] = "alternate-loop"
+    alternate["steps"] = ["alternate-step"]
+    alternate["paths"][0]["dest"] = ".agents/skills/alternate-loop"
+    data["components"]["skills"]["items"].append(alternate)
+
+    manifest = parse_manifest(json.dumps(data))
+
+    assert manifest.components.development_loop_ids == (
+        "sample-skill",
+        "alternate-loop",
+    )
+    assert manifest.default_set.development_loop == "sample-skill"
+
+
+@pytest.mark.parametrize("retired_id", ["spec-loop", "tdd", "diagnosing-bugs", "code-review"])
+def test_retired_loop_catalog_ids_cannot_be_declared(retired_id: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    _add_required_skill(data, item_id=retired_id)
+
+    with pytest.raises(ManifestError, match=f"retired.*{retired_id}"):
+        parse_manifest(json.dumps(data))
+
+    data["components"]["skills"]["items"][-1]["id"] = "new-enhancement"
+    assert parse_manifest(json.dumps(data)).components["skills"][-1].id == "new-enhancement"
+
+
+def test_catalog_item_cannot_duplicate_a_development_loop_step() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["steps"] = ["unit-test"]
+    _add_required_skill(data, item_id="unit-test")
+
+    with pytest.raises(ManifestError, match="duplicates development loop step 'unit-test'"):
+        parse_manifest(json.dumps(data))
+
+    data["components"]["skills"]["items"][-1]["id"] = "new-enhancement"
+    assert parse_manifest(json.dumps(data)).components["skills"][-1].id == "new-enhancement"
+
+
+def test_default_set_cannot_exceed_its_declared_size_budget() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["default_set"]["enhancements"] = ["mcp-config"]
+
+    with pytest.raises(
+        ManifestError,
+        match=r"Default Set size 4 exceeds limit 3.*DEFAULT_SET_SIZE_LIMIT",
+    ):
+        parse_manifest(json.dumps(data))
+
+    data["default_set"]["enhancements"] = []
+    assert parse_manifest(json.dumps(data)).default_set.documentation == (
+        "architecture",
+        "requirements",
+    )
+
+
+def test_default_set_requires_the_complete_documentation_skeleton() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["default_set"]["documentation"] = ["architecture"]
+
+    with pytest.raises(ManifestError, match="documentation.*architecture.*requirements"):
+        parse_manifest(json.dumps(data))
 
 
 def test_default_manifest_declares_verified_claude_and_windsurf_targets() -> None:
@@ -241,26 +333,26 @@ def _add_required_skill(
 
 def test_catalog_item_requirements_are_parsed_in_manifest_order() -> None:
     data = json.loads(json.dumps(VALID))
-    _add_required_skill(data, item_id="tdd")
-    _add_required_skill(data, item_id="spec-loop", requires=["tdd", "sample-skill"])
+    _add_required_skill(data, item_id="unit-test")
+    _add_required_skill(data, item_id="bundle", requires=["unit-test", "sample-skill"])
 
     manifest = parse_manifest(json.dumps(data))
 
-    assert manifest.components["skills"][-1].requires == ("tdd", "sample-skill")
+    assert manifest.components["skills"][-1].requires == ("unit-test", "sample-skill")
 
 
 @pytest.mark.parametrize(
     ("requires", "match"),
     [
         (["missing"], "unknown item"),
-        (["spec-loop"], "cannot require itself"),
+        (["bundle"], "cannot require itself"),
     ],
 )
 def test_catalog_item_requirements_reject_invalid_references(
     requires: list[str], match: str
 ) -> None:
     data = json.loads(json.dumps(VALID))
-    _add_required_skill(data, item_id="spec-loop", requires=requires)
+    _add_required_skill(data, item_id="bundle", requires=requires)
 
     with pytest.raises(ManifestError, match=match):
         parse_manifest(json.dumps(data))
@@ -268,7 +360,7 @@ def test_catalog_item_requirements_reject_invalid_references(
 
 def test_catalog_item_requirements_reject_cross_component_reference() -> None:
     data = json.loads(json.dumps(VALID))
-    _add_required_skill(data, item_id="spec-loop", requires=["mcp-config"])
+    _add_required_skill(data, item_id="bundle", requires=["mcp-config"])
 
     with pytest.raises(ManifestError, match="same component"):
         parse_manifest(json.dumps(data))
@@ -276,10 +368,10 @@ def test_catalog_item_requirements_reject_cross_component_reference() -> None:
 
 def test_catalog_item_requirements_reject_cycles() -> None:
     data = json.loads(json.dumps(VALID))
-    _add_required_skill(data, item_id="grill", requires=["spec-loop"])
-    _add_required_skill(data, item_id="spec-loop", requires=["grill"])
+    _add_required_skill(data, item_id="grill", requires=["bundle"])
+    _add_required_skill(data, item_id="bundle", requires=["grill"])
 
-    with pytest.raises(ManifestError, match="dependency cycle.*grill.*spec-loop"):
+    with pytest.raises(ManifestError, match="dependency cycle.*grill.*bundle"):
         parse_manifest(json.dumps(data))
 
 
@@ -287,15 +379,14 @@ def test_default_manifest_contains_complete_spec_loop_bundle() -> None:
     manifest = load_default_manifest()
     skills = {item.id: item for item in manifest.components["skills"]}
 
-    assert len(skills) == 9
+    assert len(skills) == 7
     assert "project-orientation" not in skills
-    assert skills["spec-loop"].requires == (
-        "tdd",
-        "diagnosing-bugs",
-        "code-review",
-    )
+    assert {"tdd", "diagnosing-bugs", "code-review"}.isdisjoint(skills)
     assert skills["spec-loop"].vendored_repo == "mattpocock/skills"
     assert {path.dest for path in skills["spec-loop"].paths} == {
+        ".agents/skills/tdd",
+        ".agents/skills/diagnosing-bugs",
+        ".agents/skills/code-review",
         ".agents/skills/grill-with-docs",
         ".agents/skills/grilling",
         ".agents/skills/domain-modeling",
@@ -319,6 +410,20 @@ def test_default_manifest_contains_complete_spec_loop_bundle() -> None:
         "skills/engineering/improve-codebase-architecture",
         "skills/engineering/codebase-design",
     }
+
+
+def test_setup_all_is_an_off_by_default_dev_enhancement() -> None:
+    manifest = load_default_manifest()
+    setup = next(
+        item
+        for item in manifest.components["skills"]
+        if item.id == "setup-all"
+    )
+
+    assert setup.kind == "enhancement"
+    assert setup.category == "dev"
+    assert setup.paths[0].dest == ".agents/skills/setup-matt-pocock-skills"
+    assert "setup-all" not in manifest.default_set.enhancements
 
 
 

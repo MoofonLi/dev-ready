@@ -5,6 +5,10 @@ from dataclasses import dataclass
 
 from dev_ready.catalog_effects import CatalogEffect
 
+RETIRED_LOOP_ITEM_IDS = frozenset(
+    {"spec-loop", "tdd", "diagnosing-bugs", "code-review"}
+)
+
 
 @dataclass(frozen=True)
 class UpstreamPin:
@@ -63,12 +67,23 @@ class Category:
 
 
 @dataclass(frozen=True)
+class DefaultSet:
+    """Manifest-declared content produced when the user accepts defaults."""
+
+    development_loop: str
+    documentation: tuple[str, ...]
+    enhancements: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class CatalogItem:
     id: str
     description: str
     mode: str
     license: str
     category: str = ""
+    kind: str = "enhancement"
+    steps: tuple[str, ...] = ()
     paths: tuple[ItemPath, ...] = ()
     pin: str | None = None
     effect: CatalogEffect | None = None
@@ -95,10 +110,20 @@ class ComponentCatalog(dict[str, tuple[CatalogItem, ...]]):
         components: Mapping[str, tuple[CatalogItem, ...]],
         agent_targets: Mapping[str, AgentTarget],
         categories: Mapping[str, Category] | None = None,
+        default_set: DefaultSet | None = None,
     ) -> None:
         super().__init__(components)
         self.agent_targets = dict(agent_targets)
         self.categories = dict(categories or {})
+        self.default_set = default_set
+        loops = tuple(
+            item
+            for component_items in components.values()
+            for item in component_items
+            if item.kind == "development-loop"
+        )
+        self.development_loop_ids = tuple(item.id for item in loops)
+        self.development_loop_steps = {item.id: item.steps for item in loops}
 
 
 @dataclass(frozen=True)
@@ -111,6 +136,7 @@ class Manifest:
     components: ComponentCatalog
     agent_targets: dict[str, AgentTarget]
     categories: dict[str, Category]
+    default_set: DefaultSet
     vendored: tuple[VendoredPin, ...] = ()
 
 

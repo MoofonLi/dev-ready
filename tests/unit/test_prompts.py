@@ -1,13 +1,14 @@
 """Unit tests for dev_ready.prompts (no network, no real TTY, tmp_path only)."""
 
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 import dev_ready.prompts.collect as collect_module
 from dev_ready.errors import AbortedError, InvalidArgumentsError
-from dev_ready.manifest import UpstreamPin, load_default_manifest
+from dev_ready.manifest import ComponentCatalog, ItemPath, UpstreamPin, load_default_manifest
 from dev_ready.prompts import (
     Answers,
     PartialAnswers,
@@ -35,7 +36,34 @@ ALL_ITEM_LABELS = [
     f"{item.category}: {item.id} — {item.description}"
     for items in CATALOG.values()
     for item in items
+    if item.id not in CATALOG.development_loop_ids
 ]
+
+
+def _catalog_with_second_loop() -> ComponentCatalog:
+    current = next(
+        item for item in CATALOG["skills"] if item.kind == "development-loop"
+    )
+    alternate = replace(
+        current,
+        id="alternate-loop",
+        description="Alternate development method.",
+        steps=("alternate-step",),
+        paths=(
+            ItemPath(
+                src="claude/skills/alternate-loop",
+                dest=".agents/skills/alternate-loop",
+            ),
+        ),
+    )
+    components = dict(CATALOG)
+    components["skills"] = (*CATALOG["skills"], alternate)
+    return ComponentCatalog(
+        components,
+        CATALOG.agent_targets,
+        CATALOG.categories,
+        CATALOG.default_set,
+    )
 
 
 def _item_labels(*item_ids: str) -> list[str]:
@@ -61,13 +89,17 @@ class FakeAsker:
         self,
         *,
         texts: list[str | None] | None = None,
+        selects: list[str | None] | None = None,
         checkboxes: list[list[str] | None] | None = None,
         confirms: list[bool | None] | None = None,
     ) -> None:
         self._texts = list(texts or [])
+        self._selects = list(selects or [])
         self._checkboxes = list(checkboxes or [])
         self._confirms = list(confirms or [])
         self.text_calls: list[str] = []
+        self.select_calls: list[str] = []
+        self.select_choices: list[list[str]] = []
         self.checkbox_calls: list[str] = []
         self.checkbox_choices: list[list[str]] = []
         self.confirm_calls: list[str] = []
@@ -75,6 +107,11 @@ class FakeAsker:
     def text(self, message: str) -> str | None:
         self.text_calls.append(message)
         return self._texts.pop(0)
+
+    def select(self, message: str, choices: Sequence[str]) -> str | None:
+        self.select_calls.append(message)
+        self.select_choices.append(list(choices))
+        return self._selects.pop(0)
 
     def checkbox(self, message: str, choices: Sequence[str]) -> list[str] | None:
         self.checkbox_calls.append(message)
@@ -90,6 +127,9 @@ class _RaisingAsker:
     """An Asker where every method raises KeyboardInterrupt."""
 
     def text(self, message: str) -> str | None:
+        raise KeyboardInterrupt
+
+    def select(self, message: str, choices: Sequence[str]) -> str | None:
         raise KeyboardInterrupt
 
     def checkbox(self, message: str, choices: Sequence[str]) -> list[str] | None:
@@ -168,23 +208,60 @@ def test_name_prompt_result_lands_in_answers() -> None:
 # --- Category prompt ---
 
 
-def test_category_prompt_accepts_all_defaults_without_extra_item_prompts() -> None:
+def test_interactive_defaults_produce_default_set_without_enhancement_selection() -> None:
+    asker = FakeAsker(confirms=[True, False], checkboxes=[ALL_AGENT_LABELS])
+
+    answers = collect_answers(
+        _partial(selection_explicit=False), catalog=CATALOG, asker=asker
+    )
+
+    assert answers.selection.categories == frozenset({"dev"})
+    assert answers.skills_items == frozenset({"spec-loop"})
+    assert answers.mcp_items == frozenset()
+    assert answers.include_docs is True
+    assert answers.items("docs") == frozenset()
+    assert asker.confirm_calls == [
+        "Use the Default Set (development loop: spec-loop; documentation: "
+        "architecture, requirements)?",
+        "Add Enhancements to the Default Set?",
+    ]
+    assert asker.checkbox_choices == [ALL_AGENT_LABELS]
+
+
+def test_interactive_default_set_can_add_one_enhancement() -> None:
     asker = FakeAsker(
-        checkboxes=[ALL_CATEGORY_LABELS, ALL_ITEM_LABELS, ALL_AGENT_LABELS]
+        confirms=[True, True],
+        checkboxes=[
+            _category_labels("security"),
+            _item_labels("security-audit"),
+            ALL_AGENT_LABELS,
+        ],
     )
 
     answers = collect_answers(
         _partial(selection_explicit=False), catalog=CATALOG, asker=asker
     )
 
-    assert answers.selection.categories == frozenset(CATALOG.categories)
-    assert answers.skills_items == frozenset(item.id for item in CATALOG["skills"])
-    assert answers.mcp_items == frozenset(item.id for item in CATALOG["mcp"])
+    assert answers.selection.development_loop == "spec-loop"
+    assert answers.skills_items == frozenset({"security-audit", "spec-loop"})
     assert answers.include_docs is True
-    assert asker.checkbox_choices[0] == ALL_CATEGORY_LABELS
-    assert asker.checkbox_choices[1] == ALL_ITEM_LABELS
-    assert asker.checkbox_choices[2] == ALL_AGENT_LABELS
-    assert len(asker.checkbox_calls) == 3
+
+
+def test_interactive_customization_can_choose_an_alternate_loop() -> None:
+    catalog = _catalog_with_second_loop()
+    asker = FakeAsker(
+        confirms=[False],
+        selects=["alternate-loop: Alternate development method."],
+        checkboxes=[[], [], ALL_AGENT_LABELS],
+    )
+
+    answers = collect_answers(
+        _partial(selection_explicit=False), catalog=catalog, asker=asker
+    )
+
+    assert answers.selection.development_loop == "alternate-loop"
+    assert answers.skills_items == frozenset({"alternate-loop"})
+    assert asker.select_calls == ["Select one development loop:"]
 
 
 def test_category_prompt_skipped_when_flags_resolved_selection() -> None:
@@ -199,12 +276,14 @@ def test_category_prompt_skipped_when_flags_resolved_selection() -> None:
         asker=asker,
     )
 
-    assert answers.include_skills is False
+    assert answers.selection.development_loop == "spec-loop"
+    assert answers.include_skills is True
     assert asker.checkbox_calls == []
 
 
 def test_category_and_item_choices_resolve_across_components() -> None:
     asker = FakeAsker(
+        confirms=[False],
         checkboxes=[
             _category_labels("token-optimize"),
             _item_labels("caveman", "code-memory"),
@@ -216,25 +295,32 @@ def test_category_and_item_choices_resolve_across_components() -> None:
         _partial(selection_explicit=False), catalog=CATALOG, asker=asker
     )
 
-    assert answers.skills_items == frozenset({"caveman"})
+    assert answers.skills_items == frozenset(
+        {"caveman", "spec-loop"}
+    )
     assert answers.mcp_items == frozenset({"code-memory"})
     assert answers.include_docs is False
 
 
 def test_empty_category_selection_produces_no_catalog_content() -> None:
-    asker = FakeAsker(checkboxes=[[], [], ALL_AGENT_LABELS])
+    asker = FakeAsker(confirms=[False], checkboxes=[[], [], ALL_AGENT_LABELS])
 
     answers = collect_answers(
         _partial(selection_explicit=False), catalog=CATALOG, asker=asker
     )
 
-    assert answers.skills_items == frozenset()
+    assert answers.skills_items == frozenset(
+        {"spec-loop"}
+    )
     assert answers.mcp_items == frozenset()
     assert answers.include_docs is False
+    assert answers.selection.development_loop == "spec-loop"
+    assert answers.selection.categories == frozenset({"dev"})
 
 
 def test_interactive_agent_targets_remain_last_and_are_resolved() -> None:
     asker = FakeAsker(
+        confirms=[False],
         checkboxes=[
             _category_labels("design"),
             _item_labels("frontend-design"),
@@ -253,6 +339,7 @@ def test_interactive_agent_targets_remain_last_and_are_resolved() -> None:
 
 def test_category_item_selection_can_be_narrowed_to_one_item() -> None:
     asker = FakeAsker(
+        confirms=[False],
         checkboxes=[
             _category_labels("quality"),
             _item_labels("react-doctor"),
@@ -264,7 +351,9 @@ def test_category_item_selection_can_be_narrowed_to_one_item() -> None:
         _partial(selection_explicit=False), catalog=CATALOG, asker=asker
     )
 
-    assert answers.skills_items == frozenset({"react-doctor"})
+    assert answers.skills_items == frozenset(
+        {"react-doctor", "spec-loop"}
+    )
     assert answers.mcp_items == frozenset()
 
 
@@ -273,12 +362,14 @@ def test_category_prompt_cancel_raises_aborted() -> None:
         collect_answers(
             _partial(selection_explicit=False),
             catalog=CATALOG,
-            asker=FakeAsker(checkboxes=[None]),
+            asker=FakeAsker(confirms=[False], checkboxes=[None]),
         )
 
 
 def test_category_item_prompt_cancel_raises_aborted() -> None:
-    asker = FakeAsker(checkboxes=[_category_labels("dev"), None])
+    asker = FakeAsker(
+        confirms=[False], checkboxes=[_category_labels("dev"), None]
+    )
 
     with pytest.raises(AbortedError, match="Category item selection cancelled"):
         collect_answers(
@@ -297,7 +388,9 @@ def test_flags_explicit_path_no_prompts() -> None:
 
     answers = collect_answers(partial, catalog=CATALOG, asker=asker)
 
-    assert answers.skills_items == frozenset({"caveman"})
+    assert answers.skills_items == frozenset(
+        {"caveman", "spec-loop"}
+    )
     assert answers.mcp_items == frozenset()
     assert len(asker.checkbox_calls) == 0
 
@@ -368,6 +461,7 @@ def test_interactive_and_flag_paths_produce_identical_answers(tmp_path: Path) ->
 
     asker = FakeAsker(
         texts=["my-app"],
+        confirms=[False],
         checkboxes=[
             _category_labels("token-optimize"),
             _item_labels("code-memory"),
@@ -409,6 +503,7 @@ def test_design_skill_only_is_identical_through_flags_and_prompts(tmp_path: Path
         ),
         catalog=CATALOG,
         asker=FakeAsker(
+            confirms=[False],
             checkboxes=[
                 _category_labels("design"),
                 _item_labels("frontend-design"),

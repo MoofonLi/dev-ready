@@ -62,7 +62,8 @@ def test_skill_examples_cover_default_none_and_mixed_current_cli_contract() -> N
     assert any("--categories none" in command and "--agents none" in command for command in examples)
     assert any(
         "--categories dev,design,token-optimize" in command
-        and "--dev spec-loop" in command
+        and "--development-loop spec-loop" in command
+        and "--dev setup-all" in command
         and "--design frontend-design,design-stripe" in command
         and "--token-optimize code-memory" in command
         for command in examples
@@ -83,8 +84,11 @@ def test_skill_category_and_item_ids_match_the_current_manifest() -> None:
             item.id
             for component_items in CATALOG.values()
             for item in component_items
-            if item.category == category
+            if item.category == category and item.kind != "development-loop"
         }
+    assert _documented_ids(text, "development loop") == set(
+        CATALOG.development_loop_ids
+    )
 
 
 def test_skill_installation_and_public_docs_stay_synchronized() -> None:
@@ -109,6 +113,7 @@ def test_skill_documents_safe_failure_and_verification_behavior() -> None:
         "--yes",
         "--dir",
         "--categories",
+        "--development-loop",
         "--design",
         "--token-optimize",
         "--agents",
