@@ -5,7 +5,6 @@ module translates the first local structural issue into ``VerificationError``;
 the inspection implementation is shared with the offline ``check`` command.
 """
 
-from collections.abc import Mapping
 from pathlib import Path
 
 from dev_ready.errors import VerificationError
@@ -16,7 +15,7 @@ from dev_ready.inspection import (
     ProjectExpectation,
     inspect_project,
 )
-from dev_ready.manifest import CatalogItem
+from dev_ready.manifest import ComponentCatalog
 from dev_ready.prompts import Answers
 
 __all__ = [
@@ -30,7 +29,7 @@ __all__ = [
 def verify_project(
     project_dir: Path,
     answers: Answers,
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
 ) -> None:
     """Raise the generation policy's typed error for the first observed issue."""
     issues = inspect_project(

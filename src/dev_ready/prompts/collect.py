@@ -7,11 +7,10 @@ which never calls into this module at all) never triggers the import.
 """
 
 import sys
-from collections.abc import Mapping
 from pathlib import Path
 
 from dev_ready.errors import AbortedError, InvalidArgumentsError
-from dev_ready.manifest import CatalogItem, UpstreamPin
+from dev_ready.manifest import ComponentCatalog, UpstreamPin
 from dev_ready.prompts.answers import Answers, PartialAnswers, ProjectSelection, validate_project_name
 from dev_ready.prompts.asker import Asker
 
@@ -30,7 +29,7 @@ def _default_asker() -> Asker:
 def collect_answers(
     partial: PartialAnswers,
     *,
-    catalog: Mapping[str, tuple[CatalogItem, ...]] | None = None,
+    catalog: ComponentCatalog | None = None,
     asker: Asker | None = None,
 ) -> Answers:
     """Fill in whatever `partial` left unanswered, via `asker` (or a real
@@ -180,9 +179,9 @@ def _prompt_project_name(asker: Asker) -> str:
 
 def _prompt_categories(
     asker: Asker,
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
 ) -> frozenset[str]:
-    categories = getattr(catalog, "categories", {})
+    categories = catalog.categories
     labels = {
         f"{category_id}: {category.description}": category_id
         for category_id, category in categories.items()
@@ -199,16 +198,13 @@ def _prompt_categories(
 
 def _prompt_category_items(
     asker: Asker,
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
     selected_categories: frozenset[str],
 ) -> frozenset[str]:
-    development_loop_ids = frozenset(
-        getattr(catalog, "development_loop_ids", ())
-    )
+    development_loop_ids = frozenset(catalog.development_loop_ids)
     labels = {
         f"{item.category}: {item.id} — {item.description}": item.id
-        for component_items in catalog.values()
-        for item in component_items
+        for item in catalog.all_items()
         if item.category in selected_categories and item.id not in development_loop_ids
     }
     try:
@@ -225,21 +221,14 @@ def _prompt_category_items(
 
 def _prompt_custom_selection(
     asker: Asker,
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
     *,
     development_loop: str | None = None,
 ) -> ProjectSelection:
     resolved_loop = development_loop or _prompt_development_loop(asker, catalog)
     selected_categories = _prompt_categories(asker, catalog)
     selected_item_ids = _prompt_category_items(asker, catalog, selected_categories)
-    selected_by_component = {
-        component: frozenset(
-            item.id
-            for item in catalog.get(component, ())
-            if item.id in selected_item_ids
-        )
-        for component in ("skills", "mcp", "docs")
-    }
+    selected_by_component = catalog.by_component(selected_item_ids)
     return ProjectSelection.from_items(
         catalog,
         skills=selected_by_component["skills"] | frozenset({resolved_loop}),
@@ -254,26 +243,20 @@ def _prompt_custom_selection(
 
 def _prompt_development_loop(
     asker: Asker,
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
 ) -> str:
-    loop_ids = tuple(getattr(catalog, "development_loop_ids", ()))
+    loop_ids = catalog.development_loop_ids
     if not loop_ids:
         raise InvalidArgumentsError("catalog does not declare a development loop")
     if len(loop_ids) == 1:
         return loop_ids[0]
-    default_set = getattr(catalog, "default_set", None)
-    default_loop = getattr(default_set, "development_loop", "")
+    default_loop = catalog.default_development_loop
     ordered_ids = (
         (default_loop, *tuple(loop_id for loop_id in loop_ids if loop_id != default_loop))
         if default_loop in loop_ids
         else loop_ids
     )
-    items = {
-        item.id: item
-        for component_items in catalog.values()
-        for item in component_items
-        if item.kind == "development-loop"
-    }
+    items = {item.id: item for item in catalog.loops()}
     labels = {f"{loop_id}: {items[loop_id].description}": loop_id for loop_id in ordered_ids}
     try:
         selected = asker.select("Select one development loop:", tuple(labels))
@@ -286,9 +269,9 @@ def _prompt_development_loop(
 
 def _prompt_use_default_set(
     asker: Asker,
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
 ) -> bool:
-    default_set = getattr(catalog, "default_set", None)
+    default_set = catalog.default_set
     if default_set is None:
         raise InvalidArgumentsError("catalog does not declare a Default Set")
     documentation = ", ".join(default_set.documentation)
@@ -317,9 +300,9 @@ def _prompt_add_enhancements(asker: Asker) -> bool:
 
 def _prompt_agent_targets(
     asker: Asker,
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
 ) -> frozenset[str]:
-    targets = getattr(catalog, "agent_targets", {})
+    targets = catalog.agent_targets
     if not targets:
         return frozenset()
     labels = {

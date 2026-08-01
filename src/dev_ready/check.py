@@ -8,7 +8,7 @@ from dev_ready import __version__
 from dev_ready.errors import DriftError
 from dev_ready.inspection import ProjectExpectation, inspect_project
 from dev_ready.manifest import CatalogItem, load_default_manifest
-from dev_ready.prompts import ProjectSelection
+from dev_ready.recorded import RecordedProject
 from dev_ready.stamp import load_stamp
 
 __all__ = ["check_project"]
@@ -42,31 +42,16 @@ def check_project(project_dir: Path, json_output: bool = False) -> str:
             "Overlay upgrade does not replace upstream application content."
         )
 
-    known_skills = frozenset(item.id for item in manifest.components.get("skills", ()))
-    known_mcp = frozenset(item.id for item in manifest.components.get("mcp", ()))
-    known_docs = frozenset(item.id for item in manifest.components.get("docs", ()))
-    removed_agent_targets = sorted(set(stamp.agent_targets) - set(manifest.agent_targets))
+    recorded_project = RecordedProject.observed(stamp, manifest)
     drifts.extend(
         f"[removed agent target] recorded Agent Target {target_id!r} "
         "is no longer present in CLI manifest"
-        for target_id in removed_agent_targets
-    )
-    selection = ProjectSelection.from_recorded_items(
-        manifest.components,
-        skills=frozenset(item.id for item in stamp.skills_items) & known_skills,
-        mcp=frozenset(item.id for item in stamp.mcp_items) & known_mcp,
-        docs_items=(
-            frozenset(item.id for item in stamp.docs_items) & known_docs
-            if stamp.stamp_version >= 5
-            else (known_docs if stamp.docs_included else frozenset())
-        ),
-        agent_targets=frozenset(stamp.agent_targets) & frozenset(manifest.agent_targets),
-        docs=stamp.docs_included,
+        for target_id in recorded_project.removed_agent_targets
     )
     structural_issues = inspect_project(
         resolved_dir,
         manifest.components,
-        ProjectExpectation.lifecycle(selection),
+        ProjectExpectation.lifecycle(recorded_project.selection),
     )
     drifts.extend(f"[{issue.category}] {issue.detail}" for issue in structural_issues)
 

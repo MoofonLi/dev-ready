@@ -1,12 +1,17 @@
-"""Shared generated-project structure builder for lifecycle tests."""
+"""Shared generated-project structure builder for lifecycle tests.
 
-from dataclasses import replace
+The Agent Target layout is read from `dev_ready.agent_targets`, never restated
+here — a fixture that re-derives the projection can agree with itself while
+disagreeing with the overlay it is meant to verify.
+"""
+
 from pathlib import Path
 from importlib import resources
 from importlib.resources.abc import Traversable
 
+from dev_ready.agent_targets import canonical_skill_names, project_targets
 from dev_ready.inspection import REQUIRED_UPSTREAM_PATHS
-from dev_ready.manifest import CatalogItem, ComponentCatalog
+from dev_ready.manifest import CATALOG_COMPONENTS, ComponentCatalog
 from dev_ready.prompts import ProjectSelection
 
 _DIRECTORY_ENTRIES = {"backend", "frontend"}
@@ -25,7 +30,7 @@ def _materialize_asset(source: Traversable, destination: Path) -> None:
 
 def materialize_project_structure(
     root: Path,
-    catalog: dict[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
     selection: ProjectSelection,
 ) -> None:
     """Create one structurally valid local project for the given selection."""
@@ -44,58 +49,42 @@ def materialize_project_structure(
     if selection.docs:
         (root / "docs").mkdir(exist_ok=True)
 
-    for name in ("skills", "mcp", "docs"):
+    projection = project_targets(catalog, selection.agent_targets)
+
+    for name in CATALOG_COMPONENTS:
         selected = selection.items(name)
         for item in catalog.get(name, ()):
             if item.id not in selected:
                 continue
-            target_files: tuple[str | None, ...] = (None,)
-            if name == "mcp":
-                target_files = tuple(
-                    target.mcp_file
-                    for target_id, target in getattr(catalog, "agent_targets", {}).items()
-                    if target_id in selection.agent_targets and target.mcp_file is not None
-                )
-            for target_file in target_files:
-                for item_path in item.paths:
-                    destination = root / (target_file or item_path.dest)
+            materialized = (
+                tuple(retargeted for _, retargeted in projection.retarget_mcp(item))
+                if name == "mcp"
+                else (item,)
+            )
+            for entry in materialized:
+                for item_path in entry.paths:
                     source = resources.files("dev_ready").joinpath(
                         "templates", *item_path.src.split("/")
                     )
-                    _materialize_asset(source, destination)
-                if item.effect is not None:
-                    effect = (
-                        replace(item.effect, target=target_file)
-                        if target_file is not None
-                        else item.effect
-                    )
-                    target = root / effect.target
+                    _materialize_asset(source, root / item_path.dest)
+                if entry.effect is not None:
+                    target = root / entry.effect.target
                     target.parent.mkdir(parents=True, exist_ok=True)
                     if not target.exists():
                         target.write_text("{}", encoding="utf-8")
-                    effect.apply(root)
+                    entry.effect.apply(root)
 
-    if isinstance(catalog, ComponentCatalog):
-        skill_names = {
-            Path(item_path.dest).parts[2]
-            for item in catalog.get("skills", ())
-            if item.id in selection.skills
-            for item_path in item.paths
-            if len(Path(item_path.dest).parts) >= 3
-            and Path(item_path.dest).parts[:2] == (".agents", "skills")
-        }
-        for target_id, target in catalog.agent_targets.items():
-            if target_id not in selection.agent_targets:
-                continue
-            if target.rules_file is not None:
-                rules_file = root / target.rules_file
-                rules_file.parent.mkdir(parents=True, exist_ok=True)
-                rules_file.write_text("@AGENTS.md\n", encoding="utf-8")
-            for skill_name in skill_names:
-                stub = root / target.skills_dir / skill_name / "SKILL.md"
-                stub.parent.mkdir(parents=True, exist_ok=True)
-                stub.write_text(
-                    f"---\nname: {skill_name}\ndescription: stub\n---\n\n"
-                    f"Read `.agents/skills/{skill_name}/SKILL.md`.\n",
-                    encoding="utf-8",
-                )
+    skill_names = canonical_skill_names(catalog, selection.skills)
+    for target in projection.targets:
+        if target.rules_file is not None:
+            rules_file = root / target.rules_file
+            rules_file.parent.mkdir(parents=True, exist_ok=True)
+            rules_file.write_text("@AGENTS.md\n", encoding="utf-8")
+        for skill_name in skill_names:
+            stub = root / projection.stub_path(target, skill_name)
+            stub.parent.mkdir(parents=True, exist_ok=True)
+            stub.write_text(
+                f"---\nname: {skill_name}\ndescription: stub\n---\n\n"
+                f"Read `.agents/skills/{skill_name}/SKILL.md`.\n",
+                encoding="utf-8",
+            )

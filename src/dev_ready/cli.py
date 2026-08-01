@@ -8,7 +8,6 @@ Responsibilities (see docs/architecture.md, Module Boundary):
 import argparse
 import sys
 import threading
-from collections.abc import Mapping
 from pathlib import Path
 from typing import TextIO
 
@@ -23,7 +22,7 @@ from dev_ready.generate import (
     ProgressStatus,
     generate,
 )
-from dev_ready.manifest import CatalogItem, load_default_manifest
+from dev_ready.manifest import ComponentCatalog, load_default_manifest
 from dev_ready.prompts import (
     Answers,
     PartialAnswers,
@@ -235,7 +234,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def build_answers(
-    args: argparse.Namespace, catalog: Mapping[str, tuple[CatalogItem, ...]]
+    args: argparse.Namespace, catalog: ComponentCatalog
 ) -> Answers:
     """Turn parsed flags into the shared Answers model.
 
@@ -266,7 +265,7 @@ def build_answers(
 
 
 def _build_partial_answers(
-    args: argparse.Namespace, catalog: Mapping[str, tuple[CatalogItem, ...]]
+    args: argparse.Namespace, catalog: ComponentCatalog
 ) -> PartialAnswers:
     """Same flag mapping as `build_answers`, but tolerates a missing name —
     `collect_answers` prompts for whatever this leaves unanswered.

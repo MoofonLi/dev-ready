@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from importlib import resources
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
+from dev_ready.agent_targets import TargetProjection, canonical_skill_names, project_targets
 from dev_ready.catalog_effects import CatalogEffectError
-from dev_ready.manifest import CatalogItem, ComponentCatalog
+from dev_ready.manifest import CATALOG_COMPONENTS, CatalogItem, ComponentCatalog
 from dev_ready.overlay.rendering import TEMPLATE_SUFFIX
 from dev_ready.prompts import ProjectSelection
 
@@ -75,20 +75,18 @@ class ProjectIssue:
 
 def inspect_project(
     project_dir: Path,
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
     expectation: ProjectExpectation,
 ) -> tuple[ProjectIssue, ...]:
     """Return every structural mismatch through one local-filesystem seam."""
     root = project_dir.resolve()
     issues: list[ProjectIssue] = []
     required_development_loop = expectation.selection.development_loop
-    if (
-        expectation.exact_catalog_selection
-        and not required_development_loop
-        and isinstance(catalog, ComponentCatalog)
-        and catalog.default_set is not None
-    ):
-        required_development_loop = catalog.default_set.development_loop
+    if expectation.exact_catalog_selection and not required_development_loop:
+        required_development_loop = catalog.default_development_loop
+    # Every declared target, not only the selected ones: generation must also
+    # observe that an unselected Agent Target left nothing behind.
+    declared = project_targets(catalog, catalog.agent_target_ids)
 
     for relative in REQUIRED_UPSTREAM_PATHS:
         target = root / relative
@@ -147,14 +145,14 @@ def inspect_project(
                 )
             )
 
-    for name in ("skills", "mcp", "docs"):
+    for name in CATALOG_COMPONENTS:
         selected = expectation.selection.items(name)
         for item in catalog.get(name, ()):
-            if name == "mcp" and isinstance(catalog, ComponentCatalog):
+            if name == "mcp":
                 _inspect_target_mcp_item(
                     root,
                     item,
-                    catalog,
+                    declared,
                     expectation.selection,
                     expectation.exact_catalog_selection,
                     issues,
@@ -169,14 +167,13 @@ def inspect_project(
                 _inspect_item_paths(root, item_group, item, expected, issues)
                 _inspect_item_effect(root, item_group, item, expected, issues)
 
-    if isinstance(catalog, ComponentCatalog):
-        _inspect_agent_target_artifacts(
-            root,
-            catalog,
-            expectation.selection,
-            required_development_loop,
-            issues,
-        )
+    _inspect_agent_target_artifacts(
+        root,
+        catalog,
+        expectation.selection,
+        required_development_loop,
+        issues,
+    )
 
     return tuple(issues)
 
@@ -184,26 +181,15 @@ def inspect_project(
 def _inspect_target_mcp_item(
     root: Path,
     item: CatalogItem,
-    catalog: ComponentCatalog,
+    declared: TargetProjection,
     selection: ProjectSelection,
     exact_catalog_selection: bool,
     issues: list[ProjectIssue],
 ) -> None:
-    for target_id, target in catalog.agent_targets.items():
-        if target.mcp_file is None:
-            continue
-        expected = item.id in selection.mcp and target_id in selection.agent_targets
+    for target, retargeted in declared.retarget_mcp(item):
+        expected = item.id in selection.mcp and target.id in selection.agent_targets
         if not expected and not exact_catalog_selection:
             continue
-        retargeted = replace(
-            item,
-            paths=tuple(replace(path, dest=target.mcp_file) for path in item.paths),
-            effect=(
-                replace(item.effect, target=target.mcp_file)
-                if item.effect is not None
-                else None
-            ),
-        )
         _inspect_item_paths(root, "mcp", retargeted, expected, issues)
         _inspect_item_effect(root, "mcp", retargeted, expected, issues)
 
@@ -215,26 +201,19 @@ def _inspect_agent_target_artifacts(
     required_development_loop: str,
     issues: list[ProjectIssue],
 ) -> None:
-    skill_names = {
-        Path(item_path.dest).parts[2]
-        for item in catalog.get("skills", ())
-        if item.id in selection.skills
-        or item.id == required_development_loop
-        for item_path in item.paths
-        if len(Path(item_path.dest).parts) >= 3
-        and Path(item_path.dest).parts[:2] == (".agents", "skills")
-    }
-    for target_id, target in catalog.agent_targets.items():
-        if target_id not in selection.agent_targets:
-            continue
+    selected = project_targets(catalog, selection.agent_targets)
+    skill_names = canonical_skill_names(
+        catalog,
+        selection.skills | frozenset({required_development_loop}),
+    )
+    for target in selected.targets:
         expected_paths: list[Path] = []
         if target.rules_file is not None:
             expected_paths.append(Path(target.rules_file))
         if selection.mcp and target.mcp_file is not None:
             expected_paths.append(Path(target.mcp_file))
         expected_paths.extend(
-            Path(target.skills_dir) / skill_name / "SKILL.md"
-            for skill_name in sorted(skill_names)
+            selected.stub_path(target, skill_name) for skill_name in skill_names
         )
         for relative in expected_paths:
             path_text = relative.as_posix()

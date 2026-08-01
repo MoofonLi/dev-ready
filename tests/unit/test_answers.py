@@ -258,7 +258,7 @@ def test_canonical_selection_rejects_unknown_catalog_items() -> None:
         ProjectSelection.from_items(CATALOG, skills=frozenset({"ghost-skill"}))
 
 
-def _dependency_catalog() -> dict[str, tuple[CatalogItem, ...]]:
+def _dependency_catalog() -> ComponentCatalog:
     def item(item_id: str, *requires: str) -> CatalogItem:
         return CatalogItem(
             id=item_id,
@@ -270,15 +270,18 @@ def _dependency_catalog() -> dict[str, tuple[CatalogItem, ...]]:
             requires=requires,
         )
 
-    return {
-        "skills": (
-            item("review"),
-            item("tdd", "review"),
-            item("spec-loop", "tdd"),
-            item("standalone"),
-        ),
-        "mcp": (),
-    }
+    return ComponentCatalog(
+        {
+            "skills": (
+                item("review"),
+                item("tdd", "review"),
+                item("spec-loop", "tdd"),
+                item("standalone"),
+            ),
+            "mcp": (),
+        },
+        agent_targets={},
+    )
 
 
 def test_selection_resolves_transitive_requirements() -> None:

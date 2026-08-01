@@ -8,7 +8,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dev_ready.errors import InvalidArgumentsError
-from dev_ready.manifest.models import CatalogItem, RETIRED_LOOP_ITEM_IDS
+from dev_ready.manifest.models import (
+    CATALOG_COMPONENTS,
+    ComponentCatalog,
+    RETIRED_LOOP_ITEM_IDS,
+)
 
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
@@ -89,7 +93,7 @@ class ProjectSelection:
     @classmethod
     def from_items(
         cls,
-        catalog: Mapping[str, tuple[CatalogItem, ...]],
+        catalog: ComponentCatalog,
         *,
         skills: frozenset[str] = frozenset(),
         mcp: frozenset[str] = frozenset(),
@@ -114,7 +118,7 @@ class ProjectSelection:
     @classmethod
     def from_recorded_items(
         cls,
-        catalog: Mapping[str, tuple[CatalogItem, ...]],
+        catalog: ComponentCatalog,
         *,
         skills: frozenset[str],
         mcp: frozenset[str],
@@ -137,7 +141,7 @@ class ProjectSelection:
     @classmethod
     def _from_items(
         cls,
-        catalog: Mapping[str, tuple[CatalogItem, ...]],
+        catalog: ComponentCatalog,
         *,
         skills: frozenset[str],
         mcp: frozenset[str],
@@ -155,7 +159,9 @@ class ProjectSelection:
             else (docs_items or frozenset())
         )
         _validate_items("docs", resolved_docs_items, catalog)
-        resolved_targets = _all_agent_target_ids(catalog) if agent_targets is None else agent_targets
+        resolved_targets = (
+            catalog.agent_target_ids if agent_targets is None else agent_targets
+        )
         _validate_agent_targets(resolved_targets, catalog)
         resolved_skills, development_loop = _resolve_development_loop(
             catalog,
@@ -185,9 +191,8 @@ class ProjectSelection:
         )
 
     @classmethod
-    def all(cls, catalog: Mapping[str, tuple[CatalogItem, ...]]) -> ProjectSelection:
-        default_set = getattr(catalog, "default_set", None)
-        default_loop = default_set.development_loop if default_set is not None else ""
+    def all(cls, catalog: ComponentCatalog) -> ProjectSelection:
+        default_loop = catalog.default_development_loop
         return cls.from_items(
             catalog,
             skills=frozenset(
@@ -195,30 +200,20 @@ class ProjectSelection:
                 for item in catalog.get("skills", ())
                 if item.kind != "development-loop" or item.id == default_loop
             ),
-            mcp=frozenset(item.id for item in catalog.get("mcp", ())),
-            docs_items=frozenset(item.id for item in catalog.get("docs", ())),
-            categories=frozenset(getattr(catalog, "categories", {})),
-            agent_targets=_all_agent_target_ids(catalog),
+            mcp=catalog.item_ids("mcp"),
+            docs_items=catalog.item_ids("docs"),
+            categories=catalog.category_ids,
+            agent_targets=catalog.agent_target_ids,
             docs=True,
         )
 
     @classmethod
-    def default_set(
-        cls, catalog: Mapping[str, tuple[CatalogItem, ...]]
-    ) -> ProjectSelection:
+    def default_set(cls, catalog: ComponentCatalog) -> ProjectSelection:
         """Resolve the manifest-declared lean selection used by ``--yes``."""
-        default_set = getattr(catalog, "default_set", None)
+        default_set = catalog.default_set
         if default_set is None:
             raise InvalidArgumentsError("catalog does not declare a Default Set")
-        enhancement_ids = frozenset(default_set.enhancements)
-        selected_by_component = {
-            component: frozenset(
-                item.id
-                for item in catalog.get(component, ())
-                if item.id in enhancement_ids
-            )
-            for component in ("skills", "mcp", "docs")
-        }
+        selected_by_component = catalog.by_component(default_set.enhancements)
         loop_skills = selected_by_component["skills"] | frozenset(
             {default_set.development_loop}
         )
@@ -227,7 +222,7 @@ class ProjectSelection:
             skills=loop_skills,
             mcp=selected_by_component["mcp"],
             docs_items=selected_by_component["docs"],
-            agent_targets=_all_agent_target_ids(catalog),
+            agent_targets=catalog.agent_target_ids,
             docs=bool(default_set.documentation),
         )
 
@@ -235,7 +230,7 @@ class ProjectSelection:
     def from_flags(
         cls,
         *,
-        catalog: Mapping[str, tuple[CatalogItem, ...]],
+        catalog: ComponentCatalog,
         categories: str | None,
         category_items: Mapping[str, str | None],
         agents: str | None = None,
@@ -256,7 +251,7 @@ class ProjectSelection:
         if not explicit:
             return None
 
-        valid_categories = frozenset(getattr(catalog, "categories", {}))
+        valid_categories = catalog.category_ids
         unknown_categories = sorted(set(category_items) - valid_categories)
         if unknown_categories:
             raise InvalidArgumentsError(
@@ -277,16 +272,9 @@ class ProjectSelection:
 
         selected_ids: set[str] = set()
         for category in selected_categories:
-            category_ids = frozenset(
-                item.id
-                for component in ("skills", "mcp", "docs")
-                for item in catalog.get(component, ())
-                if item.category == category
-            )
+            category_ids = catalog.ids_in_category(category)
             if category == "dev":
-                category_ids -= frozenset(
-                    getattr(catalog, "development_loop_ids", ())
-                )
+                category_ids -= frozenset(catalog.development_loop_ids)
             raw_items = explicit_category_items.get(category)
             if category == "dev" and category not in requested_categories and raw_items is None:
                 raw_items = "none"
@@ -297,17 +285,10 @@ class ProjectSelection:
                     category_ids,
                 )
             )
-        selected_by_component = {
-            component: frozenset(
-                item.id
-                for item in catalog.get(component, ())
-                if item.id in selected_ids
-            )
-            for component in ("skills", "mcp", "docs")
-        }
+        selected_by_component = catalog.by_component(selected_ids)
         selected_loop = _resolve_development_loop_id(
             development_loop,
-            tuple(getattr(catalog, "development_loop_ids", ())),
+            catalog.development_loop_ids,
         )
 
         return cls.from_items(
@@ -317,7 +298,7 @@ class ProjectSelection:
             mcp=selected_by_component["mcp"],
             docs_items=selected_by_component["docs"],
             categories=selected_categories,
-            agent_targets=_resolve_agent_targets(agents, _all_agent_target_ids(catalog)),
+            agent_targets=_resolve_agent_targets(agents, catalog.agent_target_ids),
             docs=bool(selected_by_component["docs"]),
         )
 
@@ -402,9 +383,9 @@ def _resolve_category_items(
 def _validate_items(
     name: str,
     selected: frozenset[str],
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
 ) -> None:
-    valid = frozenset(item.id for item in catalog.get(name, ()))
+    valid = catalog.item_ids(name)
     unknown = sorted(selected - valid)
     if unknown:
         raise InvalidArgumentsError(
@@ -413,12 +394,12 @@ def _validate_items(
 
 
 def _resolve_development_loop(
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
     selected_skills: frozenset[str],
     *,
     required: bool,
 ) -> tuple[frozenset[str], str]:
-    loop_ids = tuple(getattr(catalog, "development_loop_ids", ()))
+    loop_ids = catalog.development_loop_ids
     if not loop_ids:
         return selected_skills, ""
     selected_loops = frozenset(loop_ids) & selected_skills
@@ -433,20 +414,12 @@ def _resolve_development_loop(
     elif len(loop_ids) == 1:
         development_loop = loop_ids[0]
     else:
-        default_set = getattr(catalog, "default_set", None)
-        development_loop = getattr(default_set, "development_loop", "")
+        development_loop = catalog.default_development_loop
         if development_loop not in loop_ids:
             raise InvalidArgumentsError(
                 f"select exactly one development loop from {sorted(loop_ids)!r}"
             )
     return selected_skills | frozenset({development_loop}), development_loop
-
-
-def _all_agent_target_ids(
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
-) -> frozenset[str]:
-    targets = getattr(catalog, "agent_targets", {})
-    return frozenset(targets)
 
 
 def _resolve_agent_targets(
@@ -470,9 +443,9 @@ def _resolve_agent_targets(
 
 def _validate_agent_targets(
     selected: frozenset[str],
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
 ) -> None:
-    valid = _all_agent_target_ids(catalog)
+    valid = catalog.agent_target_ids
     unknown = sorted(selected - valid)
     if unknown:
         raise InvalidArgumentsError(
@@ -483,7 +456,7 @@ def _validate_agent_targets(
 def _resolve_requirements(
     name: str,
     selected: frozenset[str],
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
 ) -> frozenset[str]:
     item_by_id = {item.id: item for item in catalog.get(name, ())}
     resolved = set(selected)
@@ -498,14 +471,14 @@ def _resolve_requirements(
 
 
 def _categories_for_items(
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
     *,
     skills: frozenset[str],
     mcp: frozenset[str],
     docs: frozenset[str],
     include_legacy_docs: bool,
 ) -> frozenset[str]:
-    selected_by_component = {"skills": skills, "mcp": mcp, "docs": docs}
+    selected_by_component = dict(zip(CATALOG_COMPONENTS, (skills, mcp, docs)))
     categories = {
         item.category
         for component, selected in selected_by_component.items()

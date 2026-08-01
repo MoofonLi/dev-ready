@@ -7,18 +7,15 @@ there is one authoritative rendering of managed files.
 
 import hashlib
 from collections.abc import Collection, Mapping
-from dataclasses import replace
 from importlib import resources
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
+from dev_ready.agent_targets import CANONICAL_SKILLS_ROOT, AgentTarget, project_targets
 from dev_ready.catalog_effects import CatalogEffectError
 from dev_ready.errors import OverlayError
-from dev_ready.manifest import AgentTarget, CatalogItem, ComponentCatalog, UpstreamPin, VendoredPin
-from dev_ready.overlay.infrastructure import (
-    base_mcp_config_targets,
-    documentation_scaffold_paths,
-)
+from dev_ready.manifest import CATALOG_COMPONENTS, ComponentCatalog, UpstreamPin, VendoredPin
+from dev_ready.overlay.infrastructure import documentation_scaffold_paths
 from dev_ready.overlay.rendering import TEMPLATE_SUFFIX as _TEMPLATE_SUFFIX
 from dev_ready.overlay.rendering import render_asset as _render_asset
 from dev_ready.overlay.stamp_rendering import render_stamp
@@ -28,7 +25,7 @@ __all__ = ["apply_overlay", "build_overlay_content", "content_inventory", "rende
 
 
 def build_overlay_content(
-    answers: Answers, catalog: Mapping[str, tuple[CatalogItem, ...]]
+    answers: Answers, catalog: ComponentCatalog
 ) -> dict[str, bytes]:
     """Return every whole-file overlay write, rendered but not injected or written.
 
@@ -38,14 +35,7 @@ def build_overlay_content(
     """
     templates_root = resources.files("dev_ready").joinpath("templates")
     content: dict[str, bytes] = {}
-    declared_agent_targets = (
-        catalog.agent_targets if isinstance(catalog, ComponentCatalog) else {}
-    )
-    agent_targets = {
-        target_id: target
-        for target_id, target in declared_agent_targets.items()
-        if target_id in answers.agent_targets
-    }
+    projection = project_targets(catalog, answers.agent_targets)
 
     def add_bytes(dest_rel: Path, data: bytes) -> None:
         path = dest_rel.as_posix()
@@ -65,45 +55,43 @@ def build_overlay_content(
         add(source, dest_rel)
 
     add(templates_root.joinpath("rules", "AGENTS.md.tmpl"), Path("AGENTS.md"))
-    for target in agent_targets.values():
-        if target.rules_file is not None:
-            add_bytes(Path(target.rules_file), b"@AGENTS.md\n")
+    for rules_file in projection.rules_files:
+        add_bytes(Path(rules_file), b"@AGENTS.md\n")
     add(templates_root.joinpath("readme", "README.md.tmpl"), Path("README.md"))
 
-    for target_path in base_mcp_config_targets(
-        catalog,
-        answers.items("mcp"),
-        agent_targets,
-    ):
+    for target_path in projection.base_mcp_config_paths(catalog, answers.items("mcp")):
         collect(templates_root.joinpath("mcp", "mcp.json"), target_path)
 
-    for component in ("skills", "mcp", "docs"):
+    for component in CATALOG_COMPONENTS:
         selected = answers.items(component)
         for item in catalog.get(component, ()):
             if item.id not in selected:
                 continue
-            for item_path in item.paths:
-                source = templates_root.joinpath(*item_path.src.split("/"))
-                if component == "mcp":
-                    for target in agent_targets.values():
-                        if target.mcp_file is not None:
-                            collect(source, Path(target.mcp_file))
-                else:
-                    collect(source, Path(item_path.dest))
+            written_items = (
+                tuple(retargeted for _, retargeted in projection.retarget_mcp(item))
+                if component == "mcp"
+                else (item,)
+            )
+            for written_item in written_items:
+                for item_path in written_item.paths:
+                    collect(
+                        templates_root.joinpath(*item_path.src.split("/")),
+                        Path(item_path.dest),
+                    )
 
+    canonical_root = Path(*CANONICAL_SKILLS_ROOT)
     canonical_skill_files = {
         path: data
         for path, data in content.items()
-        if path.startswith(".agents/skills/") and path.endswith("/SKILL.md")
+        if path.startswith(f"{canonical_root.as_posix()}/") and path.endswith("/SKILL.md")
     }
-    for target in agent_targets.values():
+    for target in projection.targets:
         for canonical_path, canonical_bytes in canonical_skill_files.items():
-            relative = Path(canonical_path).relative_to(Path(".agents") / "skills")
+            relative = Path(canonical_path).relative_to(canonical_root)
             if len(relative.parts) != 2 or relative.name != "SKILL.md":
                 continue
-            stub_path = Path(target.skills_dir) / relative
             add_bytes(
-                stub_path,
+                projection.stub_path(target, relative.parts[0]),
                 _render_pointer_stub(canonical_bytes, relative.parts[0], canonical_path, target),
             )
 
@@ -152,12 +140,13 @@ def content_inventory(content: Mapping[str, bytes]) -> tuple[tuple[str, str], ..
 def apply_overlay(
     answers: Answers,
     project_dir: Path,
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
     pin: UpstreamPin,
     vendored: Collection[VendoredPin] = (),
 ) -> list[Path]:
     """Apply selected overlay content and return paths written relative to the project."""
     content = build_overlay_content(answers, catalog)
+    projection = project_targets(catalog, answers.agent_targets)
     written: list[Path] = []
     for path, data in content.items():
         dest_rel = Path(path)
@@ -176,13 +165,15 @@ def apply_overlay(
         for item in catalog.get(component, ()):
             if item.id not in selected or item.effect is None:
                 continue
-            effects = (item.effect,)
-            if component == "mcp":
-                effects = tuple(
-                    replace(item.effect, target=target.mcp_file)
-                    for target_id, target in getattr(catalog, "agent_targets", {}).items()
-                    if target_id in answers.agent_targets and target.mcp_file is not None
+            effects = (
+                tuple(
+                    retargeted.effect
+                    for _, retargeted in projection.retarget_mcp(item)
+                    if retargeted.effect is not None
                 )
+                if component == "mcp"
+                else (item.effect,)
+            )
             for effect in effects:
                 try:
                     effect.apply(project_dir)

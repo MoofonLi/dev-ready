@@ -14,6 +14,7 @@ from dev_ready.catalog_effects import CatalogEffectError, parse_catalog_effect
 from dev_ready.errors import ManifestError
 from dev_ready.manifest.models import (
     AgentTarget,
+    CATALOG_COMPONENTS,
     CatalogItem,
     Category,
     ComponentCatalog,
@@ -27,7 +28,6 @@ from dev_ready.manifest.models import (
 
 SUPPORTED_MANIFEST_VERSION = 1
 ALLOWED_MODES = ("builtin", "vendor", "pinned-dependency")
-CATALOG_COMPONENTS = ("skills", "mcp", "docs")
 DEFAULT_SET_SIZE_LIMIT = 3
 _ITEM_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _PIN_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+.][0-9A-Za-z.-]+)?$")

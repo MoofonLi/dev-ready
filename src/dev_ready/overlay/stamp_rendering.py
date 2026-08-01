@@ -1,17 +1,17 @@
 """Render project records for fresh generation and legacy lifecycle rewrites."""
 
 import json
-from collections.abc import Collection, Mapping
+from collections.abc import Collection
 
 from dev_ready import __version__
-from dev_ready.manifest import CatalogItem, UpstreamPin, VendoredPin
+from dev_ready.manifest import ComponentCatalog, UpstreamPin, VendoredPin
 from dev_ready.prompts import Answers
 
 
 def render_stamp(
     answers: Answers,
     pin: UpstreamPin,
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
     vendored: Collection[VendoredPin] = (),
     inventory: Collection[tuple[str, str]] = (),
     *,

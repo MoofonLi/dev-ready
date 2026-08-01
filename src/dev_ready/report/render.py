@@ -6,9 +6,8 @@ unit tests do). See docs/architecture.md, Module Boundary.
 """
 
 from pathlib import Path
-from collections.abc import Mapping
 
-from dev_ready.manifest import CatalogItem, ComponentCatalog, UpstreamPin
+from dev_ready.manifest import CATALOG_COMPONENTS, ComponentCatalog, UpstreamPin
 from dev_ready.prompts import Answers
 
 __all__ = ["render_report"]
@@ -18,7 +17,7 @@ def render_report(
     answers: Answers,
     pin: UpstreamPin,
     written: list[Path],
-    catalog: Mapping[str, tuple[CatalogItem, ...]] | None = None,
+    catalog: ComponentCatalog | None = None,
 ) -> str:
     """Render the full success message `cli.py` prints verbatim after generation."""
     overlay_paths = ", ".join(str(path) for path in written) if written else "(none)"
@@ -43,15 +42,17 @@ def render_report(
 
 def _render_selection(
     answers: Answers,
-    catalog: Mapping[str, tuple[CatalogItem, ...]] | None,
+    catalog: ComponentCatalog | None,
 ) -> list[str]:
-    if not isinstance(catalog, ComponentCatalog):
+    if catalog is None:
         return []
+    selected_ids = frozenset().union(
+        *(answers.items(component) for component in CATALOG_COMPONENTS)
+    )
     selected_enhancements = sorted(
         item.id
-        for component in ("skills", "mcp", "docs")
-        for item in catalog.get(component, ())
-        if item.kind == "enhancement" and item.id in answers.items(component)
+        for item in catalog.all_items()
+        if item.kind == "enhancement" and item.id in selected_ids
     )
     documentation = (
         "architecture, requirements" if answers.includes("docs") else "(none)"
@@ -65,13 +66,13 @@ def _render_selection(
 
 def _render_agent_targets(
     answers: Answers,
-    catalog: Mapping[str, tuple[CatalogItem, ...]] | None,
+    catalog: ComponentCatalog | None,
 ) -> list[str]:
     if not answers.agent_targets:
         return ["agent targets: (none)"]
-    targets = getattr(catalog, "agent_targets", {}) if catalog is not None else {}
-    if not isinstance(catalog, ComponentCatalog):
+    if catalog is None:
         return [f"agent targets: {', '.join(sorted(answers.agent_targets))}"]
+    targets = catalog.agent_targets
 
     lines = ["agent targets:"]
     for target_id in sorted(answers.agent_targets):

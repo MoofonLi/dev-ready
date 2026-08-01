@@ -9,7 +9,7 @@ import secrets
 import shutil
 import tempfile
 import time
-from collections.abc import Callable, Collection, Mapping
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -17,7 +17,7 @@ from typing import TypeVar
 
 from dev_ready.errors import TargetDirectoryError
 from dev_ready.fetch import fetch_snapshot
-from dev_ready.manifest import CatalogItem, UpstreamPin, VendoredPin
+from dev_ready.manifest import ComponentCatalog, UpstreamPin, VendoredPin
 from dev_ready.overlay import apply_overlay
 from dev_ready.prompts import Answers
 from dev_ready.verify import verify_project
@@ -74,7 +74,7 @@ _Result = TypeVar("_Result")
 def generate(
     answers: Answers,
     pin: UpstreamPin,
-    catalog: Mapping[str, tuple[CatalogItem, ...]],
+    catalog: ComponentCatalog,
     vendored: Collection[VendoredPin] = (),
     progress: ProgressCallback | None = None,
     *,

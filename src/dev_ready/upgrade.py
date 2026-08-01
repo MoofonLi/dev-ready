@@ -6,11 +6,13 @@ import tempfile
 from pathlib import Path
 
 from dev_ready import __version__
+from dev_ready.agent_targets import project_targets
 from dev_ready.catalog_effects import classify_shared_targets
 from dev_ready.errors import StampInvalidError, UpgradeError, UpgradeNotSupportedError
 from dev_ready.manifest import load_default_manifest
 from dev_ready.overlay import build_overlay_content, content_inventory, render_stamp
-from dev_ready.prompts import Answers, ProjectSelection
+from dev_ready.prompts import Answers
+from dev_ready.recorded import RecordedProject
 from dev_ready.stamp import load_stamp
 
 
@@ -137,36 +139,26 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         exclude=manifest_pin.exclude,
         prune=manifest_pin.prune,
     )
-    known_skills = frozenset(item.id for item in manifest.components.get("skills", ()))
-    known_mcp = frozenset(item.id for item in manifest.components.get("mcp", ()))
-    known_docs = frozenset(item.id for item in manifest.components.get("docs", ()))
-    selected_skills = recorded_skills & known_skills
-    if stamp.stamp_version < 5:
-        selected_skills |= frozenset({manifest.default_set.development_loop})
-    removed_agent_targets = sorted(set(stamp.agent_targets) - set(manifest.agent_targets))
-    if removed_agent_targets:
+    recorded_project = RecordedProject.migrated(stamp, manifest)
+    if recorded_project.removed_agent_targets:
         raise UpgradeError(
             "cannot upgrade a project that records a removed Agent Target: "
-            + ", ".join(repr(target_id) for target_id in removed_agent_targets)
+            + ", ".join(
+                repr(target_id) for target_id in recorded_project.removed_agent_targets
+            )
         )
     answers = Answers(
         project_name=stamp.project_name,
         target_dir=resolved,
-        selection=ProjectSelection.from_recorded_items(
-            manifest.components,
-            skills=selected_skills,
-            mcp=frozenset(item.id for item in stamp.mcp_items) & known_mcp,
-            docs_items=(
-                frozenset(item.id for item in stamp.docs_items) & known_docs
-                if stamp.stamp_version >= 5
-                else (known_docs if stamp.docs_included else frozenset())
-            ),
-            agent_targets=frozenset(stamp.agent_targets)
-            & frozenset(manifest.agent_targets),
-            docs=stamp.docs_included,
-        ),
+        selection=recorded_project.selection,
     )
     new_content = build_overlay_content(answers, manifest.components)
+    # An MCP effect's manifest-declared target is never where it actually lands:
+    # the projection retargets it onto each Agent Target's own MCP file.
+    declared_targets = project_targets(
+        manifest.components, manifest.components.agent_target_ids
+    )
+    selected_targets = project_targets(manifest.components, answers.agent_targets)
     shared_targets = classify_shared_targets(manifest.components, answers.selection)
     shared_all = set(shared_targets.all)
     shared_selected = set(shared_targets.selected)
@@ -175,17 +167,9 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
             continue
         shared_all.discard(item.effect.target)
         shared_selected.discard(item.effect.target)
-        shared_all.update(
-            target.mcp_file
-            for target in manifest.agent_targets.values()
-            if target.mcp_file is not None
-        )
+        shared_all.update(declared_targets.mcp_files)
         if item.id in answers.mcp_items:
-            shared_selected.update(
-                target.mcp_file
-                for target_id, target in manifest.agent_targets.items()
-                if target_id in answers.agent_targets and target.mcp_file is not None
-            )
+            shared_selected.update(selected_targets.mcp_files)
     recorded = {entry.path: entry.sha256 for entry in stamp.inventory}
     groups: dict[str, list[str]] = {
         "upgraded": [],

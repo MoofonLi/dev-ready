@@ -62,7 +62,9 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | `prompts` | Interactive/non-interactive collection of user answers into one model | perform I/O other than terminal |
 | `fetch` | Generate the upstream base via Copier at the manifest-pinned commit | know about overlay content |
 | `overlay` | Apply dev-ready files onto the fetched base; templating of names/values | fetch anything from the network |
-| `manifest` | Load/validate manifest.json; single source of truth for pins | be bypassed by other modules |
+| `manifest` | Load/validate manifest.json; single source of truth for pins. `ComponentCatalog` is the catalog interface every module takes — items, Categories, development loops, Agent Targets, Default Set | be bypassed by other modules |
+| `agent_targets` | Project the selected Agent Targets onto their native paths: rules pointers, MCP config files, retargeted MCP items and effects, Pointer Stub paths (ADR-015) | import `prompts`, touch the filesystem, or perform network I/O |
+| `recorded` | Resolve a loaded stamp into a selection over the current catalog, applying stamp-version migration once | choose CLI error/report policy, write to the project, or perform network I/O |
 | `catalog_effects` | Validate, apply, and observe catalog-item injected effects through one local-project interface | read manifest.json, perform network I/O, or choose CLI error/report policy |
 | `report` | Post-generation summary and next steps | mutate the generated project |
 | `inspection` | Read-only observation of generated-project structure shared by generation and lifecycle policies | perform network I/O, write to the project, or choose exit codes |
@@ -77,6 +79,9 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 - Direction: `cli` -> `prompts`/`manifest`/`fetch`/`overlay`/`report`/`verify`. Lower modules never import `cli`.
 - `fetch`, `overlay`, and `verify` are independent of each other; only `generate` (called only by `cli`) sequences them. `manifest`, `overlay`, `verify`, `check`, and `upgrade` may depend on `catalog_effects`; `verify` and `check` may depend on `inspection`.
 - `upgrade` (called only by `cli`) sequences `overlay` and `stamp` offline, analogous to `generate`.
+- `agent_targets` sits directly above `manifest` and depends on nothing else, so `overlay`, `inspection`, `upgrade` and the lifecycle test fixtures can all read one projection. **No module may restate the Agent Target layout** — where an Agent Target's rules pointer, MCP config or Pointer Stub goes is decided in `agent_targets` and nowhere else.
+- `recorded` depends on `manifest`, `stamp` and `prompts`, and is the only place a stamp is resolved against the current catalog. `check` and `upgrade` read it and differ only in policy: `check` reports what was dropped, `upgrade` refuses. **Stamp-version migration rules live there once** — a new stamp version is one module's change.
+- Modules take `ComponentCatalog`, not the bare mapping it subclasses. Its Categories, Agent Targets, development loops and Default Set are part of the interface; reaching them with a defaulted `getattr` reintroduces a catalog shape the loader refuses to build.
 - Runtime dependencies are kept minimal (current: questionary, copier — see ADR-005; rich optional). Every new dependency requires a note here.
 - No module reads `manifest.json` directly except `manifest`.
 - `scripts/` (CI-only maintainer tooling, e.g. `scripts/bump_upstream.py`) is not part of the wheel and is not subject to the `fetch/`-only network-call rule above, which governs `src/dev_ready` only.

@@ -1,6 +1,6 @@
 """Data models for the upstream pin manifest."""
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from dev_ready.catalog_effects import CatalogEffect
@@ -8,6 +8,11 @@ from dev_ready.catalog_effects import CatalogEffect
 RETIRED_LOOP_ITEM_IDS = frozenset(
     {"spec-loop", "tdd", "diagnosing-bugs", "code-review"}
 )
+
+# The Components a Catalog Item can be written under, in manifest order. The
+# loader rejects any other key, so this tuple is the complete set — iterate it
+# instead of restating the literal at a call site.
+CATALOG_COMPONENTS: tuple[str, ...] = ("skills", "mcp", "docs")
 
 
 @dataclass(frozen=True)
@@ -103,7 +108,12 @@ class AgentTarget:
 
 
 class ComponentCatalog(dict[str, tuple[CatalogItem, ...]]):
-    """Catalog component mapping carrying the independent Agent Target axis."""
+    """The catalog every module queries: items, Categories, Agent Targets.
+
+    Callers take this type, not the bare mapping it subclasses — the extra axes
+    are part of the interface, and every question they get asked is answered
+    here rather than re-derived at the call site.
+    """
 
     def __init__(
         self,
@@ -117,13 +127,57 @@ class ComponentCatalog(dict[str, tuple[CatalogItem, ...]]):
         self.categories = dict(categories or {})
         self.default_set = default_set
         loops = tuple(
-            item
-            for component_items in components.values()
-            for item in component_items
-            if item.kind == "development-loop"
+            item for item in self.all_items() if item.kind == "development-loop"
         )
         self.development_loop_ids = tuple(item.id for item in loops)
         self.development_loop_steps = {item.id: item.steps for item in loops}
+
+    def all_items(self) -> tuple[CatalogItem, ...]:
+        """Every declared item, in Component then declaration order."""
+        return tuple(
+            item
+            for component in CATALOG_COMPONENTS
+            for item in self.get(component, ())
+        )
+
+    def item_ids(self, component: str) -> frozenset[str]:
+        """Every id declared under one Component."""
+        return frozenset(item.id for item in self.get(component, ()))
+
+    def by_component(self, item_ids: Iterable[str]) -> dict[str, frozenset[str]]:
+        """Split one flat id set into the Component each id is written under."""
+        wanted = frozenset(item_ids)
+        return {
+            component: frozenset(
+                item.id for item in self.get(component, ()) if item.id in wanted
+            )
+            for component in CATALOG_COMPONENTS
+        }
+
+    def ids_in_category(self, category_id: str) -> frozenset[str]:
+        """Every item id presented under one Category, across Components."""
+        return frozenset(
+            item.id for item in self.all_items() if item.category == category_id
+        )
+
+    def loops(self) -> tuple[CatalogItem, ...]:
+        """Every development loop the Dev Category declares."""
+        return tuple(
+            item for item in self.all_items() if item.kind == "development-loop"
+        )
+
+    @property
+    def category_ids(self) -> frozenset[str]:
+        return frozenset(self.categories)
+
+    @property
+    def agent_target_ids(self) -> frozenset[str]:
+        return frozenset(self.agent_targets)
+
+    @property
+    def default_development_loop(self) -> str:
+        """The Default Set's loop, or '' for a catalog that declares no Default Set."""
+        return self.default_set.development_loop if self.default_set is not None else ""
 
 
 @dataclass(frozen=True)

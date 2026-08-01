@@ -11,8 +11,10 @@ from dev_ready.manifest.loader import (
 )
 from dev_ready.manifest.models import (
     AgentTarget,
+    CATALOG_COMPONENTS,
     CatalogItem,
     ComponentCatalog,
+    DefaultSet,
     ItemPath,
     Manifest,
     UpstreamPin,
@@ -20,10 +22,12 @@ from dev_ready.manifest.models import (
 )
 
 __all__ = [
+    "CATALOG_COMPONENTS",
     "SUPPORTED_MANIFEST_VERSION",
     "AgentTarget",
     "CatalogItem",
     "ComponentCatalog",
+    "DefaultSet",
     "ItemPath",
     "Manifest",
     "UpstreamPin",
