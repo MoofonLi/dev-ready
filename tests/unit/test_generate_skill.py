@@ -7,7 +7,10 @@ import re
 import shlex
 from pathlib import Path
 
+import pytest
+
 from dev_ready.cli import build_answers, build_parser
+from dev_ready.errors import InvalidArgumentsError
 from dev_ready.manifest import load_default_manifest
 from dev_ready.overlay import build_overlay_content, render_stamp
 from dev_ready.prompts import Answers, ProjectSelection
@@ -19,6 +22,13 @@ INSTALL_COMMAND = "npx skills add MoofonLi/dev-ready --skill dev-ready"
 ISSUES_URL = "https://github.com/MoofonLi/dev-ready/issues"
 MANIFEST = load_default_manifest()
 CATALOG = MANIFEST.components
+EXPECTED_RETIRED_DEV_IDS = {
+    "spec-loop",
+    "tdd",
+    "diagnosing-bugs",
+    "code-review",
+    "setup-all",
+}
 
 
 def _skill_text() -> str:
@@ -42,7 +52,21 @@ def _init_examples(text: str) -> list[str]:
 def _documented_ids(text: str, label: str) -> set[str]:
     match = re.search(rf"^Current {re.escape(label)} ids: (.+)$", text, flags=re.MULTILINE)
     assert match is not None
-    return set(re.findall(r"`([^`]+)`", match.group(1)))
+    return _backticked_ids(match.group(1))
+
+
+def _backticked_ids(text: str) -> set[str]:
+    return set(re.findall(r"`([^`]+)`", text))
+
+
+def _documented_retired_ids(text: str) -> set[str]:
+    match = re.search(
+        r"The former selectable\s+ids (?P<ids>.+?) now\s+exit 2",
+        text,
+        flags=re.DOTALL,
+    )
+    assert match is not None
+    return _backticked_ids(match.group("ids"))
 
 
 def test_skill_uses_the_minimal_standard_frontmatter_and_layout() -> None:
@@ -63,7 +87,7 @@ def test_skill_examples_cover_default_none_and_mixed_current_cli_contract() -> N
     assert any(
         "--categories dev,design,token-optimize" in command
         and "--development-loop spec-loop" in command
-        and "--dev setup-all" in command
+        and "--dev none" in command
         and "--design frontend-design,design-stripe" in command
         and "--token-optimize code-memory" in command
         for command in examples
@@ -89,6 +113,15 @@ def test_skill_category_and_item_ids_match_the_current_manifest() -> None:
     assert _documented_ids(text, "development loop") == set(
         CATALOG.development_loop_ids
     )
+    assert _documented_ids(text, "Agent Target") == set(CATALOG.agent_target_ids)
+    retired_ids = _documented_retired_ids(text)
+    assert retired_ids == EXPECTED_RETIRED_DEV_IDS
+    for retired_id in retired_ids:
+        args = build_parser().parse_args(
+            ["init", "skill-test", "--yes", "--dev", retired_id]
+        )
+        with pytest.raises(InvalidArgumentsError, match="mandatory Dev development loop"):
+            build_answers(args, CATALOG)
 
 
 def test_skill_installation_and_public_docs_stay_synchronized() -> None:

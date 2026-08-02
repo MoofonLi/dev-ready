@@ -1,6 +1,6 @@
 # CLI Specification — dev-ready
 
-Status: Current for v0.9.0. This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
+Status: Current for v0.10 development. This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
 
 ## Commands
 
@@ -14,7 +14,7 @@ Generate a new project.
 | `--dir PATH` | path | `./PROJECT_NAME` | Target directory (must not exist or be empty) |
 | `--categories IDS` | string | Default Set; `all` when another selection flag is supplied | Category selection: comma-separated ids, `all`, or `none` |
 | `--development-loop ID` | string | `spec-loop` | Mandatory development-loop single-select; valid ids come from the manifest |
-| `--dev IDS` | string | `all` when Dev is explicitly selected | Dev Enhancements: `setup-all`, `all`, or `none`; the development loop is mandatory |
+| `--dev IDS` | string | `all` when Dev is explicitly selected | Dev Enhancements: none currently; accepts `all` or `none`; the development loop is mandatory |
 | `--security IDS` | string | `all` when Security is selected | Security items: `security-audit`, `all`, or `none` |
 | `--quality IDS` | string | `all` when Quality is selected | Quality items: `react-doctor`, `webapp-testing`, `all`, or `none` |
 | `--design IDS` | string | `all` when Design is selected | Design items: `frontend-design`, `design-stripe`, `design-linear`, `all`, or `none` |
@@ -29,10 +29,10 @@ conflicts with an explicit `--categories` value that omits that Category.
 
 Dev is mandatory and currently has one development-loop option: `spec-loop`.
 It is resolved for every generation, including `--categories none` and
-`--dev none`. The `setup-all` item is an optional Dev Enhancement, not part of
-the loop. `--development-loop` is the structural single-select and remains
-data-driven if the manifest adds another loop; development-loop ids are never
-Dev Enhancement ids.
+`--dev none`. Dev currently has no selectable Enhancements, so both `--dev all`
+and `--dev none` select no optional items. `--development-loop` is the
+structural single-select and remains data-driven if the manifest adds another
+loop; development-loop ids are never Dev Enhancement ids.
 
 Unknown Category ids, unknown item ids, empty comma-separated selections, and
 conflicting Category/item flags fail before generation with an
@@ -49,6 +49,7 @@ development loop, `spec-loop`, as its replacement:
 | `tdd` |
 | `diagnosing-bugs` |
 | `code-review` |
+| `setup-all` |
 
 The old Component-shaped flags are removed and always exit 2 with these
 replacements named:
@@ -68,8 +69,9 @@ declines the named optional Enhancements; it never removes the development
 loop.
 
 Accepting every default, including `--yes` with no selection flags, produces
-the lean Default Set: the Spec Loop plus the project's `architecture` and
-`requirements` documentation skeletons, with no Enhancements. Use the explicit
+the lean Default Set: the Spec Loop with no Enhancements. Independently of that
+selection, every project receives the `architecture` and `requirements`
+documentation skeletons as generation infrastructure. Use the explicit
 whole-catalog selection `--categories all` to select every Enhancement.
 
 Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification; 6 stamp missing or unparseable/invalid; 7 drift detected; 8 upgrade not supported (pre-v3 stamp); 9 upgrade failed (rolled back).
@@ -163,15 +165,14 @@ This flow applies only to `init`. `check` and `upgrade` are non-interactive by
 construction and dispatch directly to their respective operations.
 
 1. Project name (if not given as argument)
-2. Default Set offer, naming its resolved `spec-loop` development loop plus `architecture` and `requirements` documentation (yes by default)
-3. If the Default Set is accepted, an offer to add Enhancements (no by default); accepting that offer opens Category and Enhancement selection layered onto the Default Set
-4. If the Default Set is declined and the manifest offers multiple development loops, mandatory development-loop single-selection (the Default Set loop is listed first)
-5. If the Default Set is declined, Category selection (`dev`, `security`, `quality`, `design`, and `token-optimize`; Dev remains selected because its development loop is mandatory)
-6. If the Default Set is declined, Enhancement selection across the chosen Categories (`setup-all` is offered under Dev; the loop is not an optional item)
-7. Agent Target selection (described multi-select, all on by default; plain Enter accepts all targets)
-8. Confirmation summary naming the resolved Categories, Catalog Items, and Agent Targets before writing anything
+2. Default Set offer, naming its resolved `spec-loop` development loop (yes by default)
+3. If the Default Set is declined and the manifest offers multiple development loops, mandatory development-loop single-selection (the Default Set loop is listed first)
+4. Category selection (`dev`, `security`, `quality`, `design`, and `token-optimize`; Dev remains selected because its development loop is mandatory); when the Default Set was accepted, the chosen Enhancements are layered onto it
+5. Enhancement selection across the chosen Categories (Dev currently offers none; the loop is not an optional item)
+6. Agent Target selection (described multi-select, all on by default; plain Enter accepts all targets)
+7. Confirmation summary naming the resolved Categories, Catalog Items, and Agent Targets before writing anything
 
-Steps 2–7 are skipped as a unit if any selection flag (`--development-loop`, `--categories`, any
+Steps 2–6 are skipped as a unit if any selection flag (`--development-loop`, `--categories`, any
 per-Category item flag, or `--agents`) was passed. An omitted project name is
 still prompted for, and confirmation still occurs.
 

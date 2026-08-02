@@ -68,21 +68,19 @@ def collect_answers(
             raise InvalidArgumentsError("catalog is required for Category selection")
         if _prompt_use_default_set(resolved_asker, catalog):
             base_selection = ProjectSelection.default_set(catalog)
-            if _prompt_add_enhancements(resolved_asker):
-                enhancements = _prompt_custom_selection(
-                    resolved_asker,
-                    catalog,
-                    development_loop=base_selection.development_loop,
-                )
-                base_selection = ProjectSelection.from_items(
-                    catalog,
-                    skills=base_selection.skills | enhancements.skills,
-                    mcp=base_selection.mcp | enhancements.mcp,
-                    docs_items=base_selection.docs_items | enhancements.docs_items,
-                    categories=base_selection.categories | enhancements.categories,
-                    agent_targets=frozenset(),
-                    docs=base_selection.docs or enhancements.docs,
-                )
+            enhancements = _prompt_custom_selection(
+                resolved_asker,
+                catalog,
+                development_loop=base_selection.development_loop,
+            )
+            base_selection = ProjectSelection.from_items(
+                catalog,
+                skills=base_selection.skills | enhancements.skills,
+                mcp=base_selection.mcp | enhancements.mcp,
+                docs_items=base_selection.docs_items | enhancements.docs_items,
+                categories=base_selection.categories | enhancements.categories,
+                agent_targets=frozenset(),
+            )
         else:
             base_selection = _prompt_custom_selection(resolved_asker, catalog)
         agent_targets = _prompt_agent_targets(resolved_asker, catalog)
@@ -93,7 +91,6 @@ def collect_answers(
             docs_items=base_selection.docs_items,
             categories=base_selection.categories,
             agent_targets=agent_targets,
-            docs=base_selection.docs,
         )
     else:
         assert partial.selection is not None
@@ -187,7 +184,11 @@ def _prompt_categories(
         for category_id, category in categories.items()
     }
     try:
-        selected = asker.checkbox("Select Categories to include:", tuple(labels))
+        selected = asker.checkbox(
+            "Select Categories to include:",
+            tuple(labels),
+            initially_selected=(),
+        )
     except KeyboardInterrupt:
         selected = None
     if selected is None:
@@ -211,6 +212,7 @@ def _prompt_category_items(
         selected = asker.checkbox(
             "Select items within the chosen Categories:",
             tuple(labels),
+            initially_selected=(),
         )
     except KeyboardInterrupt:
         selected = None
@@ -236,8 +238,6 @@ def _prompt_custom_selection(
         docs_items=selected_by_component["docs"],
         categories=selected_categories,
         agent_targets=frozenset(),
-        docs=bool(selected_by_component["docs"])
-        or ("design" in selected_categories and not catalog.get("docs")),
     )
 
 
@@ -274,27 +274,15 @@ def _prompt_use_default_set(
     default_set = catalog.default_set
     if default_set is None:
         raise InvalidArgumentsError("catalog does not declare a Default Set")
-    documentation = ", ".join(default_set.documentation)
     try:
         selected = asker.confirm(
-            f"Use the Default Set (development loop: {default_set.development_loop}; "
-            f"documentation: {documentation})?",
+            f"Use the Default Set (development loop: {default_set.development_loop})?",
             default=True,
         )
     except KeyboardInterrupt:
         selected = None
     if selected is None:
         raise AbortedError("Default Set prompt cancelled")
-    return selected
-
-
-def _prompt_add_enhancements(asker: Asker) -> bool:
-    try:
-        selected = asker.confirm("Add Enhancements to the Default Set?", default=False)
-    except KeyboardInterrupt:
-        selected = None
-    if selected is None:
-        raise AbortedError("Enhancement prompt cancelled")
     return selected
 
 
@@ -310,7 +298,11 @@ def _prompt_agent_targets(
         for target_id, target in targets.items()
     }
     try:
-        selected = asker.checkbox("Select Agent Targets:", tuple(labels))
+        selected = asker.checkbox(
+            "Select Agent Targets:",
+            tuple(labels),
+            initially_selected=tuple(labels),
+        )
     except KeyboardInterrupt:
         selected = None
     if selected is None:

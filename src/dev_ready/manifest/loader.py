@@ -164,24 +164,6 @@ def _parse_default_set(
             f"{list(development_loop_ids)!r}"
         )
 
-    documentation = _parse_default_set_ids(
-        raw.get("documentation"),
-        field="documentation",
-        source=source,
-    )
-    valid_documentation = {"architecture", "requirements"}
-    unknown_documentation = sorted(set(documentation) - valid_documentation)
-    if unknown_documentation:
-        raise ManifestError(
-            f"{source}: Default Set has unknown documentation ids "
-            f"{unknown_documentation!r}; valid ids: {sorted(valid_documentation)!r}"
-        )
-    if set(documentation) != valid_documentation:
-        raise ManifestError(
-            f"{source}: Default Set documentation must include exactly "
-            f"{sorted(valid_documentation)!r}"
-        )
-
     enhancements = _parse_default_set_ids(
         raw.get("enhancements"),
         field="enhancements",
@@ -205,7 +187,7 @@ def _parse_default_set(
             f"{non_enhancements!r}"
         )
 
-    current_size = 1 + len(documentation) + len(enhancements)
+    current_size = 1 + len(enhancements)
     if current_size > DEFAULT_SET_SIZE_LIMIT:
         raise ManifestError(
             f"{source}: Default Set size {current_size} exceeds limit "
@@ -214,7 +196,6 @@ def _parse_default_set(
         )
     return DefaultSet(
         development_loop=development_loop,
-        documentation=documentation,
         enhancements=enhancements,
     )
 

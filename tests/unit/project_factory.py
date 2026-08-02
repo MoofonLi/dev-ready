@@ -46,8 +46,7 @@ def materialize_project_structure(
     (root / "README.md").write_text("# Readme\n", encoding="utf-8")
     (root / ".dev-ready.json").write_text("{}", encoding="utf-8")
 
-    if selection.docs:
-        (root / "docs").mkdir(exist_ok=True)
+    (root / "docs").mkdir(exist_ok=True)
 
     projection = project_targets(catalog, selection.agent_targets)
 

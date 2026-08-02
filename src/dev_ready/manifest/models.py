@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from dev_ready.catalog_effects import CatalogEffect
 
 RETIRED_LOOP_ITEM_IDS = frozenset(
-    {"spec-loop", "tdd", "diagnosing-bugs", "code-review"}
+    {"spec-loop", "tdd", "diagnosing-bugs", "code-review", "setup-all"}
 )
 
 # The Components a Catalog Item can be written under, in manifest order. The
@@ -76,7 +76,6 @@ class DefaultSet:
     """Manifest-declared content produced when the user accepts defaults."""
 
     development_loop: str
-    documentation: tuple[str, ...]
     enhancements: tuple[str, ...]
 
 
@@ -192,5 +191,3 @@ class Manifest:
     categories: dict[str, Category]
     default_set: DefaultSet
     vendored: tuple[VendoredPin, ...] = ()
-
-

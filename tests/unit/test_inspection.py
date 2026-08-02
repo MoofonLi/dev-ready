@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 from pathlib import Path
+import shutil
 
 from dev_ready.inspection import ProjectExpectation, inspect_project
 from dev_ready.manifest import ComponentCatalog, ItemPath, load_default_manifest
@@ -49,6 +50,26 @@ def test_lifecycle_inspection_aggregates_shared_structural_facts(tmp_path: Path)
     assert "missing upstream path" in categories
     assert "missing overlay path" in categories
     assert "missing overlay file" in categories
+
+
+def test_lifecycle_inspection_requires_documentation_infrastructure(
+    tmp_path: Path,
+) -> None:
+    selection = ProjectSelection.from_items(CATALOG, docs_items=frozenset())
+    materialize_project_structure(tmp_path, CATALOG, selection)
+    shutil.rmtree(tmp_path / "docs")
+
+    issues = inspect_project(
+        tmp_path,
+        CATALOG,
+        ProjectExpectation.lifecycle(selection),
+    )
+
+    assert any(
+        issue.category == "missing overlay directory"
+        and "documentation directory 'docs/' is missing" in issue.detail
+        for issue in issues
+    )
 
 
 def test_generation_inspection_rejects_unselected_catalog_paths(tmp_path: Path) -> None:
@@ -107,7 +128,6 @@ def test_inspection_reports_malformed_effect_target_as_a_fact(tmp_path: Path) ->
     selection = ProjectSelection.from_items(
         CATALOG,
         mcp=frozenset({"code-memory"}),
-        docs=False,
     )
 
     issues = inspect_project(
@@ -126,7 +146,6 @@ def test_inspection_strips_template_suffix_from_catalog_assets(tmp_path: Path) -
     selection = ProjectSelection.from_items(
         CATALOG,
         skills=frozenset({"spec-loop"}),
-        docs=False,
     )
 
     # Fake generation of spec-loop asset without .tmpl suffix (rendered destination path)
@@ -150,7 +169,6 @@ def test_inspection_requires_the_selected_design_reference(tmp_path: Path) -> No
     selection = ProjectSelection.from_items(
         CATALOG,
         docs_items=frozenset({"design-stripe"}),
-        docs=True,
     )
 
     issues = inspect_project(
@@ -172,7 +190,6 @@ def test_inspection_requires_only_selected_agent_target_artifacts(tmp_path: Path
         skills=frozenset({"caveman"}),
         mcp=frozenset({"code-memory"}),
         agent_targets=frozenset({"windsurf"}),
-        docs=False,
     )
     materialize_project_structure(tmp_path, CATALOG, selection)
     missing_stub = tmp_path / ".windsurf/skills/caveman/SKILL.md"

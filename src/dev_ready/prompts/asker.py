@@ -21,6 +21,12 @@ class Asker(Protocol):
 
     def select(self, message: str, choices: Sequence[str]) -> str | None: ...
 
-    def checkbox(self, message: str, choices: Sequence[str]) -> list[str] | None: ...
+    def checkbox(
+        self,
+        message: str,
+        choices: Sequence[str],
+        *,
+        initially_selected: Sequence[str],
+    ) -> list[str] | None: ...
 
     def confirm(self, message: str, *, default: bool = True) -> bool | None: ...

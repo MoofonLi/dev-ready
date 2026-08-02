@@ -43,7 +43,6 @@ def _answers(
             mcp=mcp_items if include_mcp else frozenset(),
             docs_items=docs_items if include_docs else frozenset(),
             agent_targets=agent_targets,
-            docs=include_docs,
         ),
     )
 
@@ -113,21 +112,15 @@ def test_default_set_tree_contains_structure_and_no_enhancements(tmp_path: Path)
         for path in project_dir.rglob("*")
         if path.is_file() and path.suffix in {".md", ".json", ".yaml"}
     )
-    assert "setup-matt-pocock-skills" not in generated_text
+    assert "setup-matt-pocock-skills" in generated_text
 
 
-def test_setup_all_can_be_selected_without_becoming_a_generation_prerequisite(
+def test_setup_skill_arrives_through_the_mandatory_development_loop(
     tmp_path: Path,
 ) -> None:
     project_dir = tmp_path / "setup-selected"
     project_dir.mkdir()
-    selection = ProjectSelection.from_items(
-        CATALOG,
-        skills=frozenset({"setup-all"}),
-        mcp=frozenset(),
-        docs_items=frozenset(),
-        docs=True,
-    )
+    selection = ProjectSelection.default_set(CATALOG)
 
     apply_overlay(Answers("my-app", project_dir, selection), project_dir, CATALOG, PIN)
 
@@ -140,6 +133,10 @@ def test_setup_all_can_be_selected_without_becoming_a_generation_prerequisite(
     ).is_file()
     assert (project_dir / "docs" / "agents" / "issue-tracker.md").is_file()
     assert (project_dir / "docs" / "agents" / "domain.md").is_file()
+    code_review = (
+        project_dir / ".agents" / "skills" / "code-review" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    assert "run `/setup-matt-pocock-skills`" in code_review
 
 
 @pytest.mark.parametrize("selection_name", ["everything", "nothing", "mixed"])
@@ -156,7 +153,6 @@ def test_no_selection_writes_handoff_protocol_paths(
             skills=frozenset({"spec-loop"}),
             mcp=frozenset(),
             agent_targets=frozenset({"claude"}),
-            docs=True,
         )
 
     project_dir = tmp_path / selection_name
@@ -188,7 +184,6 @@ def test_no_selection_writes_project_orientation_skill(
             skills=frozenset({"caveman"}),
             mcp=frozenset(),
             agent_targets=frozenset({"claude"}),
-            docs=True,
         )
 
     project_dir = tmp_path / selection_name
@@ -300,8 +295,12 @@ def test_no_agent_targets_still_writes_only_canonical_content(tmp_path: Path) ->
         ),
         (
             "include_docs",
-            Path("docs") / "architecture.md",
-            [Path(".mcp.json"), Path(".claude") / "skills" / "caveman" / "SKILL.md"],
+            Path("docs") / "design-stripe.md",
+            [
+                Path(".mcp.json"),
+                Path(".claude") / "skills" / "caveman" / "SKILL.md",
+                Path("docs") / "architecture.md",
+            ],
         ),
     ],
 )
@@ -338,12 +337,15 @@ def test_mandatory_loop_is_present_with_all_enhancements_disabled(tmp_path: Path
     assert (project_dir / ".claude" / "skills" / "implement" / "SKILL.md").is_file()
     assert (project_dir / ".agents" / "skills" / "implement" / "SKILL.md").is_file()
     assert not (project_dir / ".mcp.json").exists()
-    assert not (project_dir / "docs" / "architecture.md").exists()
-    assert not (project_dir / "docs" / "requirements.md").exists()
+    assert (project_dir / "docs" / "architecture.md").is_file()
+    assert (project_dir / "docs" / "requirements.md").is_file()
+    assert "docs/architecture.md" in (project_dir / "AGENTS.md").read_text(
+        encoding="utf-8"
+    )
 
 
 @pytest.mark.parametrize("include_docs", [False, True])
-def test_mandatory_spec_loop_renders_independently_of_documentation(
+def test_mandatory_spec_loop_renders_independently_of_documentation_items(
     tmp_path: Path,
     include_docs: bool,
 ) -> None:
@@ -364,10 +366,11 @@ def test_mandatory_spec_loop_renders_independently_of_documentation(
     assert not (project_dir / "docs" / "handoffs").exists()
     assert (project_dir / ".claude" / "skills" / "to-spec" / "SKILL.md").is_file()
     assert (project_dir / "docs" / "agents" / "issue-tracker.md").is_file()
-    assert ((project_dir / "docs" / "architecture.md").is_file()) is include_docs
+    assert (project_dir / "docs" / "architecture.md").is_file()
+    assert (project_dir / "docs" / "requirements.md").is_file()
     assert "## Handoff Protocol" not in agents_md
     assert "## Spec Loop" in agents_md
-    assert ("docs/architecture.md" in agents_md) is include_docs
+    assert "docs/architecture.md" in agents_md
     assert "## Process-v2 role mapping" not in agents_md
 
     tracker = (project_dir / "docs" / "agents" / "issue-tracker.md").read_text(
@@ -377,13 +380,12 @@ def test_mandatory_spec_loop_renders_independently_of_documentation(
     assert "docs/handoffs/" not in tracker
     assert ".scratch/" in tracker
 
-    if include_docs:
-        architecture = (project_dir / "docs" / "architecture.md").read_text(
-            encoding="utf-8"
-        )
-        for heading in ("## System Overview", "## Module Boundary", "## Dependency Rules"):
-            assert heading in architecture
-        assert "`tech_lead`" not in architecture
+    architecture = (project_dir / "docs" / "architecture.md").read_text(
+        encoding="utf-8"
+    )
+    for heading in ("## System Overview", "## Module Boundary", "## Dependency Rules"):
+        assert heading in architecture
+    assert "`tech_lead`" not in architecture
 
     assert "{{" not in agents_md
 
@@ -671,6 +673,7 @@ def test_apply_overlay_writes_vendored_skills_and_docs(tmp_path: Path) -> None:
         "tdd",
         "diagnosing-bugs",
         "code-review",
+        "setup-matt-pocock-skills",
     }
     answers = _answers(tmp_path, skills_items=selected_items, include_docs=True)
 
@@ -859,10 +862,10 @@ def test_standalone_spec_loop_is_complete_and_role_neutral(tmp_path: Path) -> No
 
     claude_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
     assert "## Spec Loop" in claude_md
+    assert "`to-tickets` -> `implement` -> `tdd` -> `code-review`" in claude_md
     assert "docs/agents/issue-tracker.md" in claude_md
     assert "Handoff Protocol" not in claude_md
     assert "tech_lead" not in claude_md
-    assert "setup-matt-pocock-skills" not in claude_md
 
 
 def test_declining_every_enhancement_keeps_bundle_configuration_and_guidance(
@@ -904,9 +907,12 @@ def test_spec_loop_stamp_records_the_resolved_selection_and_complete_inventory(
     assert {item["id"] for item in stamp["components"]["skills"]["items"]} == {
         "spec-loop"
     }
+    assert stamp["components"]["docs"] == {"included": False, "items": []}
     inventory_paths = {entry["path"] for entry in stamp["inventory"]}
     assert ".agents/skills/domain-modeling/ADR-FORMAT.md" in inventory_paths
     assert "docs/agents/issue-tracker.md" in inventory_paths
+    assert "docs/architecture.md" in inventory_paths
+    assert "docs/requirements.md" in inventory_paths
     assert not (project_dir / "CONTEXT.md").exists()
 
 
@@ -930,7 +936,6 @@ def test_manifest_only_project_mcp_path_retargets_catalog_effects(tmp_path: Path
             custom_catalog,
             mcp=frozenset({"code-memory"}),
             agent_targets=frozenset({"custom"}),
-            docs=False,
         ),
     )
     project_dir = tmp_path / "project"

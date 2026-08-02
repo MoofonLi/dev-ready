@@ -59,6 +59,7 @@ _REQUIRED_LOOP_STEPS = (
     "code-review",
     "improve-codebase-architecture",
     "codebase-design",
+    "setup-matt-pocock-skills",
 )
 _LOOP_TARGET_SKILLS_DIRS = (Path(".claude/skills"), Path(".windsurf/skills"))
 
@@ -83,7 +84,6 @@ def _make_project(tmp_path: Path, *, code_memory: bool = False) -> Path:
                 skills=frozenset({"caveman"}),
                 mcp=mcp_items,
                 docs_items=frozenset(),
-                docs=False,
         ),
     )
     apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
@@ -557,6 +557,30 @@ def test_upgrade_maps_each_retired_loop_item_to_the_development_loop(
         "spec-loop"
     ]
     assert migrated["categories"] == ["dev"]
+
+
+def test_upgrade_migrates_a_v5_record_naming_retired_setup_all(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["components"]["skills"]["items"].append(
+        {"id": "setup-all", "pin": None}
+    )
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    upgrade_project(project)
+
+    migrated = load_stamp(project)
+    assert {item.id for item in migrated.skills_items} == {"caveman", "spec-loop"}
+    assert (
+        project
+        / ".agents"
+        / "skills"
+        / "setup-matt-pocock-skills"
+        / "SKILL.md"
+    ).is_file()
 
 
 def test_v4_project_that_declined_the_loop_gains_the_complete_loop_tree(

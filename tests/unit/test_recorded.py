@@ -88,6 +88,22 @@ def test_ids_the_current_catalog_no_longer_declares_are_dropped() -> None:
     assert recorded.selection.mcp == frozenset()
 
 
+def test_a_v5_record_with_retired_setup_all_resolves_through_its_loop() -> None:
+    stamp = _stamp(
+        version=5,
+        skills=("spec-loop", "setup-all"),
+        development_loop="spec-loop",
+    )
+
+    observed = RecordedProject.observed(stamp, MANIFEST)
+    migrated = RecordedProject.migrated(stamp, MANIFEST)
+
+    assert observed.selection.skills == frozenset({"spec-loop"})
+    assert observed.selection.development_loop == "spec-loop"
+    assert migrated.selection.skills == frozenset({"spec-loop"})
+    assert migrated.selection.development_loop == "spec-loop"
+
+
 def test_a_removed_agent_target_is_reported_rather_than_silently_dropped() -> None:
     recorded = RecordedProject.observed(
         _stamp(version=5, agent_targets=("claude", "long-gone")), MANIFEST

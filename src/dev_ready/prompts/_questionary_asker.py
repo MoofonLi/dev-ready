@@ -17,10 +17,22 @@ class QuestionaryAsker:
     def select(self, message: str, choices: Sequence[str]) -> str | None:
         return questionary.select(message, choices=list(choices)).ask()
 
-    def checkbox(self, message: str, choices: Sequence[str]) -> list[str] | None:
+    def checkbox(
+        self,
+        message: str,
+        choices: Sequence[str],
+        *,
+        initially_selected: Sequence[str],
+    ) -> list[str] | None:
         return questionary.checkbox(
             message,
-            choices=[questionary.Choice(choice, checked=True) for choice in choices],
+            choices=[
+                questionary.Choice(
+                    choice,
+                    checked=choice in initially_selected,
+                )
+                for choice in choices
+            ],
         ).ask()
 
     def confirm(self, message: str, *, default: bool = True) -> bool | None:

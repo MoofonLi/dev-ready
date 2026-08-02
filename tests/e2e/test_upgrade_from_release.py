@@ -206,8 +206,6 @@ def _json_report(result: subprocess.CompletedProcess[str], stage: str) -> dict[s
 
 
 def _selection_arguments(stamp: dict[str, Any]) -> list[str]:
-    components = stamp.get("components")
-    assert isinstance(components, dict), "released stamp has no component selection"
     manifest = load_default_manifest()
     items_by_id = {
         item.id: item
@@ -216,14 +214,8 @@ def _selection_arguments(stamp: dict[str, Any]) -> list[str]:
     }
     selected_by_category: dict[str, set[str]] = {}
     for component in ("skills", "mcp", "docs"):
-        selected = components.get(component)
-        assert isinstance(selected, dict), f"released stamp has no {component} selection"
-        items = selected.get("items")
-        assert isinstance(items, list), f"released stamp has invalid {component} items"
-        item_ids = [entry.get("id") if isinstance(entry, dict) else entry for entry in items]
-        assert all(isinstance(item_id, str) for item_id in item_ids), (
-            f"released stamp has an invalid {component} item id"
-        )
+        selected = _component_selection(stamp, component, "released")
+        item_ids = _component_item_ids(stamp, component, "released")
         if selected.get("included"):
             for item_id in item_ids:
                 item = items_by_id.get(item_id)
@@ -238,7 +230,7 @@ def _selection_arguments(stamp: dict[str, Any]) -> list[str]:
             arguments.extend(
                 (f"--{category}", ",".join(sorted(selected_by_category[category])))
             )
-    elif not components["docs"].get("included"):
+    elif not _component_selection(stamp, "docs", "released").get("included"):
         arguments.extend(("--categories", "none"))
     agent_targets = stamp.get("agent_targets", ["claude"])
     assert isinstance(agent_targets, list) and all(
@@ -259,6 +251,31 @@ def _inventory_paths(stamp: dict[str, Any], stage: str) -> set[str]:
         assert isinstance(path, str), f"{stage} stamp inventory entry has no path"
         paths.add(path)
     return paths
+
+
+def _component_item_ids(
+    stamp: dict[str, Any], component: str, stage: str
+) -> set[str]:
+    selection = _component_selection(stamp, component, stage)
+    items = selection.get("items")
+    assert isinstance(items, list), f"{stage} stamp has invalid {component} items"
+    item_ids = {
+        entry.get("id") if isinstance(entry, dict) else entry for entry in items
+    }
+    assert all(isinstance(item_id, str) for item_id in item_ids), (
+        f"{stage} stamp has an invalid {component} item id"
+    )
+    return item_ids
+
+
+def _component_selection(
+    stamp: dict[str, Any], component: str, stage: str
+) -> dict[str, Any]:
+    components = stamp.get("components")
+    assert isinstance(components, dict), f"{stage} stamp has no Components"
+    selection = components.get(component)
+    assert isinstance(selection, dict), f"{stage} stamp has no {component} selection"
+    return selection
 
 
 def _managed_paths_with_parents(paths: set[str]) -> set[str]:
@@ -310,6 +327,10 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
             "--yes",
             "--dir",
             str(target),
+            "--categories",
+            "dev",
+            "--dev",
+            "setup-all",
         ],
         cwd=tmp_path,
     )
@@ -329,7 +350,24 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
         "released project omitted the Claude rules pointer"
     )
     old_stamp = _load_stamp(target, "old generation")
+    assert "setup-all" in _component_item_ids(old_stamp, "skills", "old generation")
+    assert not _component_item_ids(old_stamp, "docs", "old generation")
+    old_docs = old_stamp["components"]["docs"]
+    assert old_docs.get("included") is False, (
+        "released project unexpectedly selected documentation"
+    )
+    assert not (target / "docs" / "architecture.md").exists()
+    assert not (target / "docs" / "requirements.md").exists()
     _assert_skill_projection(target, old_stamp, "implement", "released project")
+
+    edited_setup_relative = Path(
+        *CANONICAL_SKILLS_ROOT,
+        "setup-matt-pocock-skills",
+        "SKILL.md",
+    )
+    edited_setup = target / edited_setup_relative
+    user_edit = b"\n<!-- user-edited setup conventions -->\n"
+    edited_setup.write_bytes(edited_setup.read_bytes() + user_edit)
 
     before_upgrade = _snapshot(target)
     old_provenance = _base_provenance(old_stamp, "old generation")
@@ -400,7 +438,7 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     )
     assert _snapshot(target) == before_upgrade, "dry-run upgrade mutated generated project bytes"
 
-    _, checkout_probe = _checkout_stage(
+    real_upgrade, checkout_probe = _checkout_stage(
         "real upgrade",
         ["upgrade", str(target)],
         cwd=tmp_path,
@@ -413,6 +451,20 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
         "upgrade omitted the Claude rules pointer"
     )
     _assert_skill_projection(target, new_stamp, "implement", "upgrade")
+    _assert_skill_projection(
+        target, new_stamp, "setup-matt-pocock-skills", "upgrade"
+    )
+    assert edited_setup.read_bytes().endswith(user_edit), (
+        "upgrade overwrote the user-edited setup skill"
+    )
+    assert "Skipped (user-modified)" in real_upgrade.stdout
+    assert edited_setup_relative.as_posix() in real_upgrade.stdout
+    assert "setup-all" not in _component_item_ids(new_stamp, "skills", "real upgrade")
+    assert "spec-loop" in _component_item_ids(new_stamp, "skills", "real upgrade")
+    assert not _component_item_ids(new_stamp, "docs", "real upgrade")
+    assert new_stamp["components"]["docs"].get("included") is False
+    assert (target / "docs" / "architecture.md").is_file()
+    assert (target / "docs" / "requirements.md").is_file()
     for path in target.rglob("*"):
         assert not path.is_symlink(), f"upgrade produced a symbolic link: {path}"
     assert new_stamp.get("stamp_version") == 5, "upgrade changed the stamp format version"
@@ -503,7 +555,8 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert action_counts and not any(action_counts.values()), (
         "second upgrade reported a nonzero action plan: " + repr(action_counts)
     )
-    assert "No changes were needed." in idempotence_result.stdout
+    assert "Skipped (user-modified) (1):" in idempotence_result.stdout
+    assert edited_setup_relative.as_posix() in idempotence_result.stdout
 
     _checkout_stage(
         "idempotence real upgrade",

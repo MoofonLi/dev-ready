@@ -2,10 +2,6 @@
   "manifest_version": 1,
   "default_set": {
     "development_loop": "spec-loop",
-    "documentation": [
-      "architecture",
-      "requirements"
-    ],
     "enhancements": []
   },
   "categories": {
@@ -257,7 +253,8 @@
             "diagnosing-bugs",
             "code-review",
             "improve-codebase-architecture",
-            "codebase-design"
+            "codebase-design",
+            "setup-matt-pocock-skills"
           ],
           "paths": [
             {
@@ -305,23 +302,12 @@
               "dest": ".agents/skills/codebase-design"
             },
             {
-              "src": "claude/spec-loop",
-              "dest": "docs/agents"
-            }
-          ]
-        },
-        {
-          "id": "setup-all",
-          "kind": "enhancement",
-          "category": "dev",
-          "description": "Interactive post-generation setup for changing the Spec Loop's tracker and documentation conventions.",
-          "mode": "vendor",
-          "license": "MIT",
-          "vendored_repo": "mattpocock/skills",
-          "paths": [
-            {
               "src": "claude/skills/setup-matt-pocock-skills",
               "dest": ".agents/skills/setup-matt-pocock-skills"
+            },
+            {
+              "src": "claude/spec-loop",
+              "dest": "docs/agents"
             }
           ]
         },

@@ -12,8 +12,6 @@ _DOCUMENTATION_SCAFFOLD_PATHS = (
 )
 
 
-def documentation_scaffold_paths(
-    included: bool,
-) -> tuple[tuple[Path, Path], ...]:
-    """Return documentation scaffold source/destination paths for this selection."""
-    return _DOCUMENTATION_SCAFFOLD_PATHS if included else ()
+def documentation_scaffold_paths() -> tuple[tuple[Path, Path], ...]:
+    """Return the unconditional documentation scaffold paths."""
+    return _DOCUMENTATION_SCAFFOLD_PATHS

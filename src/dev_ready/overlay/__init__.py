@@ -95,7 +95,7 @@ def build_overlay_content(
                 _render_pointer_stub(canonical_bytes, relative.parts[0], canonical_path, target),
             )
 
-    for source, destination in documentation_scaffold_paths(answers.includes("docs")):
+    for source, destination in documentation_scaffold_paths():
         collect(templates_root.joinpath(source), destination)
     return content
 

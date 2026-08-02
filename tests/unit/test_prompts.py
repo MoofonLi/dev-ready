@@ -102,6 +102,7 @@ class FakeAsker:
         self.select_choices: list[list[str]] = []
         self.checkbox_calls: list[str] = []
         self.checkbox_choices: list[list[str]] = []
+        self.checkbox_initially_selected: list[list[str]] = []
         self.confirm_calls: list[str] = []
 
     def text(self, message: str) -> str | None:
@@ -113,9 +114,16 @@ class FakeAsker:
         self.select_choices.append(list(choices))
         return self._selects.pop(0)
 
-    def checkbox(self, message: str, choices: Sequence[str]) -> list[str] | None:
+    def checkbox(
+        self,
+        message: str,
+        choices: Sequence[str],
+        *,
+        initially_selected: Sequence[str],
+    ) -> list[str] | None:
         self.checkbox_calls.append(message)
         self.checkbox_choices.append(list(choices))
+        self.checkbox_initially_selected.append(list(initially_selected))
         return self._checkboxes.pop(0)
 
     def confirm(self, message: str, *, default: bool = True) -> bool | None:
@@ -132,7 +140,13 @@ class _RaisingAsker:
     def select(self, message: str, choices: Sequence[str]) -> str | None:
         raise KeyboardInterrupt
 
-    def checkbox(self, message: str, choices: Sequence[str]) -> list[str] | None:
+    def checkbox(
+        self,
+        message: str,
+        choices: Sequence[str],
+        *,
+        initially_selected: Sequence[str],
+    ) -> list[str] | None:
         raise KeyboardInterrupt
 
     def confirm(self, message: str, *, default: bool = True) -> bool | None:
@@ -209,7 +223,7 @@ def test_name_prompt_result_lands_in_answers() -> None:
 
 
 def test_interactive_defaults_produce_default_set_without_enhancement_selection() -> None:
-    asker = FakeAsker(confirms=[True, False], checkboxes=[ALL_AGENT_LABELS])
+    asker = FakeAsker(confirms=[True], checkboxes=[[], [], ALL_AGENT_LABELS])
 
     answers = collect_answers(
         _partial(selection_explicit=False), catalog=CATALOG, asker=asker
@@ -218,19 +232,22 @@ def test_interactive_defaults_produce_default_set_without_enhancement_selection(
     assert answers.selection.categories == frozenset({"dev"})
     assert answers.skills_items == frozenset({"spec-loop"})
     assert answers.mcp_items == frozenset()
-    assert answers.include_docs is True
+    assert answers.include_docs is False
     assert answers.items("docs") == frozenset()
     assert asker.confirm_calls == [
-        "Use the Default Set (development loop: spec-loop; documentation: "
-        "architecture, requirements)?",
-        "Add Enhancements to the Default Set?",
+        "Use the Default Set (development loop: spec-loop)?",
     ]
-    assert asker.checkbox_choices == [ALL_AGENT_LABELS]
+    assert asker.checkbox_calls == [
+        "Select Categories to include:",
+        "Select items within the chosen Categories:",
+        "Select Agent Targets:",
+    ]
+    assert asker.checkbox_initially_selected == [[], [], ALL_AGENT_LABELS]
 
 
 def test_interactive_default_set_can_add_one_enhancement() -> None:
     asker = FakeAsker(
-        confirms=[True, True],
+        confirms=[True],
         checkboxes=[
             _category_labels("security"),
             _item_labels("security-audit"),
@@ -244,7 +261,10 @@ def test_interactive_default_set_can_add_one_enhancement() -> None:
 
     assert answers.selection.development_loop == "spec-loop"
     assert answers.skills_items == frozenset({"security-audit", "spec-loop"})
-    assert answers.include_docs is True
+    assert answers.include_docs is False
+    assert asker.confirm_calls == [
+        "Use the Default Set (development loop: spec-loop)?",
+    ]
 
 
 def test_interactive_customization_can_choose_an_alternate_loop() -> None:
@@ -316,6 +336,7 @@ def test_empty_category_selection_produces_no_catalog_content() -> None:
     assert answers.include_docs is False
     assert answers.selection.development_loop == "spec-loop"
     assert answers.selection.categories == frozenset({"dev"})
+    assert asker.checkbox_initially_selected == [[], [], ALL_AGENT_LABELS]
 
 
 def test_interactive_agent_targets_remain_last_and_are_resolved() -> None:
@@ -454,7 +475,6 @@ def test_interactive_and_flag_paths_produce_identical_answers(tmp_path: Path) ->
             CATALOG,
             mcp=frozenset({"code-memory"}),
             categories=frozenset({"token-optimize"}),
-            docs=False,
         ),
         assume_yes=False,
     )

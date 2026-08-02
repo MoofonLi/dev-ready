@@ -78,7 +78,6 @@ def _resolve(
             mcp=frozenset(item.id for item in stamp.mcp_items) & catalog.item_ids("mcp"),
             docs_items=docs_items,
             agent_targets=frozenset(stamp.agent_targets) & catalog.agent_target_ids,
-            docs=stamp.docs_included,
         ),
         removed_agent_targets=tuple(
             sorted(set(stamp.agent_targets) - catalog.agent_target_ids)

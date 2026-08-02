@@ -125,14 +125,13 @@ def inspect_project(
                     f"required file {relative!r} is missing",
                 )
             )
-    if expectation.require_lifecycle_overlay:
-        if expectation.selection.docs and not (root / "docs").exists():
-            issues.append(
-                ProjectIssue(
-                    "missing overlay directory",
-                    "recorded 'docs' selection but 'docs/' directory is missing",
-                )
+    if not (root / "docs").exists():
+        issues.append(
+            ProjectIssue(
+                "missing overlay directory",
+                "documentation directory 'docs/' is missing",
             )
+        )
     for relative in FORBIDDEN_PATHS:
         if (root / relative).exists():
             issues.append(

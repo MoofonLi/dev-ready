@@ -125,11 +125,10 @@ def test_report_distinguishes_required_loop_from_selected_enhancements() -> None
             CATALOG,
             skills=frozenset({"security-audit"}),
             docs_items=frozenset(),
-            docs=False,
         ),
     )
     enhanced_report = render_report(enhanced_answers, PIN, [], CATALOG)
 
     assert "development loop (required): spec-loop" in enhanced_report
-    assert "documentation skeletons: (none)" in enhanced_report
+    assert "documentation skeletons: architecture, requirements" in enhanced_report
     assert "enhancements: security-audit" in enhanced_report

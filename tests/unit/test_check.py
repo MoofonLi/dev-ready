@@ -32,7 +32,6 @@ def _create_minimal_valid_project(project_dir: Path, stamp_version: int = 2) -> 
         manifest.components,
         skills=frozenset({skill_item.id}),
         mcp=frozenset({mcp_item.id}),
-        docs=False,
     )
     materialize_project_structure(project_dir, manifest.components, selection)
 
@@ -258,7 +257,6 @@ def test_check_v5_uses_the_recorded_docs_item_selection(
     selection = ProjectSelection.from_items(
         manifest.components,
         docs_items=frozenset({"design-stripe"}),
-        docs=True,
     )
     materialize_project_structure(tmp_path, manifest.components, selection)
     _create_minimal_valid_project(tmp_path, stamp_version=5)

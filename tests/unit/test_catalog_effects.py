@@ -171,7 +171,6 @@ def test_shared_target_classification_stays_behind_effect_seam() -> None:
     selection = ProjectSelection.from_items(
         manifest.components,
         mcp=frozenset({"code-memory"}),
-        docs=False,
         handoff=False,
     )
 

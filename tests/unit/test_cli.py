@@ -349,7 +349,7 @@ def test_build_answers_defaults() -> None:
     assert answers.include_mcp is False
     assert answers.skills_items == frozenset({"spec-loop"})
     assert answers.mcp_items == frozenset()
-    assert answers.include_docs is True
+    assert answers.include_docs is False
     assert answers.selection.docs_items == frozenset()
     assert answers.assume_yes is False
 
@@ -538,7 +538,6 @@ def test_category_item_flag_variations() -> None:
     )
     assert ans.skills_items == frozenset(
         {
-            "setup-all",
             "spec-loop",
         }
     )
@@ -572,12 +571,12 @@ def test_removed_project_orientation_id_uses_standard_unknown_item_error(
     assert main(["init", "my-app", "--yes", "--dev", "project-orientation"]) == 2
     error = capsys.readouterr().err
     assert "unknown Dev item ids: ['project-orientation']" in error
-    assert "valid ids: ['setup-all']" in error
+    assert "valid ids: []" in error
 
 
 @pytest.mark.parametrize(
     "retired_id",
-    ["spec-loop", "tdd", "diagnosing-bugs", "code-review"],
+    ["spec-loop", "tdd", "diagnosing-bugs", "code-review", "setup-all"],
 )
 def test_retired_loop_item_ids_exit_2_with_their_replacement(
     retired_id: str,
@@ -591,6 +590,15 @@ def test_retired_loop_item_ids_exit_2_with_their_replacement(
     assert retired_id in error
     assert "mandatory Dev development loop" in error
     assert "'spec-loop'" in error
+
+
+def test_dev_category_accepts_no_enhancement_items() -> None:
+    answers = build_answers(
+        _init_args(categories="dev", dev="none"),
+        CATALOG,
+    )
+
+    assert answers.skills_items == frozenset({"spec-loop"})
 
 
 def test_conflicting_flags_exits_2(capsys) -> None:

@@ -26,7 +26,8 @@ Inspect the destination first. If it exists and is non-empty, stop and ask the u
 Always use `--yes` for agent-driven, non-interactive generation.
 
 With no selection flags, `--yes` accepts the lean Default Set: the mandatory
-Spec Loop plus the project's architecture and requirements skeletons. Select
+Spec Loop with no optional Enhancements. Every project also receives
+architecture and requirements skeletons as generation infrastructure. Select
 user-facing Categories with `--categories IDS`. Narrow Enhancements within
 each selected Category with `--dev`, `--security`, `--quality`, `--design`, or
 `--token-optimize`. Choose the mandatory loop with `--development-loop ID` if
@@ -44,7 +45,7 @@ Current Category ids: `dev`, `security`, `quality`, `design`, `token-optimize`.
 Current development loop ids: `spec-loop` (mandatory; select on the structural
 `--development-loop` axis, not as a `--dev` Enhancement).
 
-Current dev item ids: `setup-all`.
+Current dev item ids: (none).
 
 Current security item ids: `security-audit`.
 
@@ -58,10 +59,10 @@ Current Agent Target ids: `claude`, `windsurf`.
 
 Every generated project resolves `spec-loop`; `--categories none` and
 `--dev none` decline Enhancements without removing it. The former selectable
-ids `spec-loop`, `tdd`, `diagnosing-bugs`, and `code-review` now exit 2 when
-passed to `--dev`, because their content is part of the mandatory Dev
-development loop. Treat the resolved selection shown in the report and stamp
-as authoritative.
+ids `spec-loop`, `tdd`, `diagnosing-bugs`, `code-review`, and `setup-all` now
+exit 2 when passed to `--dev`, because their content is part of the mandatory
+Dev development loop. Treat the resolved selection shown in the report and
+stamp as authoritative.
 
 Unknown Category ids, unknown item ids, unknown Agent Target ids, and conflicting
 flags are exit 2 failures; surface the error instead of guessing a replacement.
@@ -96,7 +97,7 @@ uvx dev-ready init minimal-app --yes --categories none --agents none --dir ./min
 Mixed Enhancement selection:
 
 ```shell
-uvx dev-ready init focused-app --yes --development-loop spec-loop --categories dev,design,token-optimize --dev setup-all --design frontend-design,design-stripe --token-optimize code-memory --agents claude --dir ./focused-app
+uvx dev-ready init focused-app --yes --development-loop spec-loop --categories dev,design,token-optimize --dev none --design frontend-design,design-stripe --token-optimize code-memory --agents claude --dir ./focused-app
 ```
 
 Run exactly one selected command. Do not invent flags for language, overwriting, or cleanup.

@@ -40,7 +40,6 @@ class ProjectSelection:
     categories: frozenset[str] = frozenset()
     development_loop: str = ""
     agent_targets: frozenset[str] = frozenset()
-    docs: bool = True
 
     @classmethod
     def _create(
@@ -52,7 +51,6 @@ class ProjectSelection:
         categories: frozenset[str],
         development_loop: str,
         agent_targets: frozenset[str],
-        docs: bool,
     ) -> ProjectSelection:
         selection = object.__new__(cls)
         object.__setattr__(selection, "skills", skills)
@@ -61,7 +59,6 @@ class ProjectSelection:
         object.__setattr__(selection, "categories", categories)
         object.__setattr__(selection, "development_loop", development_loop)
         object.__setattr__(selection, "agent_targets", agent_targets)
-        object.__setattr__(selection, "docs", docs)
         return selection
 
     @classmethod
@@ -74,7 +71,6 @@ class ProjectSelection:
             categories=frozenset(),
             development_loop="",
             agent_targets=frozenset({"claude"}),
-            docs=True,
         )
 
     @classmethod
@@ -87,7 +83,6 @@ class ProjectSelection:
             categories=frozenset(),
             development_loop="",
             agent_targets=frozenset(),
-            docs=False,
         )
 
     @classmethod
@@ -97,10 +92,9 @@ class ProjectSelection:
         *,
         skills: frozenset[str] = frozenset(),
         mcp: frozenset[str] = frozenset(),
-        docs_items: frozenset[str] | None = None,
+        docs_items: frozenset[str] = frozenset(),
         categories: frozenset[str] | None = None,
         agent_targets: frozenset[str] | None = None,
-        docs: bool = True,
         handoff: bool = False,
     ) -> ProjectSelection:
         _ = handoff  # Compatibility for internal v0.8 lifecycle fixtures only.
@@ -111,7 +105,6 @@ class ProjectSelection:
             docs_items=docs_items,
             categories=categories,
             agent_targets=agent_targets,
-            docs=docs,
             require_development_loop=True,
         )
 
@@ -124,7 +117,6 @@ class ProjectSelection:
         mcp: frozenset[str],
         docs_items: frozenset[str],
         agent_targets: frozenset[str] | None = None,
-        docs: bool,
     ) -> ProjectSelection:
         """Reconstruct existing intent without applying Phase 4 migration policy."""
         return cls._from_items(
@@ -134,7 +126,6 @@ class ProjectSelection:
             docs_items=docs_items,
             categories=None,
             agent_targets=agent_targets,
-            docs=docs,
             require_development_loop=False,
         )
 
@@ -145,20 +136,14 @@ class ProjectSelection:
         *,
         skills: frozenset[str],
         mcp: frozenset[str],
-        docs_items: frozenset[str] | None,
+        docs_items: frozenset[str],
         categories: frozenset[str] | None,
         agent_targets: frozenset[str] | None,
-        docs: bool,
         require_development_loop: bool,
     ) -> ProjectSelection:
         _validate_items("skills", skills, catalog)
         _validate_items("mcp", mcp, catalog)
-        resolved_docs_items = (
-            frozenset(item.id for item in catalog.get("docs", ()))
-            if docs and docs_items is None
-            else (docs_items or frozenset())
-        )
-        _validate_items("docs", resolved_docs_items, catalog)
+        _validate_items("docs", docs_items, catalog)
         resolved_targets = (
             catalog.agent_target_ids if agent_targets is None else agent_targets
         )
@@ -173,8 +158,7 @@ class ProjectSelection:
                 catalog,
                 skills=resolved_skills,
                 mcp=mcp,
-                docs=resolved_docs_items,
-                include_legacy_docs=docs,
+                docs=docs_items,
             )
             if categories is None
             else categories
@@ -183,11 +167,10 @@ class ProjectSelection:
         return cls._create(
             skills=_resolve_requirements("skills", resolved_skills, catalog),
             mcp=_resolve_requirements("mcp", mcp, catalog),
-            docs_items=_resolve_requirements("docs", resolved_docs_items, catalog),
+            docs_items=_resolve_requirements("docs", docs_items, catalog),
             categories=resolved_categories,
             development_loop=development_loop,
             agent_targets=resolved_targets,
-            docs=docs,
         )
 
     @classmethod
@@ -204,7 +187,6 @@ class ProjectSelection:
             docs_items=catalog.item_ids("docs"),
             categories=catalog.category_ids,
             agent_targets=catalog.agent_target_ids,
-            docs=True,
         )
 
     @classmethod
@@ -223,7 +205,6 @@ class ProjectSelection:
             mcp=selected_by_component["mcp"],
             docs_items=selected_by_component["docs"],
             agent_targets=catalog.agent_target_ids,
-            docs=bool(default_set.documentation),
         )
 
     @classmethod
@@ -299,7 +280,6 @@ class ProjectSelection:
             docs_items=selected_by_component["docs"],
             categories=selected_categories,
             agent_targets=_resolve_agent_targets(agents, catalog.agent_target_ids),
-            docs=bool(selected_by_component["docs"]),
         )
 
     def items(self, name: str) -> frozenset[str]:
@@ -309,14 +289,10 @@ class ProjectSelection:
             return self.mcp
         if name == "docs":
             return self.docs_items
-        raise ValueError(f"catalog selection {name!r} has no items")
+        raise ValueError(f"unknown selection {name!r}")
 
     def includes(self, name: str) -> bool:
-        if name in {"skills", "mcp"}:
-            return bool(self.items(name))
-        if name == "docs":
-            return self.docs
-        raise ValueError(f"unknown selection {name!r}")
+        return bool(self.items(name))
 
 
 def _resolve_category_ids(
@@ -476,7 +452,6 @@ def _categories_for_items(
     skills: frozenset[str],
     mcp: frozenset[str],
     docs: frozenset[str],
-    include_legacy_docs: bool,
 ) -> frozenset[str]:
     selected_by_component = dict(zip(CATALOG_COMPONENTS, (skills, mcp, docs)))
     categories = {
@@ -485,8 +460,6 @@ def _categories_for_items(
         for item in catalog.get(component, ())
         if item.id in selected and item.category
     }
-    if include_legacy_docs and not catalog.get("docs"):
-        categories.add("design")
     return frozenset(categories)
 
 

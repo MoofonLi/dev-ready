@@ -54,12 +54,9 @@ def _render_selection(
         for item in catalog.all_items()
         if item.kind == "enhancement" and item.id in selected_ids
     )
-    documentation = (
-        "architecture, requirements" if answers.includes("docs") else "(none)"
-    )
     return [
         f"development loop (required): {answers.selection.development_loop}",
-        f"documentation skeletons: {documentation}",
+        "documentation skeletons: architecture, requirements",
         "enhancements: " + (", ".join(selected_enhancements) or "(none)"),
     ]
 

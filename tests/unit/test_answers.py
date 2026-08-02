@@ -74,14 +74,15 @@ def test_handoff_is_not_a_generation_selection_axis() -> None:
     assert not hasattr(selection, "handoff")
 
 
-def test_default_set_is_the_loop_and_documentation_without_enhancements() -> None:
+def test_default_set_is_the_loop_without_selected_documentation_items() -> None:
     selection = ProjectSelection.default_set(CATALOG)
 
     assert selection.development_loop == "spec-loop"
     assert selection.items("skills") == frozenset({"spec-loop"})
     assert selection.items("mcp") == frozenset()
     assert selection.items("docs") == frozenset()
-    assert selection.includes("docs") is True
+    assert selection.includes("docs") is False
+    assert not hasattr(selection, "docs")
     assert selection.categories == frozenset({"dev"})
 
 
@@ -98,7 +99,6 @@ def test_second_loop_is_a_data_addition_with_one_resolved_default() -> None:
     alternate_selection = ProjectSelection.from_items(
         catalog,
         skills=frozenset({"alternate-loop"}),
-        docs=False,
     )
     alternate_flag_selection = ProjectSelection.from_flags(
         catalog=catalog,
@@ -201,7 +201,6 @@ def test_recorded_selection_does_not_apply_the_phase_4_loop_migration() -> None:
         mcp=frozenset(),
         docs_items=frozenset(),
         agent_targets=frozenset({"claude"}),
-        docs=False,
     )
 
     assert selection.development_loop == ""
