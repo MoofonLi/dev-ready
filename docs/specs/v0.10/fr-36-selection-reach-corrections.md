@@ -165,6 +165,25 @@ to name the implement step in its execution position, between ticket dispatch
 and the steps implement delegates to. The delegated steps continue to be named,
 because agents invoke them directly for narrow tasks.
 
+**Project-record compatibility.** Deleting the selection boolean reaches the
+project record, which persists the same flag, so the two are separated rather
+than deleted together. The record keeps parsing the flag, because a project
+stamped before the record began listing individual documentation items has no
+other way to say what it received. Writing the flag becomes derived from
+whether any documentation item is selected, which narrows its meaning to "a
+design reference was chosen" for every record written from now on. No record
+version bump is needed: the key remains present with the same type, and the
+only consumer that still reads it — reconstruction of pre-item-listing records
+— is unaffected by the narrowing, because records from that era predate
+individually selectable documentation items entirely.
+
+**Structural inspection.** The check that a project has a documentation
+directory stops being conditional on the recorded selection and becomes
+unconditional, matching the skeletons' new status as infrastructure. A project
+that has lost its documentation directory is now drift regardless of what it
+selected, which is a strengthening the previous coupling made impossible to
+express.
+
 **Documentation.** The CLI contract's prompt-sequence description, the README's
 flag table and workflow material, and the distributed generation skill's
 documented identifiers and examples are brought into agreement with the above.
