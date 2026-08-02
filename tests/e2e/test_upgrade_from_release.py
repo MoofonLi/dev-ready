@@ -13,24 +13,14 @@ from typing import Any, NamedTuple
 
 import pytest
 
+from dev_ready.agent_targets import CANONICAL_SKILLS_ROOT, project_targets
 from dev_ready.manifest import load_default_manifest
 
 pytestmark = pytest.mark.network
 
-_RELEASED_VERSION = "0.8.0"
+_RELEASED_VERSION = "0.9.0"
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PROBE_PREFIX = "__DEV_READY_PROBE__="
-_HANDOFF_PATHS = (
-    "docs/handoffs/.gitignore",
-    "docs/handoffs/README.md",
-    "docs/handoffs/phase-N/03-review.md",
-    "docs/handoffs/phase-N/04-qa-review.md",
-    "docs/handoffs/phase-N/05-security-review.md",
-    "docs/handoffs/phase-N/06-sre-review.md",
-    "docs/handoffs/phase-N/reports/execution-report.md",
-    "docs/handoffs/phase-N/tickets/README.md",
-    "docs/handoffs/protocol.yaml",
-)
 _PROBE_AND_RUN = f"""
 import json
 import sys
@@ -176,6 +166,27 @@ def _load_stamp(target: Path, stage: str) -> dict[str, Any]:
     return stamp
 
 
+def _assert_skill_projection(
+    root: Path, stamp: dict[str, Any], skill_name: str, stage: str
+) -> None:
+    agent_target_ids = stamp.get("agent_targets")
+    assert isinstance(agent_target_ids, list) and all(
+        isinstance(target_id, str) for target_id in agent_target_ids
+    ), f"{stage} stamp has invalid Agent Target selection"
+    catalog = load_default_manifest().components
+    projection = project_targets(catalog, agent_target_ids)
+    canonical_skill = root.joinpath(*CANONICAL_SKILLS_ROOT, skill_name, "SKILL.md")
+    assert canonical_skill.is_file(), f"{stage} omitted canonical {skill_name} content"
+    for target in projection.targets:
+        pointer_stub = root / projection.stub_path(target, skill_name)
+        assert pointer_stub.is_file(), (
+            f"{stage} omitted the {target.id} {skill_name} Pointer Stub"
+        )
+        assert canonical_skill.read_bytes() != pointer_stub.read_bytes(), (
+            f"{stage} duplicated canonical {skill_name} bytes into {target.id}"
+        )
+
+
 def _json_report(result: subprocess.CompletedProcess[str], stage: str) -> dict[str, Any]:
     decoder = json.JSONDecoder()
     for stream in (result.stdout, result.stderr):
@@ -204,7 +215,7 @@ def _selection_arguments(stamp: dict[str, Any]) -> list[str]:
         for item in component_items
     }
     selected_by_category: dict[str, set[str]] = {}
-    for component in ("skills", "mcp"):
+    for component in ("skills", "mcp", "docs"):
         selected = components.get(component)
         assert isinstance(selected, dict), f"released stamp has no {component} selection"
         items = selected.get("items")
@@ -219,20 +230,22 @@ def _selection_arguments(stamp: dict[str, Any]) -> list[str]:
                 if item is not None and item.kind != "development-loop":
                     selected_by_category.setdefault(item.category, set()).add(item.id)
 
-    docs = components.get("docs")
-    if isinstance(docs, dict) and docs.get("included"):
-        for item in manifest.components.get("docs", ()):
-            selected_by_category.setdefault(item.category, set()).add(item.id)
-
     categories = sorted(selected_by_category)
-    arguments = ["--categories", ",".join(categories) or "none"]
-    for category in categories:
-        arguments.extend((f"--{category}", ",".join(sorted(selected_by_category[category]))))
+    arguments: list[str] = []
+    if categories:
+        arguments.extend(("--categories", ",".join(categories)))
+        for category in categories:
+            arguments.extend(
+                (f"--{category}", ",".join(sorted(selected_by_category[category])))
+            )
+    elif not components["docs"].get("included"):
+        arguments.extend(("--categories", "none"))
     agent_targets = stamp.get("agent_targets", ["claude"])
     assert isinstance(agent_targets, list) and all(
         isinstance(target_id, str) for target_id in agent_targets
     ), "released stamp has invalid Agent Target selection"
-    arguments.extend(("--agents", ",".join(agent_targets) or "none"))
+    if set(agent_targets) != set(manifest.agent_targets):
+        arguments.extend(("--agents", ",".join(agent_targets) or "none"))
     return arguments
 
 
@@ -269,21 +282,9 @@ def _base_provenance(stamp: dict[str, Any], stage: str) -> BaseProvenance:
 
 
 def _overlay_currency(stamp: dict[str, Any]) -> OverlayCurrency:
-    components = stamp.get("components")
-    normalized_components: dict[str, Any] | None = None
-    if isinstance(components, dict):
-        normalized_components = {}
-        for component in ("skills", "mcp", "docs"):
-            value = components.get(component)
-            if not isinstance(value, dict):
-                continue
-            normalized = dict(value)
-            if component == "docs":
-                normalized.pop("items", None)
-            normalized_components[component] = normalized
     return OverlayCurrency(
         dev_ready_version=stamp.get("dev_ready_version"),
-        components=normalized_components,
+        components=stamp.get("components"),
         inventory=stamp.get("inventory"),
     )
 
@@ -323,29 +324,14 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert (target / ".dev-ready.json").is_file(), "old generation did not write its stamp"
     assert (target / "backend").is_dir(), "old generation omitted the backend application"
     assert (target / "frontend").is_dir(), "old generation omitted the frontend application"
-    canonical_skill = target / ".agents/skills/project-orientation/SKILL.md"
-    claude_stub = target / ".claude/skills/project-orientation/SKILL.md"
-    windsurf_stub = target / ".windsurf/skills/project-orientation/SKILL.md"
     assert (target / "AGENTS.md").is_file(), "released project omitted canonical rules"
-    assert canonical_skill.is_file(), "released project omitted canonical skill content"
     assert (target / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n", (
         "released project omitted the Claude rules pointer"
     )
-    assert claude_stub.is_file(), "released project omitted the Claude Pointer Stub"
-    assert windsurf_stub.is_file(), "released project omitted the Windsurf Pointer Stub"
-    assert canonical_skill.read_bytes() != claude_stub.read_bytes(), (
-        "released project duplicated canonical skill bytes into the Claude target"
-    )
-    for path in _HANDOFF_PATHS:
-        assert (target / path).is_file(), f"released project omitted Handoff file {path}"
-    implement_skill = target / ".agents/skills/implement/SKILL.md"
-    assert not implement_skill.exists(), "released v0.8 project unexpectedly contains implement"
-
-    edited_protocol = target / "docs/handoffs/protocol.yaml"
-    edited_protocol.write_text("user-edited retired protocol\n", encoding="utf-8")
+    old_stamp = _load_stamp(target, "old generation")
+    _assert_skill_projection(target, old_stamp, "implement", "released project")
 
     before_upgrade = _snapshot(target)
-    old_stamp = _load_stamp(target, "old generation")
     old_provenance = _base_provenance(old_stamp, "old generation")
 
     reference_target = tmp_path / "checkout-reference"
@@ -413,12 +399,8 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
         cwd=tmp_path,
     )
     assert _snapshot(target) == before_upgrade, "dry-run upgrade mutated generated project bytes"
-    assert "would .dev-ready.json" in dry_run_result.stdout
-    assert "would .agents/skills/implement/SKILL.md" in dry_run_result.stdout
-    assert "would delete .agents/skills/project-orientation/SKILL.md" in dry_run_result.stdout
-    assert "docs/handoffs/protocol.yaml: preserved" in dry_run_result.stdout
 
-    real_upgrade_result, checkout_probe = _checkout_stage(
+    _, checkout_probe = _checkout_stage(
         "real upgrade",
         ["upgrade", str(target)],
         cwd=tmp_path,
@@ -430,39 +412,15 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert (target / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n", (
         "upgrade omitted the Claude rules pointer"
     )
-    assert not canonical_skill.exists(), "upgrade retained retired canonical skill content"
-    assert not claude_stub.exists(), "upgrade retained the retired Claude Pointer Stub"
-    assert not windsurf_stub.exists(), "upgrade retained the retired Windsurf Pointer Stub"
-    for path in _HANDOFF_PATHS:
-        retired = target / path
-        if retired == edited_protocol:
-            assert retired.read_text(encoding="utf-8") == "user-edited retired protocol\n"
-        else:
-            assert not retired.exists(), f"upgrade retained untouched Handoff file {path}"
-    assert "docs/handoffs/protocol.yaml: preserved" in real_upgrade_result.stdout
-    assert (
-        "docs/handoffs/protocol.yaml: retained outside the current managed inventory"
-        in real_upgrade_result.stdout
-    )
-    assert implement_skill.is_file(), "upgrade did not add canonical implement content"
-    assert (target / ".claude/skills/implement/SKILL.md").is_file(), (
-        "upgrade did not add the Claude implement Pointer Stub"
-    )
-    assert (target / ".windsurf/skills/implement/SKILL.md").is_file(), (
-        "upgrade did not add the Windsurf implement Pointer Stub"
-    )
+    _assert_skill_projection(target, new_stamp, "implement", "upgrade")
     for path in target.rglob("*"):
         assert not path.is_symlink(), f"upgrade produced a symbolic link: {path}"
-    assert new_stamp.get("stamp_version") == 5, "upgrade did not migrate to stamp version 5"
-    assert new_stamp.get("categories") == [
-        "design",
-        "dev",
-        "quality",
-        "security",
-        "token-optimize",
-    ], "upgrade did not derive the released selection's Categories"
-    assert new_stamp.get("development_loop") == "spec-loop", (
-        "upgrade did not record the mandatory development loop"
+    assert new_stamp.get("stamp_version") == 5, "upgrade changed the stamp format version"
+    assert new_stamp.get("categories") == old_stamp.get("categories"), (
+        "upgrade changed the released project's Categories"
+    )
+    assert new_stamp.get("development_loop") == old_stamp.get("development_loop"), (
+        "upgrade changed the released project's development loop"
     )
     components = new_stamp.get("components")
     assert isinstance(components, dict) and "handoff" not in components, (
