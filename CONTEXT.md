@@ -72,10 +72,22 @@ _Avoid_: hook, anchor, attachment point, phase
 
 **Default Set**:
 What a generated project receives when the user accepts every default: the Spec
-Loop and the project's own documentation skeletons. It is the only thing the
-size limit governs — the rest of the catalog is unbounded (ADR-018). Every
-Enhancement is off by default, reference design-document templates included.
+Loop. It is the only thing the size limit governs — the rest of the catalog is
+unbounded (ADR-018). Every Enhancement is off by default, reference
+design-document templates included. The project's own documentation skeletons
+were part of it until the 2026-08-02 amendment moved them out of selection
+entirely; they are [[Overlay Infrastructure]] now.
 _Avoid_: default selection, baseline, starter set, the cap
+
+**Overlay Infrastructure**:
+Overlay content every generated project receives unconditionally, named by no
+Category and selectable by nothing: `AGENTS.md`, the project `README.md`, the
+Spec Loop, `docs/architecture.md`, `docs/requirements.md`, and the stamp. A
+mandatory process may not have optional outputs — the loop writes the two
+documentation skeletons, so they are not a [[Catalog Item]] (ADR-018,
+2026-08-02 amendment). `.mcp.json` is adjacent but conditional: it appears only
+when a selected Enhancement needs it.
+_Avoid_: always-on item, implicit default, base overlay, core set
 
 **Bundle**:
 A catalog item that materializes multiple related assets selected as one unit

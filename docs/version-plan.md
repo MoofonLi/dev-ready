@@ -409,7 +409,7 @@ it?" — the same test as the curation principle.
 | v0.7 (DONE; v0.7.0 released) | FR-23 Handoff Protocol config, FR-28 Spec Loop, FR-24 generate skill, FR-29 progress reporting | FR-23×FR-28 share the generated rules surface; FR-29 landed before FR-25, which was subsequently withdrawn (D-3 rejected) |
 | v0.8 (DONE; v0.8.0 released) | FR-26 multi-agent render targets | Canonical Content, Agent Target Pointer Stubs, stamp v4, and the v0.7 migration are complete; FR-25 remains withdrawn and Traditional Chinese is served by repository documentation instead |
 | v0.9 (DONE; v0.9.0 released) | FR-30 Category-first selection, FR-31 Spec Loop always generated + Default Set, FR-35 retire the generated Handoff Protocol | Category selection, the lean Default Set, stamp v5, and the v0.8 migration are complete; ADR-020 changed generated projects only, while ADR-021 separately retired the internal protocol |
-| v0.10 (added 2026-07-27) | FR-32 Mount Points, FR-33 Agent Target Map, FR-34 interview-driven generation skill | Assembly and reach, all non-breaking, and all downstream of v0.9's contract |
+| v0.10 (added 2026-07-27) | FR-32 Mount Points, FR-33 Agent Target Map, FR-34 interview-driven generation skill, FR-36 selection reach and overlay-infrastructure corrections (added 2026-08-02) | Assembly and reach, all non-breaking, and all downstream of v0.9's contract |
 | v1.0 | FR-27 second template (Next.js — selected 2026-07-24, see D-5); Web UI decision revisited | Platform step; gated on real-user feedback and the D-5 hard gates |
 
 **2026-07-24 — v0.6 close-out re-confirmation (CEO-confirmed, Moofon):**
@@ -690,11 +690,39 @@ composes the command. Mapping a described need onto a selection is what a model
 does well and what CLI branching does badly. Distribution is unchanged — this
 repository, outside the generated overlay (D-2).
 
+FR-36. **Selection reach and overlay-infrastructure corrections** (added
+2026-08-02 after grilling the shipped v0.9 surface; the two ADR-018 amendments
+of that date carry the decisions). Every item is a defect in something v0.9
+shipped, not new capability. The `Add Enhancements?` confirmation defaults to
+`no`, so a user who accepts every default never reaches the item menu — the
+Category-first selection FR-30 built is unreachable on the default path.
+`docs/architecture.md` and `docs/requirements.md` are gated on the `docs`
+Component, whose only items are two visual design references, so declining the
+Default Set and taking no design reference silently drops the project's own
+documentation skeletons; they become unconditional infrastructure. `setup-all`
+retires into the always-generated loop, taking its generation-time text
+substitution with it — that substitution is keyed on the id and would fire
+wrongly once the id is gone. And the generated loop guidance is corrected to
+name `implement`: v0.9 vendored it as the Execution step and then omitted it
+from the only file every agent session reads, which is the failure mode ADR-018
+created it to fix.
+
+Sequencing note: (a)–(d) touch the same prompt, selection, and stamp-migration
+surfaces as nothing else in v0.10, so FR-36 is independent of FR-32 and FR-33
+and can run in parallel with either. FR-34 must land after it — an interview
+skill that composes selection commands should be written against the corrected
+contract, not the shipped one.
+
 Also in v0.10: the README pair is refreshed for the Category model, the Default
-Set, and the supported-agent count. `README.zh-TW.md` is updated only where the
-product facts it carries change — what dev-ready produces and what the
-lifecycle commands guarantee — and gains none of the new flags or exit codes
-(ADR-016).
+Set, and the supported-agent count, and gains the detailed development-workflow
+section this repository's README currently lacks — written for the *generated
+project's* loop, the audience deciding whether to adopt dev-ready, rather than
+restating the internal process AGENTS.md already owns. `README.zh-TW.md` is
+updated only where the product facts it carries change — what dev-ready
+produces and what the lifecycle commands guarantee — and gains none of the new
+flags or exit codes (ADR-016). Its line describing the Default Set as "the Spec
+Loop plus the project's own architecture and requirements skeletons" is one
+such fact and does change.
 
 ### Considered and rejected in this session
 

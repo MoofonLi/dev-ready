@@ -12,6 +12,75 @@ if third-party) → removed from this file.
 
 ## Third-party candidates
 
+### GitHub MCP server (github/github-mcp-server)
+
+- Decided 2026-08-02 (grilling, Moofon): **a selectable Catalog Item, not
+  always-written infrastructure.** "Every project gets it, no menu line" was
+  proposed and rejected — see the three blockers below, any one of which is
+  paid by users who did not ask for it.
+- Integration mode: pinned dependency with an `inject: mcp-server` effect, the
+  same shape as `code-memory` (ADR-008). No source is vendored, so no NOTICES
+  entry.
+- Category: undecided. `dev` fits the loop's tracker story; a case exists for
+  `token-optimize` being the wrong home given the server's context weight.
+- Blockers to resolve before it ships:
+  1. **No `uvx`/`npx` launcher.** Upstream offers Docker
+     (`ghcr.io/github/github-mcp-server`) or the remote endpoint
+     `https://api.githubcopilot.com/mcp/`. Docker contradicts the README's
+     "Docker only to run the generated project, not to generate it"; the
+     remote endpoint is a hosted service.
+  2. **ADR-002.** An untagged image is `latest` by another name — a digest
+     must be pinned in the manifest. The remote endpoint cannot be pinned at
+     all, which is the stronger argument against choosing it.
+  3. **Auth and context weight.** It needs `GITHUB_PERSONAL_ACCESS_TOKEN`, so
+     a user without one meets a failing server on first agent session; and its
+     tool surface (issues, PRs, code search, actions) is charged to every
+     session's context, the version-plan's first recorded risk. This is
+     exactly the cost `code-memory` is opt-in to avoid imposing.
+- Note: this item does not talk to `setup-matt-pocock-skills`. MCP config is
+  written at generation time; the skill runs later and writes only Markdown. A
+  skill that edited `.mcp.json` would mark it user-modified and exclude it from
+  `upgrade` forever (ADR-014, ADR-018).
+
+### headroom (headroomlabs-ai/headroom)
+
+- Status: **deferred, not rejected** (2026-08-02, Moofon). Blocked on FR-32
+  Mount Points landing and on first-party measurement — see below.
+- License: Apache-2.0. Pinned-dependency mode redistributes nothing, so no
+  THIRD_PARTY_NOTICES entry is required. Distributed as `headroom-ai` on PyPI
+  and npm, and as `ghcr.io/chopratejas/headroom` — verify at integration time
+  that the image owner and the `headroomlabs-ai` org are the same party.
+- Category: `token-optimize`. Not mutually exclusive with `caveman`: caveman
+  changes how the agent writes, headroom compresses what it reads.
+- **The measured reason for deferral.** Headroom has three modes and only one
+  is reachable by a tool that writes project files:
+  - `headroom mcp serve` — exposes `headroom_compress`, `headroom_retrieve`,
+    `headroom_stats`. Configurable in `.mcp.json` exactly like `code-memory`.
+  - `headroom wrap <agent>` — starts a local proxy, redirects the agent's API
+    traffic through it, and installs Serena. Machine-level, not a project
+    file; dev-ready cannot configure it and should not try.
+  - library / proxy — irrelevant to a generated project.
+
+  The advertised "15-20% fewer tokens for coding agents" belongs to *wrap*
+  mode. MCP mode compresses nothing on its own: an MCP server cannot intercept
+  the host's other tool results, so it only compresses what the agent
+  deliberately hands it. Shipping MCP mode alone bills every session for three
+  tool definitions in exchange for a call the agent may never make — plausibly
+  net negative for the metric the Category is named after.
+- What would unblock it: a Mount Point (FR-32) that tells a loop skill *when*
+  to call `headroom_compress` — `diagnosing-bugs` before reading a large log is
+  the obvious first candidate — plus a first-party measurement of real savings.
+  Headroom would then be FR-32's first non-`react-doctor` customer, which is a
+  reason to sequence it **after** FR-32 ships rather than alongside it.
+- Conflict to handle if it ships: `headroom learn` writes to `CLAUDE.md` when
+  `CLAUDE.local.md` is not used. dev-ready writes `CLAUDE.md` as a managed
+  one-line `@AGENTS.md` Pointer Stub; an append marks it user-modified and
+  excludes it from `upgrade` permanently.
+- Live alternative to reconsider: if measurement shows the value is
+  overwhelmingly in wrap mode, the honest outcome is a recommendation in the
+  generated README rather than a catalog item — dev-ready would be installing
+  the mode that does not deliver the benefit.
+
 ### graphify (Graphify-Labs/graphify)
 
 - License: MIT. PyPI package name is `graphifyy` (double y) — the `graphify`
