@@ -120,11 +120,19 @@ filesystems and platforms where symlinks are unavailable.
 _Avoid_: shim, alias, symlink, mirror, proxy
 
 **Agent Target Map**:
-The manifest's transcription of every Agent Target's project-level skills
-directory, derived from the reference installer's machine-readable agent list
-and held to it by a drift check (ADR-019). Rules and MCP paths are absent from
-that source and stay hand-declared.
-_Avoid_: agent table, path map, target registry
+The manifest's record of each Agent Target's project-level skills directory,
+derived from the reference installer's machine-readable agent list and held to
+it by a drift check (ADR-019). Never a transcription — every entry is generated,
+and an entry a human typed is a defect. Rules and MCP paths are absent from that
+source and stay hand-declared.
+_Avoid_: agent table, path map, target registry, transcription
+
+**Standard-Compliant Agent**:
+A coding agent that reads [[Canonical Content]] at `.agents/skills/` and is
+therefore never an [[Agent Target]] — it needs no Pointer Stub and no selection.
+Absence from the Agent Target Map means full support, not missing support, which
+is why the selection prompt and the generation report both name these agents.
+_Avoid_: standard agent, generic agent, default agent, unsupported agent
 
 ### Lifecycle
 
