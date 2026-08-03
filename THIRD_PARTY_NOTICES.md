@@ -23,7 +23,7 @@ dev-ready does not ship a copy of this template inside the wheel. At generation 
 - Source: https://github.com/mattpocock/skills
 - Subset: `skills/engineering/tdd`, `skills/engineering/diagnosing-bugs`, `skills/engineering/code-review`, `skills/engineering/grill-with-docs`, `skills/productivity/grilling`, `skills/engineering/domain-modeling`, `skills/engineering/to-spec`, `skills/engineering/to-tickets`, `skills/engineering/implement`, `skills/engineering/improve-codebase-architecture`, `skills/engineering/codebase-design`, and `skills/engineering/setup-matt-pocock-skills` vendored into `src/dev_ready/templates/claude/skills/`.
 
-Generated default-loop copies adapt setup-command references to the local Markdown configuration that dev-ready writes during generation. The vendored source snapshots remain byte-checked against the pinned commit.
+Copies of these skills written into generated projects may be modified by dev-ready and are distributed as derived works under the same MIT license. The vendored source snapshots in this repository remain byte-checked against the pinned commit.
 
 ## cloudflare/security-audit-skill
 
@@ -56,6 +56,6 @@ Generated default-loop copies adapt setup-command references to the local Markdo
 
 ---
 
-Everything else dev-ready writes into a generated project — `CLAUDE.md`, the built-in Claude Code skills overlay (`project-orientation`), MCP configuration, and base design-doc templates under `src/dev_ready/templates/` — is original to this project and is not derived from a third-party source.
+Unless attributed above, content authored by dev-ready and written into a generated project is original to this project and is not derived from a third-party source.
 
 Runtime Python dependencies (e.g. `questionary`) are ordinary PyPI packages resolved by the installer at install time; they are not vendored into this package and each carries its own license via its own PyPI distribution.

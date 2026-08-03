@@ -81,6 +81,13 @@ def test_mattpocock_notice_names_the_complete_spec_loop_subset() -> None:
     ):
         assert skill_name in notices
 
+    assert "distributed as derived works under the same MIT license" in notices
+    assert "source snapshots in this repository remain byte-checked" in notices
+    assert "adapt setup-command references" not in notices
+    assert "project-orientation" not in notices
+    assert "mounted Enhancement" not in notices
+    assert "delimited block" not in notices
+
 
 def test_check_notices_sync_success_when_matching(tmp_path: Path) -> None:
     manifest_path = tmp_path / "manifest.json"
