@@ -613,6 +613,108 @@ def test_selected_mount_appends_derived_guidance_to_the_loop_skill(
     )
 
 
+def test_review_mount_lists_both_selected_enhancements_in_identifier_order(
+    tmp_path: Path,
+) -> None:
+    content = build_overlay_content(
+        _answers(
+            tmp_path,
+            skills_items=frozenset({"react-doctor", "security-audit"}),
+            include_mcp=False,
+            include_docs=False,
+            agent_targets=frozenset(),
+        ),
+        CATALOG,
+    )
+
+    code_review = content[".agents/skills/code-review/SKILL.md"].decode("utf-8")
+    assert code_review.count("<!-- dev-ready:mounted-enhancements:start -->") == 1
+    assert code_review.count("<!-- dev-ready:mounted-enhancements:end -->") == 1
+    react_entry = (
+        "- **react-doctor** â€” Wrapper skill teaching the agent when to run "
+        "react-doctor on the frontend and how to act on its findings. "
+        "See `.agents/skills/react-doctor`."
+    )
+    security_entry = (
+        "- **security-audit** â€” Multi-phase security auditing skill for "
+        "vulnerability scanning and risk assessment. "
+        "See `.agents/skills/security-audit`."
+    )
+    assert react_entry in code_review
+    assert security_entry in code_review
+    assert code_review.index(react_entry) < code_review.index(security_entry)
+
+
+def test_document_mount_points_to_its_generated_destination(tmp_path: Path) -> None:
+    content = build_overlay_content(
+        _answers(
+            tmp_path,
+            skills_items=frozenset(),
+            include_mcp=False,
+            docs_items=frozenset({"design-linear"}),
+            agent_targets=frozenset(),
+        ),
+        CATALOG,
+    )
+
+    implement = content[".agents/skills/implement/SKILL.md"].decode("utf-8")
+    assert (
+        "- **design-linear** â€” Linear-inspired DESIGN.md reference for a "
+        "polished dark product interface system; omit it if that visual "
+        "direction is not useful. See `docs/design-linear.md`."
+    ) in implement
+
+
+def test_browser_testing_mounts_on_the_test_writing_step(tmp_path: Path) -> None:
+    content = build_overlay_content(
+        _answers(
+            tmp_path,
+            skills_items=frozenset({"webapp-testing"}),
+            include_mcp=False,
+            include_docs=False,
+            agent_targets=frozenset(),
+        ),
+        CATALOG,
+    )
+
+    tdd = content[".agents/skills/tdd/SKILL.md"].decode("utf-8")
+    assert "- **webapp-testing**" in tdd
+    assert "See `.agents/skills/webapp-testing`." in tdd
+
+
+def test_unmounted_enhancements_do_not_change_loop_skills(tmp_path: Path) -> None:
+    baseline = build_overlay_content(
+        _answers(
+            tmp_path,
+            skills_items=frozenset(),
+            include_mcp=False,
+            include_docs=False,
+            agent_targets=frozenset(),
+        ),
+        CATALOG,
+    )
+    selected = build_overlay_content(
+        _answers(
+            tmp_path,
+            skills_items=frozenset({"caveman"}),
+            mcp_items=frozenset({"code-memory"}),
+            include_docs=False,
+            agent_targets=frozenset(),
+        ),
+        CATALOG,
+    )
+    loop = next(item for item in CATALOG.loops() if item.id == "spec-loop")
+    loop_skill_paths = {
+        f"{item_path.dest}/SKILL.md"
+        for item_path in loop.paths
+        if item_path.dest.startswith(".agents/skills/")
+    }
+
+    assert {path: selected[path] for path in loop_skill_paths} == {
+        path: baseline[path] for path in loop_skill_paths
+    }
+
+
 def test_default_set_leaves_every_loop_skill_byte_identical_to_its_template(
     tmp_path: Path,
 ) -> None:

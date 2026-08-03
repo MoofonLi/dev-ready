@@ -361,19 +361,27 @@ def test_default_manifest_declares_category_assignments() -> None:
     assert items["code-memory"].category == "token-optimize"
 
 
-def test_default_manifest_mounts_react_doctor_on_code_review() -> None:
+def test_default_manifest_declares_the_six_expected_mounts() -> None:
     items = {
         item.id: item
         for component_items in load_default_manifest().components.values()
         for item in component_items
     }
 
-    assert items["react-doctor"].mount == "code-review"
-    assert all(
-        item.mount is None
+    assert {
+        item_id: item.mount
         for item_id, item in items.items()
-        if item_id != "react-doctor"
-    )
+        if item.mount is not None
+    } == {
+        "design-linear": "implement",
+        "design-stripe": "implement",
+        "frontend-design": "implement",
+        "react-doctor": "code-review",
+        "security-audit": "code-review",
+        "webapp-testing": "tdd",
+    }
+    assert items["caveman"].mount is None
+    assert items["code-memory"].mount is None
 
 
 @pytest.mark.parametrize("field", ["skills_dir", "rules_file", "mcp_file"])
