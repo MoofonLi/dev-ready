@@ -718,6 +718,8 @@ def test_unmounted_enhancements_do_not_change_loop_skills(tmp_path: Path) -> Non
 def test_default_set_leaves_every_loop_skill_byte_identical_to_its_template(
     tmp_path: Path,
 ) -> None:
+    from importlib import resources
+
     answers = Answers(
         "my-app",
         tmp_path / "project",
@@ -725,25 +727,17 @@ def test_default_set_leaves_every_loop_skill_byte_identical_to_its_template(
     )
 
     content = build_overlay_content(answers, CATALOG)
-
-    expected_hashes = {
-        ".agents/skills/tdd/SKILL.md": "2de14b893e7a1bf7030b9eb778a3714a19da70c4284ad18a6e43b2402aa693ef",
-        ".agents/skills/diagnosing-bugs/SKILL.md": "3dfe5ec16b89a01dbc1bf606a1a1cfc32349e225f3bb75a3fb86117974a83cb8",
-        ".agents/skills/code-review/SKILL.md": "e5507100ac01a04d082ac23ac6311d0fec8699d1ab00c599db7064039b819f63",
-        ".agents/skills/grill-with-docs/SKILL.md": "269376d5146332f597c4194fa1adef93b879ad62e0183c0d111a447e7af51be9",
-        ".agents/skills/grilling/SKILL.md": "74b36ef0c3c5402681cf821ca20bedb1b62cc970ae1abbab5dbafe767ad27bd7",
-        ".agents/skills/domain-modeling/SKILL.md": "004d5cb6258658f2e9cbf0d9f90bdc9104f8b83bd296556783800c31d503814f",
-        ".agents/skills/to-spec/SKILL.md": "a8ffe2ecd1692f012d310dca3f3c9a75f61086df77dbb0a5bc38ddbc0bd2e6bc",
-        ".agents/skills/to-tickets/SKILL.md": "b9478faa82b40c653bba2ea110682b5ae22a6736e4600768ae158c17db861ae2",
-        ".agents/skills/implement/SKILL.md": "30cd7bc1ebfb3891e85a1eed3b3b81aea0fa4ad4553a784de7f8e421b2d223e0",
-        ".agents/skills/improve-codebase-architecture/SKILL.md": "411f295e0bf467fa46e8d8fc6ae3742135a5647380a5f9512c339c9fddb3cb17",
-        ".agents/skills/codebase-design/SKILL.md": "22d3815e5629ddea7ed7c9f8e7c330f6a1559466ee904e58371e1e8a10be0c4b",
-        ".agents/skills/setup-matt-pocock-skills/SKILL.md": "5bb39f7c7468525677cb3ce7b0ef64d596570f9df489d88cafc4e302ef08810e",
+    templates_root = resources.files("dev_ready").joinpath("templates")
+    loop = next(item for item in CATALOG.loops() if item.id == "spec-loop")
+    template_bytes = {
+        f"{item_path.dest}/SKILL.md": templates_root.joinpath(
+            *item_path.src.split("/"), "SKILL.md"
+        ).read_bytes()
+        for item_path in loop.paths
+        if item_path.dest.startswith(".agents/skills/")
     }
-    assert {
-        path: hashlib.sha256(content[path]).hexdigest()
-        for path in expected_hashes
-    } == expected_hashes
+
+    assert {path: content[path] for path in template_bytes} == template_bytes
 
 
 def test_mounted_guidance_is_deterministic_and_does_not_change_pointer_stubs(
