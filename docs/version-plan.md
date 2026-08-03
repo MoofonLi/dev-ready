@@ -672,6 +672,12 @@ npm-dev-dependency effects, applied at generation into a delimited, regenerable
 block. Nothing edits a skill at runtime — a runtime edit marks the file
 user-modified and permanently excludes it from `upgrade`.
 
+**Corrected 2026-08-03** — see the amendment at the end of this document. The
+mount is optional rather than universal, `implement` is a valid target, and the
+"third catalog effect kind" sentence is wrong: injection happens inside the
+overlay's whole-file rendering, because a catalog effect runs after the stamp
+inventory is hashed.
+
 FR-33. **Agent Target Map (ADR-019).** Measurement against `vercel-labs/skills`
 `src/agents.ts` found that of 75 declared agents only 19 read `.agents/skills/`
 at project level — **56 declare a unique project directory**. v0.8's two
@@ -723,6 +729,50 @@ produces and what the lifecycle commands guarantee — and gains none of the new
 flags or exit codes (ADR-016). Its line describing the Default Set as "the Spec
 Loop plus the project's own architecture and requirements skeletons" is one
 such fact and does change.
+
+## 2026-08-03 amendment — FR-32 correction, FR-37, and a licensing observation (CEO-confirmed, Moofon)
+
+Written after grilling v0.10 Phase 2 against the code. Three outcomes.
+
+**FR-32's mechanism above is wrong and is corrected.** The paragraph describing
+injection as "a third catalog effect kind beside the existing MCP-server and
+npm-dev-dependency effects" does not survive contact with the overlay. Catalog
+effects run *after* the overlay writes its files, while the stamp inventory
+hashes the rendered content *before* they run — so an effect-shaped mount
+records a hash that can never match the mounted skill, and `upgrade` classifies
+a file nobody edited as user-modified permanently. `classify_shared_targets`
+excludes it again as a shared target. Injection therefore happens inside the
+overlay's whole-file rendering; the declaration is manifest data validated by
+the loader. Neither mistake raises anything at generation time, which is why the
+rule is now recorded in `docs/architecture.md` rather than only in a spec. The
+2026-08-03 amendment to ADR-018 carries the product half: a mount is optional,
+it changes *when* an agent is reminded rather than whether it can find a skill,
+and `implement` is a valid target for guidance that has no lower acting step.
+
+**FR-37. Tech stack and standards sources in the generated `AGENTS.md`** (added
+this session). The vendored `code-review` skill resolves its Standards axis by
+looking for "anything in the repo that documents how code should be written,
+such as `CODING_STANDARDS.md` or `CONTRIBUTING.md`" — and this manifest's prune
+list removes upstream's `CONTRIBUTING.md`. A grep of the whole `templates/` tree
+returns exactly one hit for `pytest`, `ruff`, or `mypy`: that line in
+`code-review` asking for a file dev-ready itself deletes. So the Standards axis
+of the review step every generated project ships has nothing to resolve to, and
+falls back to the built-in smell baseline. The fix goes in `AGENTS.md`, which
+already carries `## Stack` and `## Commands` and is the one file every session
+loads; a per-skill copy would duplicate and drift, and a separate `tech-stack.md`
+is one hop an agent may not take. This is not per-project customization: a
+single pinned base template (ADR-001, ADR-002) makes the stack a constant until
+FR-27 adds a second one, at which point this becomes a real decision rather than
+a transcription.
+
+**Licensing observation — recorded, not scheduled.** The two Apache-2.0 skills
+carry their `LICENSE.txt` into every generated project. The twelve MIT
+`mattpocock/skills` loop skills carry no license notice at all, while MIT's own
+terms require the copyright and permission notice to travel with copies. This
+predates v0.10 — it has been true since v0.7 — and FR-32 does not create it, but
+FR-32 does make those files formally derived works, which puts it in view. No
+legal conclusion is drawn here. Recorded so that the next person to look does
+not have to rediscover that the two licenses are being treated differently.
 
 ### Considered and rejected in this session
 

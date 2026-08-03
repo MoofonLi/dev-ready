@@ -60,14 +60,18 @@ presented under exactly one Category.
 _Avoid_: skill entry, module, addon
 
 **Enhancement**:
-A Catalog Item outside the Spec Loop, declaring the Mount Point it attaches to.
-Everything a user can add or drop is an Enhancement.
+A Catalog Item outside the Spec Loop, optionally declaring the [[Mount Point]]
+it attaches to. Everything a user can add or drop is an Enhancement.
 _Avoid_: plugin, extra, addon, optional skill
 
 **Mount Point**:
-The Spec Loop skill an Enhancement attaches to, declared as manifest data —
-react-doctor mounts on `code-review`, not on `implement` (ADR-018). Guidance is
-injected at generation time; nothing rewrites a skill at runtime.
+The Spec Loop skill an [[Enhancement]] attaches to, declared as manifest data
+and optional — an Enhancement whose guidance has no single right moment
+declares none. A mount decides *when* an agent is reminded, never whether it can
+find the skill: a [[Pointer Stub]] already makes every selected skill
+discoverable, so a mount at the wrong step is worse than no mount. Guidance is
+injected at generation time; nothing rewrites a skill at runtime (ADR-018, as
+amended 2026-08-03).
 _Avoid_: hook, anchor, attachment point, phase
 
 **Default Set**:

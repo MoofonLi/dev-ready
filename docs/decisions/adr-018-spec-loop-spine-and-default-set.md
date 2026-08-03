@@ -97,3 +97,57 @@ Consequences: `setup-all` joins the ids that leave the selectable catalog while
 remaining in v5 stamps, so the migration maps or retires it as it does the
 others. Dev holds no Enhancement at all now — `--dev` accepts only `none` or an
 empty selection until a Dev Enhancement exists again.
+
+---
+
+## 2026-08-03 amendment — Mount Points are optional, and `implement` is a valid mount
+
+This ADR wrote "Enhancements declare a Mount Point", which reads as a
+requirement, and named `implement` as the wrong place to attach guidance. The
+v0.10 Phase 2 grilling found both statements too strong.
+
+**A Mount Point is optional.** Forcing every Enhancement to declare one
+produces fabricated attachments, and a fabricated attachment is not an empty
+field — it is printed into the user's skill file. Of the eight Enhancements in
+the catalog today, four have no honest moment: `caveman` is token discipline
+that applies at every step, `code-memory` is an MCP server the agent already
+holds as a tool, and `design-stripe` and `design-linear` are reference
+documents rather than behaviour. The field is therefore omissible, and an
+Enhancement that declares nothing behaves exactly as it does now.
+
+**A mount decides timing, not discoverability.** Every selected skill is
+already reachable: ADR-015 writes a Pointer Stub at each Agent Target's native
+path, so the agent loads its name and description whatever the manifest says
+about mounting. What a mount buys is that the reminder sits inside the file the
+agent is executing at the moment it matters — the same property that made this
+ADR reject a table in `AGENTS.md`. It follows that **a wrong mount is worse than
+no mount**: it interrupts at the wrong step and dilutes the correct ones. The
+reverse holds for Catalog Items under `docs`: nothing in the generated overlay
+references `docs/design-stripe.md`, so for those a mount is the only discovery
+path there is.
+
+**`implement` is a valid Mount Point.** This ADR's "not on `implement`" is
+about `react-doctor`, which has a lower acting step — examining a diff is
+`code-review`'s entire job. The general rule is the one that sentence was
+serving: *mount at the step that acts on the guidance*. UI-building guidance has
+no lower step. `tdd` writes tests and `code-review` examines diffs; `implement`
+is where a component is written, so `frontend-design`, `design-stripe`, and
+`design-linear` mount there. v0.10 declares six mounts in total: `react-doctor`
+and `security-audit` on `code-review`, `webapp-testing` on `tdd`, and the three
+design items on `implement`.
+
+- **Considered: keeping the mount mandatory** — rejected. The four fabricated
+  attachments it would force are not schema noise; they are text an agent reads
+  at a moment when it is wrong.
+- **Considered: mounting the design items on `to-spec`**, on the argument that
+  a visual direction is one decision that should outlive a ticket — rejected.
+  The moment a palette or type scale is actually consulted is while a component
+  is written, and a mount at `to-spec` is not present then.
+
+Consequences: the mount is an optional manifest field, and the loader validates
+a declared target against the steps of *every* declared development loop rather
+than any one of them. Adding a second loop that lacks a mounted step therefore
+fails at manifest load, in front of the maintainer adding the loop, instead of
+silently producing an Enhancement with no guidance in front of a user. That
+strictness is the price of not needing the graceful degradation this ADR
+rejected optional loops to avoid.
