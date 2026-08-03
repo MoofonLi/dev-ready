@@ -124,6 +124,24 @@ single-select when the manifest offers more than one loop. The two paths differ
 only in their starting selection, not in the questions asked. Agent Target
 selection and the pre-write confirmation summary are unchanged.
 
+**Prompt default state.** The multi-select prompt currently pre-selects every
+choice, and the asker protocol offers no way to say otherwise, so "shown the
+Categories with nothing pre-selected" is not expressible today. Without this,
+removing the Enhancement confirmation would produce the opposite of its
+purpose: a user pressing Enter would receive the entire catalog rather than the
+lean default. The protocol therefore gains an explicit initial-state parameter
+on its multi-select operation, with **no default value**, so every call site
+must state which behaviour it wants. Category and item selection ask for
+nothing pre-selected. Agent Target selection keeps everything pre-selected,
+which is right while the map is small and becomes a decision to revisit when
+FR-33 enlarges it — the parameter is what makes that decision visible rather
+than inherited.
+
+This also corrects a defect the shipped custom path already has: declining the
+Default Set and pressing Enter throughout currently yields every Category and
+every item, so the fastest route through the tool still produces the heaviest
+project — the outcome FR-31 retired the catalog cap to prevent.
+
 **Selection model.** The boolean recording documentation inclusion is deleted
 from the canonical selection type. Inclusion of the documentation grouping is
 derived from whether any of its items are selected, matching how the skills and
