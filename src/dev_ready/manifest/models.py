@@ -86,6 +86,7 @@ class CatalogItem:
     mode: str
     license: str
     category: str = ""
+    mount: str | None = None
     kind: str = "enhancement"
     steps: tuple[str, ...] = ()
     paths: tuple[ItemPath, ...] = ()

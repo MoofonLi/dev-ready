@@ -186,6 +186,84 @@ def test_second_development_loop_is_valid_manifest_data() -> None:
     assert manifest.default_set.development_loop == "sample-skill"
 
 
+def test_enhancement_mount_is_parsed_as_a_development_loop_step() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["mcp"]["items"][0]["mount"] = "sample-step"
+
+    item = parse_manifest(json.dumps(data)).components["mcp"][0]
+
+    assert item.mount == "sample-step"
+
+
+@pytest.mark.parametrize("mount", [None, "", 42])
+def test_declared_mount_must_be_a_non_empty_string(mount: object) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["mcp"]["items"][0]["mount"] = mount
+
+    with pytest.raises(ManifestError, match="item 'mcp-config'.*mount.*non-empty string"):
+        parse_manifest(json.dumps(data))
+
+
+def test_mount_must_name_a_step_of_the_development_loop() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["mcp"]["items"][0]["mount"] = "unknown-step"
+
+    with pytest.raises(ManifestError, match="mount 'unknown-step'.*every development loop"):
+        parse_manifest(json.dumps(data))
+
+
+def test_mount_must_name_a_step_shared_by_every_development_loop() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["mcp"]["items"][0]["mount"] = "sample-step"
+    alternate = json.loads(json.dumps(data["components"]["skills"]["items"][0]))
+    alternate["id"] = "alternate-loop"
+    alternate["steps"] = ["alternate-step"]
+    alternate["paths"][0]["dest"] = ".agents/skills/alternate-loop"
+    data["components"]["skills"]["items"].append(alternate)
+
+    with pytest.raises(ManifestError, match="mount 'sample-step'.*every development loop"):
+        parse_manifest(json.dumps(data))
+
+
+def test_development_loop_cannot_declare_a_mount() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["mount"] = "sample-step"
+
+    with pytest.raises(ManifestError, match="development loop 'sample-skill'.*mount"):
+        parse_manifest(json.dumps(data))
+
+
+def test_mounted_enhancement_must_declare_one_content_path() -> None:
+    data = json.loads(json.dumps(VALID))
+    item = data["components"]["mcp"]["items"][0]
+    item["mount"] = "sample-step"
+    item["mode"] = "pinned-dependency"
+    item["pin"] = "1.2.3"
+    item.pop("paths")
+    item["inject"] = {
+        "kind": "mcp-server",
+        "target": ".mcp.json",
+        "server_name": "sample",
+        "command": "uvx",
+        "package": "sample-package",
+    }
+
+    with pytest.raises(ManifestError, match="item 'mcp-config'.*mount.*exactly one path"):
+        parse_manifest(json.dumps(data))
+
+
+def test_mounted_enhancement_cannot_declare_two_content_paths() -> None:
+    data = json.loads(json.dumps(VALID))
+    item = data["components"]["mcp"]["items"][0]
+    item["mount"] = "sample-step"
+    item["paths"].append(
+        {"src": "mcp/other.json", "dest": ".config/other.json"}
+    )
+
+    with pytest.raises(ManifestError, match="item 'mcp-config'.*mount.*exactly one path"):
+        parse_manifest(json.dumps(data))
+
+
 @pytest.mark.parametrize(
     "retired_id",
     ["spec-loop", "tdd", "diagnosing-bugs", "code-review", "setup-all"],
@@ -281,6 +359,21 @@ def test_default_manifest_declares_category_assignments() -> None:
     assert items["frontend-design"].category == "design"
     assert items["caveman"].category == "token-optimize"
     assert items["code-memory"].category == "token-optimize"
+
+
+def test_default_manifest_mounts_react_doctor_on_code_review() -> None:
+    items = {
+        item.id: item
+        for component_items in load_default_manifest().components.values()
+        for item in component_items
+    }
+
+    assert items["react-doctor"].mount == "code-review"
+    assert all(
+        item.mount is None
+        for item_id, item in items.items()
+        if item_id != "react-doctor"
+    )
 
 
 @pytest.mark.parametrize("field", ["skills_dir", "rules_file", "mcp_file"])

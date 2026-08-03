@@ -187,6 +187,7 @@
         {
           "id": "react-doctor",
           "category": "quality",
+          "mount": "code-review",
           "description": "Wrapper skill teaching the agent when to run react-doctor on the frontend and how to act on its findings.",
           "mode": "pinned-dependency",
           "license": "MIT",

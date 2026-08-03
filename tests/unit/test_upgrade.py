@@ -3,6 +3,7 @@
 import hashlib
 import json
 import shutil
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -12,8 +13,8 @@ import dev_ready.overlay.stamp_rendering as stamp_rendering_module
 from dev_ready.cli import main
 from dev_ready.errors import StampInvalidError, UpgradeError, UpgradeNotSupportedError
 from dev_ready.inspection import REQUIRED_UPSTREAM_PATHS
-from dev_ready.manifest import load_default_manifest
-from dev_ready.overlay import apply_overlay
+from dev_ready.manifest import ComponentCatalog, load_default_manifest
+from dev_ready.overlay import apply_overlay, build_overlay_content
 from dev_ready.prompts import Answers, ProjectSelection
 from dev_ready.stamp import load_stamp
 from dev_ready.upgrade import upgrade_project
@@ -84,6 +85,27 @@ def _make_project(tmp_path: Path, *, code_memory: bool = False) -> Path:
                 skills=frozenset({"caveman"}),
                 mcp=mcp_items,
                 docs_items=frozenset(),
+        ),
+    )
+    apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
+    return project
+
+
+def _make_mounted_project(tmp_path: Path) -> Path:
+    project = tmp_path / "project"
+    (project / "frontend").mkdir(parents=True)
+    (project / "frontend" / "package.json").write_text(
+        json.dumps({"scripts": {}, "devDependencies": {}}),
+        encoding="utf-8",
+    )
+    answers = Answers(
+        project_name="upgrade-app",
+        target_dir=project,
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            skills=frozenset({"react-doctor"}),
+            mcp=frozenset(),
+            docs_items=frozenset(),
         ),
     )
     apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
@@ -680,6 +702,80 @@ def test_modified_obsolete_managed_file_is_preserved_and_reported(tmp_path: Path
     ) in report
     assert "Divergence (1):" in report
     assert "remove it manually" in report
+
+
+def test_upgrade_reports_no_change_for_an_untouched_mounted_skill(
+    tmp_path: Path,
+) -> None:
+    project = _make_mounted_project(tmp_path)
+    mounted_path = ".agents/skills/code-review/SKILL.md"
+
+    report = upgrade_project(project)
+
+    assert mounted_path not in report
+    assert "No changes were needed." in report
+
+
+def test_upgrade_preserves_an_edited_mounted_skill_and_reports_divergence(
+    tmp_path: Path,
+) -> None:
+    project = _make_mounted_project(tmp_path)
+    mounted_path = ".agents/skills/code-review/SKILL.md"
+    mounted_skill = project / mounted_path
+    edited = mounted_skill.read_bytes() + b"\nUser edit.\n"
+    mounted_skill.write_bytes(edited)
+
+    report = upgrade_project(project)
+
+    assert mounted_skill.read_bytes() == edited
+    assert "Skipped (user-modified) (1):" in report
+    assert mounted_path in report
+    assert "Divergence (1):" in report
+    assert (
+        f"{mounted_path}: preserved; mounted guidance was not updated because "
+        "the file is user-modified"
+    ) in report
+
+
+def test_upgrade_adds_mount_block_to_an_untouched_pre_mount_skill(
+    tmp_path: Path,
+) -> None:
+    project = _make_mounted_project(tmp_path)
+    mounted_path = ".agents/skills/code-review/SKILL.md"
+    mounted_skill = project / mounted_path
+    pre_mount_catalog = ComponentCatalog(
+        {
+            component: tuple(
+                replace(item, mount=None) if item.id == "react-doctor" else item
+                for item in items
+            )
+            for component, items in CATALOG.items()
+        },
+        CATALOG.agent_targets,
+        CATALOG.categories,
+        CATALOG.default_set,
+    )
+    previous_answers = Answers(
+        project_name="upgrade-app",
+        target_dir=project,
+        selection=ProjectSelection.from_items(
+            pre_mount_catalog,
+            skills=frozenset({"react-doctor"}),
+            agent_targets=frozenset(),
+        ),
+    )
+    previous_bytes = build_overlay_content(
+        previous_answers, pre_mount_catalog
+    )[mounted_path]
+    mounted_skill.write_bytes(previous_bytes)
+    _set_inventory_hash(project, mounted_path, previous_bytes)
+
+    report = upgrade_project(project)
+
+    assert mounted_path in report
+    assert "<!-- dev-ready:mounted-enhancements:start -->" in mounted_skill.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_modified_retired_project_orientation_skill_is_preserved_and_reported(

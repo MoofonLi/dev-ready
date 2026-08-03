@@ -3,7 +3,9 @@
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
+from dev_ready.agent_targets import CANONICAL_SKILLS_ROOT
 from dev_ready.errors import OverlayError
+from dev_ready.manifest import CATALOG_COMPONENTS, CatalogItem, ComponentCatalog
 from dev_ready.prompts import Answers
 
 TEMPLATE_SUFFIX = ".tmpl"
@@ -74,3 +76,49 @@ def render_asset(
     except OSError as error:
         raise OverlayError(f"failed to read overlay asset for {dest_rel}: {error}") from error
     return result
+
+
+def inject_mounted_enhancements(
+    content: dict[str, bytes], answers: Answers, catalog: ComponentCatalog
+) -> None:
+    """Append selected Enhancement guidance to its mounted loop skill."""
+    mounted = mounted_enhancements(answers, catalog)
+    for mounted_path, items in mounted.items():
+        if mounted_path not in content:
+            raise OverlayError(
+                f"mounted development-loop skill is missing: {mounted_path}"
+            )
+        entries = "\n".join(
+            f"- **{item.id}** â€” {item.description} See `{item.paths[0].dest}`."
+            for item in items
+        )
+        block = (
+            "<!-- dev-ready:mounted-enhancements:start -->\n"
+            "## Mounted enhancements\n\n"
+            "When running this skill, also apply the enhancements selected for this project.\n\n"
+            f"{entries}\n"
+            "<!-- dev-ready:mounted-enhancements:end -->\n"
+        ).encode("utf-8")
+        content[mounted_path] = content[mounted_path].rstrip(b"\r\n") + b"\n\n" + block
+
+
+def mounted_enhancements(
+    answers: Answers, catalog: ComponentCatalog
+) -> dict[str, tuple[CatalogItem, ...]]:
+    """Group selected mounted Enhancements by canonical loop-skill path."""
+    mounted_items = tuple(
+        item
+        for component in CATALOG_COMPONENTS
+        for item in catalog.get(component, ())
+        if item.mount is not None and item.id in answers.items(component)
+    )
+    return {
+        Path(*CANONICAL_SKILLS_ROOT, mount, "SKILL.md").as_posix(): tuple(
+            item
+            for item in sorted(mounted_items, key=lambda candidate: candidate.id)
+            if item.mount == mount
+        )
+        for mount in sorted(
+            {item.mount for item in mounted_items if item.mount is not None}
+        )
+    }

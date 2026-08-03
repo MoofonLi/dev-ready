@@ -17,6 +17,7 @@ from dev_ready.errors import OverlayError
 from dev_ready.manifest import CATALOG_COMPONENTS, ComponentCatalog, UpstreamPin, VendoredPin
 from dev_ready.overlay.infrastructure import documentation_scaffold_paths
 from dev_ready.overlay.rendering import TEMPLATE_SUFFIX as _TEMPLATE_SUFFIX
+from dev_ready.overlay.rendering import inject_mounted_enhancements as _inject_mounts
 from dev_ready.overlay.rendering import render_asset as _render_asset
 from dev_ready.overlay.stamp_rendering import render_stamp
 from dev_ready.prompts import Answers
@@ -27,7 +28,7 @@ __all__ = ["apply_overlay", "build_overlay_content", "content_inventory", "rende
 def build_overlay_content(
     answers: Answers, catalog: ComponentCatalog
 ) -> dict[str, bytes]:
-    """Return every whole-file overlay write, rendered but not injected or written.
+    """Return every whole-file overlay write, fully rendered but not written.
 
     Keys are POSIX-relative project paths and preserve generation's historical
     write order.  Reading package resources is necessary; this function never
@@ -78,6 +79,8 @@ def build_overlay_content(
                         templates_root.joinpath(*item_path.src.split("/")),
                         Path(item_path.dest),
                     )
+
+    _inject_mounts(content, answers, catalog)
 
     canonical_root = Path(*CANONICAL_SKILLS_ROOT)
     canonical_skill_files = {

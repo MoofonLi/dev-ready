@@ -144,6 +144,23 @@ def _validate_development_loops(
             f"{source}: catalog item {duplicated_steps[0]!r} duplicates development "
             f"loop step {duplicated_steps[0]!r}"
         )
+    for item in items:
+        if item.kind == "development-loop" and item.mount is not None:
+            raise ManifestError(
+                f"{source}: development loop {item.id!r} cannot declare a mount"
+            )
+        if item.mount is not None and len(item.paths) != 1:
+            raise ManifestError(
+                f"{source}: catalog item {item.id!r} declaring a mount must have "
+                "exactly one path"
+            )
+        if item.mount is not None and not all(
+            item.mount in loop.steps for loop in loops
+        ):
+            raise ManifestError(
+                f"{source}: catalog item {item.id!r} mount {item.mount!r} must name "
+                "a step of every development loop"
+            )
     return tuple(item.id for item in loops)
 
 
@@ -547,6 +564,14 @@ def _parse_components(
                 category=category,
                 source=source,
             )
+            mount = item_entry.get("mount")
+            if "mount" in item_entry and (
+                not isinstance(mount, str) or not mount
+            ):
+                raise ManifestError(
+                    f"{source}: component '{comp_name}' item '{item_id}' field "
+                    "'mount' must be a non-empty string"
+                )
 
             desc = item_entry.get("description")
             if not isinstance(desc, str) or not desc:
@@ -637,6 +662,7 @@ def _parse_components(
                 CatalogItem(
                     id=item_id,
                     category=category,
+                    mount=mount if isinstance(mount, str) else None,
                     kind=kind,
                     steps=steps,
                     description=desc,

@@ -11,6 +11,7 @@ from dev_ready.catalog_effects import classify_shared_targets
 from dev_ready.errors import StampInvalidError, UpgradeError, UpgradeNotSupportedError
 from dev_ready.manifest import load_default_manifest
 from dev_ready.overlay import build_overlay_content, content_inventory, render_stamp
+from dev_ready.overlay.rendering import mounted_enhancements
 from dev_ready.prompts import Answers
 from dev_ready.recorded import RecordedProject
 from dev_ready.stamp import load_stamp
@@ -153,6 +154,7 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         selection=recorded_project.selection,
     )
     new_content = build_overlay_content(answers, manifest.components)
+    mounted_skill_paths = mounted_enhancements(answers, manifest.components).keys()
     # An MCP effect's manifest-declared target is never where it actually lands:
     # the projection retargets it onto each Agent Target's own MCP file.
     declared_targets = project_targets(
@@ -206,7 +208,12 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
             current = target.read_bytes()
             if hashlib.sha256(current).hexdigest() != recorded[path]:
                 groups["skipped_modified"].append(path)
-                if stamp.stamp_version < 4 and path.startswith(".claude/skills/"):
+                if path in mounted_skill_paths:
+                    groups["divergence"].append(
+                        f"{path}: preserved; mounted guidance was not updated because "
+                        "the file is user-modified"
+                    )
+                elif stamp.stamp_version < 4 and path.startswith(".claude/skills/"):
                     canonical_path = path.removeprefix(".claude/")
                     groups["divergence"].append(
                         f"{path}: preserved; canonical content was added at "
