@@ -1,6 +1,6 @@
 # FR-38 — Secret Hygiene and Credential Disclosure
 
-Status: Draft (2026-08-04)
+Status: Accepted by Moofon (2026-08-04)
 
 Version: v0.10
 
@@ -167,11 +167,22 @@ Both are written rather than relying on `.env*` alone: the bare `.env` line is
 the one a human scanning the file looks for. Nothing else is added — this is a
 correction, not an opinion about what a FastAPI project should ignore.
 
-**Divergence from upstream is detected by the existing bump machinery, not by a
-new guard.** dev-ready now owns a file upstream also maintains, so an upstream
-addition no longer arrives automatically. The weekly upstream-bump job already
-regenerates a project against the candidate pin; the pinned upstream file's
-content is compared there. No new CI job and no new manifest section.
+**Divergence from upstream is detected by comparing against the pinned source,
+not inside project verification.** dev-ready now owns a file upstream also
+maintains, so an upstream addition no longer arrives automatically. An earlier
+draft of this spec said the weekly bump job's regeneration would catch it; that
+is wrong, and the reason is worth stating so it is not re-proposed. Pruning is
+applied as a Copier exclude at fetch time, so the upstream file is never
+generated at all — it is absent from the generated project, and there is
+nothing there to compare against. The check therefore resolves the pinned
+commit from the manifest, reads upstream's file at that commit, and compares it
+against the upstream-derived portion of dev-ready's replacement, failing the
+bump PR on any difference. dev-ready's own added entries are excluded from the
+comparison by construction. This is the existing vendored-drift mechanism
+applied to one more piece of content: network-marked, running in the job the
+other real-repository checks already run in, with the comparison logic unit
+tested offline against a fixture. No new manifest section and no new runtime
+dependency.
 
 **Credential disclosure is constant text in two renderers.** The report renderer
 is a pure function of its arguments and stays one — the disclosure is a literal,
@@ -261,6 +272,11 @@ untouched one is replaced; an edited one is preserved and reported as divergent.
 generation job**, which already generates against the true pin and verifies the
 result. No unit test asserts the presence of a file that only a real Copier run
 produces.
+
+**The upstream-divergence comparison is unit tested offline against a fixture**,
+including a fixture where upstream's file has gained an entry and one where it
+is missing entirely; the test that reaches the real repository is network-marked
+and deselected by default, like every other check that resolves a pinned commit.
 
 Unit tests use `tmp_path`, touch no filesystem outside it, and make no network
 calls. The cross-release upgrade gate stays network-marked.
