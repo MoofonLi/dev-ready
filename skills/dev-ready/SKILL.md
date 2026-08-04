@@ -55,7 +55,7 @@ Current design item ids: `frontend-design`, `design-stripe`, `design-linear`.
 
 Current token-optimize item ids: `caveman`, `code-memory`.
 
-Current Agent Target ids: `claude`, `windsurf`.
+Current Agent Target ids: `adal`, `aider-desk`, `astrbot`, `augment`, `autohand-code`, `bob`, `claude`, `codearts-agent`, `codebuddy`, `codemaker`, `codestudio`, `command-code`, `continue`, `cortex`, `crush`, `devin`, `droid`, `eve`, `forgecode`, `goose`, `grok`, `hermes-agent`, `iflow-cli`, `inference-sh`, `jazz`, `junie`, `kilo`, `kimchi`, `kiro-cli`, `kode`, `lingma`, `mcpjam`, `minimax-code`, `mistral-vibe`, `moxby`, `mux`, `neovate`, `ona`, `openclaw`, `openhands`, `pi`, `pochi`, `qoder`, `qoder-cn`, `qwen-code`, `reasonix`, `roo`, `rovodev`, `tabnine-cli`, `terramind`, `tinycloud`, `trae`, `trae-cn`, `windsurf`, `zcode`, `zencoder`, `zenflow`.
 
 Every generated project resolves `spec-loop`; `--categories none` and
 `--dev none` decline Enhancements without removing it. The former selectable

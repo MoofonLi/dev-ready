@@ -118,3 +118,12 @@ def test_a_stamp_with_no_removals_reports_none() -> None:
     recorded = RecordedProject.observed(_stamp(version=5), MANIFEST)
 
     assert recorded.removed_agent_targets == ()
+
+
+def test_the_two_v08_agent_target_identifiers_reconstruct_without_removal() -> None:
+    recorded = RecordedProject.observed(
+        _stamp(version=5, agent_targets=("claude", "windsurf")), MANIFEST
+    )
+
+    assert recorded.selection.agent_targets == frozenset({"claude", "windsurf"})
+    assert recorded.removed_agent_targets == ()

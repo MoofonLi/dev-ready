@@ -85,6 +85,7 @@ def _make_project(tmp_path: Path, *, code_memory: bool = False) -> Path:
                 skills=frozenset({"caveman"}),
                 mcp=mcp_items,
                 docs_items=frozenset(),
+                agent_targets=frozenset({"claude", "windsurf"}),
         ),
     )
     apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
@@ -106,6 +107,7 @@ def _make_mounted_project(tmp_path: Path) -> Path:
             skills=frozenset({"react-doctor"}),
             mcp=frozenset(),
             docs_items=frozenset(),
+            agent_targets=frozenset({"claude", "windsurf"}),
         ),
     )
     apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)

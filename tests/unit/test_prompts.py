@@ -7,8 +7,15 @@ from pathlib import Path
 import pytest
 
 import dev_ready.prompts.collect as collect_module
+import dev_ready.prompts._questionary_asker as questionary_asker_module
 from dev_ready.errors import AbortedError, InvalidArgumentsError
-from dev_ready.manifest import ComponentCatalog, ItemPath, UpstreamPin, load_default_manifest
+from dev_ready.manifest import (
+    AgentTarget,
+    ComponentCatalog,
+    ItemPath,
+    UpstreamPin,
+    load_default_manifest,
+)
 from dev_ready.prompts import (
     Answers,
     PartialAnswers,
@@ -24,10 +31,21 @@ PIN = UpstreamPin(
     license="MIT",
 )
 CATALOG = load_default_manifest().components
+
+
+def _agent_target_label(target: AgentTarget) -> str:
+    paths = [f"skills {target.skills_dir}"]
+    if target.rules_file is not None:
+        paths.append(f"rules {target.rules_file}")
+    if target.mcp_file is not None:
+        paths.append(f"MCP {target.mcp_file}")
+    return f"{target.id}: {'; '.join(paths)}"
+
+
 ALL_AGENT_LABELS = [
-    "claude: Claude Code native project configuration.",
-    "windsurf: Windsurf native project skill discovery.",
+    _agent_target_label(target) for target in CATALOG.agent_targets.values()
 ]
+CLAUDE_AGENT_LABELS = [_agent_target_label(CATALOG.agent_targets["claude"])]
 ALL_CATEGORY_LABELS = [
     f"{category.id}: {category.description}"
     for category in CATALOG.categories.values()
@@ -223,7 +241,7 @@ def test_name_prompt_result_lands_in_answers() -> None:
 
 
 def test_interactive_defaults_produce_default_set_without_enhancement_selection() -> None:
-    asker = FakeAsker(confirms=[True], checkboxes=[[], [], ALL_AGENT_LABELS])
+    asker = FakeAsker(confirms=[True], checkboxes=[[], [], CLAUDE_AGENT_LABELS])
 
     answers = collect_answers(
         _partial(selection_explicit=False), catalog=CATALOG, asker=asker
@@ -237,12 +255,26 @@ def test_interactive_defaults_produce_default_set_without_enhancement_selection(
     assert asker.confirm_calls == [
         "Use the Default Set (development loop: spec-loop)?",
     ]
-    assert asker.checkbox_calls == [
-        "Select Categories to include:",
-        "Select items within the chosen Categories:",
-        "Select Agent Targets:",
-    ]
-    assert asker.checkbox_initially_selected == [[], [], ALL_AGENT_LABELS]
+    assert asker.checkbox_calls[0] == "Select Categories to include:"
+    assert asker.checkbox_calls[1] == "Select items within the chosen Categories:"
+    assert asker.checkbox_calls[2].startswith(
+        "Select Agent Targets (standard-compliant agents read .agents/skills/ directly"
+    )
+    assert "cursor" in asker.checkbox_calls[2]
+    assert answers.agent_targets == frozenset({"claude"})
+    assert answers.selection == ProjectSelection.default_set(CATALOG)
+    assert asker.checkbox_initially_selected == [[], [], CLAUDE_AGENT_LABELS]
+
+
+def test_interactive_custom_branch_preselects_the_same_agent_as_default_set() -> None:
+    asker = FakeAsker(confirms=[False], checkboxes=[[], [], CLAUDE_AGENT_LABELS])
+
+    answers = collect_answers(
+        _partial(selection_explicit=False), catalog=CATALOG, asker=asker
+    )
+
+    assert answers.agent_targets == ProjectSelection.default_set(CATALOG).agent_targets
+    assert asker.checkbox_initially_selected[-1] == CLAUDE_AGENT_LABELS
 
 
 def test_interactive_default_set_can_add_one_enhancement() -> None:
@@ -336,7 +368,7 @@ def test_empty_category_selection_produces_no_catalog_content() -> None:
     assert answers.include_docs is False
     assert answers.selection.development_loop == "spec-loop"
     assert answers.selection.categories == frozenset({"dev"})
-    assert asker.checkbox_initially_selected == [[], [], ALL_AGENT_LABELS]
+    assert asker.checkbox_initially_selected == [[], [], CLAUDE_AGENT_LABELS]
 
 
 def test_interactive_agent_targets_remain_last_and_are_resolved() -> None:
@@ -345,7 +377,7 @@ def test_interactive_agent_targets_remain_last_and_are_resolved() -> None:
         checkboxes=[
             _category_labels("design"),
             _item_labels("frontend-design"),
-            ["windsurf: Windsurf native project skill discovery."],
+            ["windsurf: skills .windsurf/skills"],
         ]
     )
 
@@ -354,8 +386,34 @@ def test_interactive_agent_targets_remain_last_and_are_resolved() -> None:
     )
 
     assert answers.agent_targets == frozenset({"windsurf"})
-    assert asker.checkbox_calls[-1] == "Select Agent Targets:"
+    assert asker.checkbox_calls[-1].startswith(
+        "Select Agent Targets (standard-compliant agents read .agents/skills/ directly"
+    )
     assert asker.checkbox_choices[-1] == ALL_AGENT_LABELS
+
+
+def test_questionary_checkboxes_enable_type_to_filter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _Question:
+        def ask(self) -> list[str]:
+            return []
+
+    def _checkbox(message: str, choices: list[object], **kwargs: object) -> _Question:
+        captured.update(message=message, choices=choices, **kwargs)
+        return _Question()
+
+    monkeypatch.setattr(questionary_asker_module.questionary, "checkbox", _checkbox)
+
+    questionary_asker_module.QuestionaryAsker().checkbox(
+        "Select choices:",
+        ["alpha", "beta"],
+        initially_selected=["alpha"],
+    )
+
+    assert captured["use_search_filter"] is True
 
 
 def test_category_item_selection_can_be_narrowed_to_one_item() -> None:
@@ -471,11 +529,12 @@ def test_interactive_and_flag_paths_produce_identical_answers(tmp_path: Path) ->
     flag_answers = Answers(
         project_name="my-app",
         target_dir=target_dir,
-        selection=ProjectSelection.from_items(
-            CATALOG,
-            mcp=frozenset({"code-memory"}),
-            categories=frozenset({"token-optimize"}),
-        ),
+            selection=ProjectSelection.from_items(
+                CATALOG,
+                mcp=frozenset({"code-memory"}),
+                categories=frozenset({"token-optimize"}),
+                agent_targets=frozenset({"claude"}),
+            ),
         assume_yes=False,
     )
 
@@ -483,9 +542,9 @@ def test_interactive_and_flag_paths_produce_identical_answers(tmp_path: Path) ->
         texts=["my-app"],
         confirms=[False],
         checkboxes=[
-            _category_labels("token-optimize"),
-            _item_labels("code-memory"),
-            ALL_AGENT_LABELS,
+                _category_labels("token-optimize"),
+                _item_labels("code-memory"),
+                CLAUDE_AGENT_LABELS,
         ],
     )
     prompt_answers = collect_answers(
@@ -527,7 +586,7 @@ def test_design_skill_only_is_identical_through_flags_and_prompts(tmp_path: Path
             checkboxes=[
                 _category_labels("design"),
                 _item_labels("frontend-design"),
-                ALL_AGENT_LABELS,
+                CLAUDE_AGENT_LABELS,
             ]
         ),
     )

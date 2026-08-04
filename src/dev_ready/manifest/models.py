@@ -101,7 +101,7 @@ class AgentTarget:
     """One native Agent Target layout declared by the manifest."""
 
     id: str
-    description: str
+    description: str | None
     skills_dir: str
     rules_file: str | None
     mcp_file: str | None
@@ -121,11 +121,13 @@ class ComponentCatalog(dict[str, tuple[CatalogItem, ...]]):
         agent_targets: Mapping[str, AgentTarget],
         categories: Mapping[str, Category] | None = None,
         default_set: DefaultSet | None = None,
+        standard_compliant_agents: Iterable[str] = (),
     ) -> None:
         super().__init__(components)
         self.agent_targets = dict(agent_targets)
         self.categories = dict(categories or {})
         self.default_set = default_set
+        self.standard_compliant_agents = tuple(standard_compliant_agents)
         loops = tuple(
             item for item in self.all_items() if item.kind == "development-loop"
         )
@@ -191,4 +193,5 @@ class Manifest:
     agent_targets: dict[str, AgentTarget]
     categories: dict[str, Category]
     default_set: DefaultSet
+    standard_compliant_agents: tuple[str, ...]
     vendored: tuple[VendoredPin, ...] = ()

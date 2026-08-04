@@ -88,7 +88,7 @@ def build_overlay_content(
         for path, data in content.items()
         if path.startswith(f"{canonical_root.as_posix()}/") and path.endswith("/SKILL.md")
     }
-    for target in projection.targets:
+    for target in projection.skill_targets:
         for canonical_path, canonical_bytes in canonical_skill_files.items():
             relative = Path(canonical_path).relative_to(canonical_root)
             if len(relative.parts) != 2 or relative.name != "SKILL.md":

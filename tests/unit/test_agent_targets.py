@@ -32,6 +32,13 @@ _BETA = AgentTarget(
     rules_file=None,
     mcp_file=None,
 )
+_GAMMA = AgentTarget(
+    id="gamma",
+    description="Target sharing Alpha's skill directory.",
+    skills_dir=".alpha/skills",
+    rules_file="GAMMA.md",
+    mcp_file=None,
+)
 
 
 def _catalog(*, mcp_items: tuple[CatalogItem, ...] = ()) -> ComponentCatalog:
@@ -68,11 +75,11 @@ def _mcp_item(item_id: str = "code-memory") -> CatalogItem:
 def test_projection_keeps_catalog_order_and_drops_unselected_targets() -> None:
     projection = project_targets(_catalog(), {"beta"})
 
-    assert [target.id for target in projection.targets] == ["beta"]
-    assert [target.id for target in project_targets(_catalog(), {"beta", "alpha"}).targets] == [
-        "alpha",
-        "beta",
-    ]
+    assert [target.id for target in projection.skill_targets] == ["beta"]
+    assert [
+        target.id
+        for target in project_targets(_catalog(), {"beta", "alpha"}).skill_targets
+    ] == ["alpha", "beta"]
 
 
 def test_projection_omits_targets_that_declare_no_rules_or_mcp_file() -> None:
@@ -115,6 +122,24 @@ def test_stub_path_places_the_pointer_under_the_targets_own_skills_dir() -> None
     )
 
 
+def test_projection_yields_each_shared_skill_destination_once() -> None:
+    catalog = ComponentCatalog(
+        {"skills": (), "mcp": (), "docs": ()},
+        {"alpha": _ALPHA, "gamma": _GAMMA, "beta": _BETA},
+    )
+
+    projection = project_targets(catalog, {"alpha", "gamma", "beta"})
+    stub_paths = [
+        projection.stub_path(target, "spec-loop") for target in projection.skill_targets
+    ]
+
+    assert stub_paths == [
+        Path(".alpha/skills/spec-loop/SKILL.md"),
+        Path(".beta/skills/spec-loop/SKILL.md"),
+    ]
+    assert projection.rules_files == ("ALPHA.md", "GAMMA.md")
+
+
 def test_canonical_skill_names_reads_only_canonical_skill_destinations() -> None:
     catalog = ComponentCatalog(
         {
@@ -151,10 +176,23 @@ def test_the_real_catalog_projects_a_stub_for_every_canonical_spec_loop_skill() 
     names = canonical_skill_names(CATALOG, {"spec-loop"})
 
     assert "to-spec" in names
-    for target in projection.targets:
+    for target in projection.skill_targets:
         assert projection.stub_path(target, "to-spec").parts[0] != ".agents", (
             "a Pointer Stub must never be written over Canonical Content"
         )
+
+
+def test_newly_derived_targets_project_to_their_native_skill_directories() -> None:
+    projection = project_targets(CATALOG, {"aider-desk", "astrbot", "openclaw"})
+
+    assert {
+        projection.stub_path(target, "to-spec").as_posix()
+        for target in projection.skill_targets
+    } == {
+        ".aider-desk/skills/to-spec/SKILL.md",
+        "data/skills/to-spec/SKILL.md",
+        "skills/to-spec/SKILL.md",
+    }
 
 
 def test_an_empty_projection_answers_every_question_without_targets() -> None:

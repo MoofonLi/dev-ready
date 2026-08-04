@@ -459,6 +459,21 @@ def test_agents_flag_reaches_generation_as_resolved_target_selection(
     assert captured["answers"].agent_targets == frozenset({"windsurf"})
 
 
+def test_yes_without_selection_flags_generates_for_claude_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Answers] = {}
+
+    def _capture(answers: Answers, pin, catalog=None, **kwargs) -> list[Path]:
+        captured["answers"] = answers
+        return []
+
+    monkeypatch.setattr(cli_module, "generate", _capture)
+
+    assert main(["init", "my-app", "--yes", "--dir", str(tmp_path / "out")]) == 0
+    assert captured["answers"].agent_targets == frozenset({"claude"})
+
+
 def test_development_loop_flag_uses_the_structural_selection_axis() -> None:
     args = build_parser().parse_args(
         [
@@ -494,8 +509,27 @@ def test_unknown_agents_flag_fails_before_generation(
     assert called is False
     error = capsys.readouterr().err
     assert "unknown agent target ids" in error
-    assert "claude" in error
-    assert "windsurf" in error
+    assert "valid ids:" not in error
+
+
+def test_init_rejects_standard_compliant_agent_target_id(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    called = False
+
+    def _capture(*args, **kwargs) -> list[Path]:
+        nonlocal called
+        called = True
+        return []
+
+    monkeypatch.setattr(cli_module, "generate", _capture)
+
+    assert main(["init", "my-app", "--yes", "--agents", "cursor"]) == 2
+    assert called is False
+    error = capsys.readouterr().err
+    assert "cursor" in error
+    assert "reads standard '.agents/skills/' directly" in error
+    assert "needs no Agent Target" in error
 
 
 def test_upgrade_parser_accepts_path_and_dry_run() -> None:

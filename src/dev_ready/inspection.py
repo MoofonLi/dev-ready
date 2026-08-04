@@ -205,7 +205,7 @@ def _inspect_agent_target_artifacts(
         catalog,
         selection.skills | frozenset({required_development_loop}),
     )
-    for target in selected.targets:
+    for target in selected.skill_targets:
         expected_paths: list[Path] = []
         if target.rules_file is not None:
             expected_paths.append(Path(target.rules_file))

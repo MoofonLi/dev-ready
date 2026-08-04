@@ -80,11 +80,11 @@ def test_report_states_selected_target_artifacts_and_manual_windsurf_mcp() -> No
 
     report = render_report(answers, PIN, [], CATALOG)
 
-    assert "Claude Code" in report
+    assert "claude:" in report
     assert "CLAUDE.md" in report
     assert ".claude/skills" in report
     assert ".mcp.json" in report
-    assert "Windsurf" in report
+    assert "windsurf:" in report
     assert ".windsurf/skills" in report
     assert "MCP configuration must be set up manually" in report
 
@@ -132,3 +132,18 @@ def test_report_distinguishes_required_loop_from_selected_enhancements() -> None
     assert "development loop (required): spec-loop" in enhanced_report
     assert "documentation skeletons: architecture, requirements" in enhanced_report
     assert "enhancements: security-audit" in enhanced_report
+
+
+def test_report_states_standard_compliant_agents_needing_no_target_selection() -> None:
+    answers = Answers(
+        project_name="my-app",
+        target_dir=Path("/does/not/exist/my-app"),
+        selection=ProjectSelection.default_set(CATALOG),
+    )
+
+    report = render_report(answers, PIN, [], CATALOG)
+
+    assert "standard-compliant agents (read .agents/skills/ directly" in report
+    assert "cursor" in report
+    assert "codex" in report
+

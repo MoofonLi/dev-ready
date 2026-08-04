@@ -177,7 +177,7 @@ def _assert_skill_projection(
     projection = project_targets(catalog, agent_target_ids)
     canonical_skill = root.joinpath(*CANONICAL_SKILLS_ROOT, skill_name, "SKILL.md")
     assert canonical_skill.is_file(), f"{stage} omitted canonical {skill_name} content"
-    for target in projection.targets:
+    for target in projection.skill_targets:
         pointer_stub = root / projection.stub_path(target, skill_name)
         assert pointer_stub.is_file(), (
             f"{stage} omitted the {target.id} {skill_name} Pointer Stub"

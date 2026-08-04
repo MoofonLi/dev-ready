@@ -19,7 +19,7 @@ Generate a new project.
 | `--quality IDS` | string | `all` when Quality is selected | Quality items: `react-doctor`, `webapp-testing`, `all`, or `none` |
 | `--design IDS` | string | `all` when Design is selected | Design items: `frontend-design`, `design-stripe`, `design-linear`, `all`, or `none` |
 | `--token-optimize IDS` | string | `all` when Token Optimize is selected | Token Optimize items: `caveman`, `code-memory`, `all`, or `none` |
-| `--agents IDS` | string | `all` | Agent Target selection: comma-separated identifiers, `all`, or `none` |
+| `--agents IDS` | string | `claude` | Agent Target selection: comma-separated identifiers, `all`, or `none` |
 
 The Category identifiers accepted by `--categories` are `dev`, `security`,
 `quality`, `design`, and `token-optimize`. If `--categories` is omitted while
@@ -169,7 +169,7 @@ construction and dispatch directly to their respective operations.
 3. If the Default Set is declined and the manifest offers multiple development loops, mandatory development-loop single-selection (the Default Set loop is listed first)
 4. Category selection (`dev`, `security`, `quality`, `design`, and `token-optimize`; Dev remains selected because its development loop is mandatory); when the Default Set was accepted, the chosen Enhancements are layered onto it
 5. Enhancement selection across the chosen Categories (Dev currently offers none; the loop is not an optional item)
-6. Agent Target selection (described multi-select, all on by default; plain Enter accepts all targets)
+6. Agent Target selection (described multi-select, Claude Code on by default; plain Enter accepts Claude Code only)
 7. Confirmation summary naming the resolved Categories, Catalog Items, and Agent Targets before writing anything
 
 Steps 2–6 are skipped as a unit if any selection flag (`--development-loop`, `--categories`, any

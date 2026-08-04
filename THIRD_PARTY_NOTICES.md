@@ -9,6 +9,13 @@ dev-ready vendors curated snapshots of third-party open-source components under 
 
 dev-ready does not ship a copy of this template inside the wheel. At generation time (`dev-ready init`), the CLI downloads a snapshot of this repository at the exact commit pinned in `src/dev_ready/manifest.json` (see ADR-002, `docs/architecture.md`) directly onto the end user's machine. The upstream `LICENSE` file is part of that snapshot and arrives inside every generated project unmodified.
 
+## vercel-labs/skills
+
+- License: MIT
+- Pinned Commit: 1164afa5f0e21ebd01e6fc11249759353f494ad1
+- Source: https://github.com/vercel-labs/skills
+- Integration: Agent Target Map and standard-compliant agent identifiers are derived data; no files are copied from this repository.
+
 ## JuliusBrussee/caveman
 
 - License: MIT

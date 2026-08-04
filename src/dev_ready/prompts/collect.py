@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from dev_ready.errors import AbortedError, InvalidArgumentsError
-from dev_ready.manifest import ComponentCatalog, UpstreamPin
+from dev_ready.manifest import AgentTarget, ComponentCatalog, UpstreamPin
 from dev_ready.prompts.answers import Answers, PartialAnswers, ProjectSelection, validate_project_name
 from dev_ready.prompts.asker import Asker
 
@@ -293,18 +293,35 @@ def _prompt_agent_targets(
     targets = catalog.agent_targets
     if not targets:
         return frozenset()
-    labels = {
-        f"{target_id}: {target.description}": target_id
-        for target_id, target in targets.items()
-    }
+    labels = {_agent_target_label(target): target.id for target in targets.values()}
+    message = "Select Agent Targets:"
+    if catalog.standard_compliant_agents:
+        agents_str = ", ".join(sorted(catalog.standard_compliant_agents))
+        message = (
+            f"Select Agent Targets (standard-compliant agents read .agents/skills/ directly "
+            f"— no selection needed: {agents_str}):"
+        )
     try:
         selected = asker.checkbox(
-            "Select Agent Targets:",
+            message,
             tuple(labels),
-            initially_selected=tuple(labels),
+            initially_selected=tuple(
+                label
+                for label, target_id in labels.items()
+                if target_id in ProjectSelection.default_agent_targets(catalog)
+            ),
         )
     except KeyboardInterrupt:
         selected = None
     if selected is None:
         raise AbortedError("Agent Target selection cancelled")
     return frozenset(labels[label] for label in selected)
+
+
+def _agent_target_label(target: AgentTarget) -> str:
+    paths = [f"skills {target.skills_dir}"]
+    if target.rules_file is not None:
+        paths.append(f"rules {target.rules_file}")
+    if target.mcp_file is not None:
+        paths.append(f"MCP {target.mcp_file}")
+    return f"{target.id}: {'; '.join(paths)}"

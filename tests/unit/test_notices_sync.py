@@ -89,6 +89,23 @@ def test_mattpocock_notice_names_the_complete_spec_loop_subset() -> None:
     assert "delimited block" not in notices
 
 
+def test_reference_installer_notice_records_pathless_derived_data() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    notices_path = repo_root / "THIRD_PARTY_NOTICES.md"
+    notices = notices_path.read_text(encoding="utf-8")
+    parsed = check_notices_sync_mod.parse_notices_content(notices)
+
+    assert parsed["vercel-labs/skills"] == {
+        "commit": "1164afa5f0e21ebd01e6fc11249759353f494ad1",
+        "license": "MIT",
+    }
+    assert "derived data" in notices
+    assert "no files are copied" in notices
+    assert check_notices_sync_mod.check_notices_sync(
+        repo_root / "src/dev_ready/manifest.json", notices_path, repo_root
+    ) == []
+
+
 def test_check_notices_sync_success_when_matching(tmp_path: Path) -> None:
     manifest_path = tmp_path / "manifest.json"
     notices_path = tmp_path / "THIRD_PARTY_NOTICES.md"

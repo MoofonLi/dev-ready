@@ -9,6 +9,7 @@ import json
 
 from dev_ready import __version__
 from dev_ready.errors import InvalidArgumentsError, OverlayError
+from dev_ready.inspection import ProjectExpectation, REQUIRED_UPSTREAM_PATHS, inspect_project
 from dev_ready.manifest import AgentTarget, ComponentCatalog, UpstreamPin, load_default_manifest
 from dev_ready.overlay import apply_overlay, build_overlay_content, render_stamp
 from dev_ready.prompts import Answers, ProjectSelection
@@ -32,7 +33,7 @@ def _answers(
     skills_items: frozenset[str] = frozenset({"caveman"}),
     mcp_items: frozenset[str] = frozenset({"code-memory"}),
     docs_items: frozenset[str] = frozenset({"design-stripe", "design-linear"}),
-    agent_targets: frozenset[str] | None = None,
+    agent_targets: frozenset[str] = frozenset({"claude", "windsurf"}),
 ) -> Answers:
     return Answers(
         project_name=project_name,
@@ -113,6 +114,89 @@ def test_default_set_tree_contains_structure_and_no_enhancements(tmp_path: Path)
         if path.is_file() and path.suffix in {".md", ".json", ".yaml"}
     )
     assert "setup-matt-pocock-skills" in generated_text
+
+
+def test_shared_agent_target_directory_writes_one_stub_tree_and_inspects_cleanly(
+    tmp_path: Path,
+) -> None:
+    shared_targets = {
+        target_id: AgentTarget(
+            id=target_id,
+            description=f"{target_id} shared target",
+            skills_dir=".shared/skills",
+            rules_file=None,
+            mcp_file=None,
+        )
+        for target_id in ("alpha", "beta")
+    }
+    catalog = ComponentCatalog(CATALOG, shared_targets)
+    selection = ProjectSelection.from_items(
+        catalog,
+        skills=frozenset({"spec-loop"}),
+        agent_targets=frozenset(shared_targets),
+    )
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    for relative in REQUIRED_UPSTREAM_PATHS:
+        path = project_dir / relative
+        if relative in {"backend", "frontend"}:
+            path.mkdir()
+        else:
+            path.write_text("upstream\n", encoding="utf-8")
+
+    written = apply_overlay(Answers("my-app", project_dir, selection), project_dir, catalog, PIN)
+
+    shared_stubs = list((project_dir / ".shared/skills").glob("*/SKILL.md"))
+    assert len(shared_stubs) == len(
+        tuple(path for path in project_dir.glob(".agents/skills/*/SKILL.md"))
+    )
+    assert inspect_project(
+        project_dir,
+        catalog,
+        ProjectExpectation.generation(selection),
+    ) == ()
+    assert all(not path.is_absolute() for path in written)
+    assert all((project_dir / path).resolve().is_relative_to(project_dir.resolve()) for path in written)
+
+
+def test_overlay_still_rejects_a_genuine_duplicate_destination(tmp_path: Path) -> None:
+    catalog = ComponentCatalog(
+        CATALOG,
+        {
+            "collision": AgentTarget(
+                id="collision",
+                description="Rules collide with overlay infrastructure.",
+                skills_dir=".collision/skills",
+                rules_file="README.md",
+                mcp_file=None,
+            )
+        },
+    )
+    selection = ProjectSelection.from_items(
+        catalog,
+        skills=frozenset({"spec-loop"}),
+        agent_targets=frozenset({"collision"}),
+    )
+
+    with pytest.raises(OverlayError, match="overlay destination collision: README.md"):
+        build_overlay_content(Answers("my-app", tmp_path / "project", selection), catalog)
+
+
+def test_real_shared_directory_pair_generates_one_stub_tree(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    selection = ProjectSelection.from_items(
+        CATALOG,
+        skills=frozenset({"spec-loop"}),
+        agent_targets=frozenset({"qoder", "qoder-cn"}),
+    )
+
+    apply_overlay(Answers("my-app", project_dir, selection), project_dir, CATALOG, PIN)
+
+    canonical = tuple(project_dir.glob(".agents/skills/*/SKILL.md"))
+    shared = tuple(project_dir.glob(".qoder/skills/*/SKILL.md"))
+    assert len(shared) == len(canonical)
+    assert not (project_dir / ".qoder-cn").exists()
 
 
 def test_setup_skill_arrives_through_the_mandatory_development_loop(

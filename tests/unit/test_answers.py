@@ -84,6 +84,18 @@ def test_default_set_is_the_loop_without_selected_documentation_items() -> None:
     assert selection.includes("docs") is False
     assert not hasattr(selection, "docs")
     assert selection.categories == frozenset({"dev"})
+    assert selection.agent_targets == frozenset({"claude"})
+
+
+def test_omitted_agent_target_flag_defaults_to_claude() -> None:
+    selection = ProjectSelection.from_flags(
+        catalog=CATALOG,
+        categories="none",
+        category_items={},
+    )
+
+    assert selection is not None
+    assert selection.agent_targets == frozenset({"claude"})
 
 
 def test_second_loop_is_a_data_addition_with_one_resolved_default() -> None:
@@ -317,7 +329,7 @@ def test_explicit_none_keeps_the_mandatory_loop_dependency_closure() -> None:
     ("raw", "expected"),
     [
         ("claude,windsurf", frozenset({"claude", "windsurf"})),
-        ("all", frozenset({"claude", "windsurf"})),
+        ("all", CATALOG.agent_target_ids),
         ("none", frozenset()),
     ],
 )
@@ -333,7 +345,7 @@ def test_agent_target_flag_selection(raw: str, expected: frozenset[str]) -> None
     assert selection.agent_targets == expected
 
 
-def test_unknown_agent_target_lists_valid_ids() -> None:
+def test_unknown_agent_target_does_not_list_all_valid_ids() -> None:
     with pytest.raises(InvalidArgumentsError) as excinfo:
         ProjectSelection.from_flags(
             catalog=CATALOG,
@@ -344,5 +356,19 @@ def test_unknown_agent_target_lists_valid_ids() -> None:
 
     message = str(excinfo.value)
     assert "unknown agent target ids" in message
-    assert "claude" in message
-    assert "windsurf" in message
+    assert "valid ids:" not in message
+
+
+def test_standard_compliant_agent_target_is_rejected_with_specific_message() -> None:
+    with pytest.raises(InvalidArgumentsError) as excinfo:
+        ProjectSelection.from_flags(
+            catalog=CATALOG,
+            categories=None,
+            category_items={},
+            agents="cursor",
+        )
+
+    message = str(excinfo.value)
+    assert "cursor" in message
+    assert "reads standard '.agents/skills/' directly" in message
+    assert "needs no Agent Target" in message

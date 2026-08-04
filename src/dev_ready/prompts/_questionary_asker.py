@@ -33,6 +33,7 @@ class QuestionaryAsker:
                 )
                 for choice in choices
             ],
+            use_search_filter=True,
         ).ask()
 
     def confirm(self, message: str, *, default: bool = True) -> bool | None:

@@ -13,7 +13,7 @@ Deliberately below `prompts`: callers hand over the selected target ids, not a
 
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -38,20 +38,39 @@ _BASE_MCP_CONFIG = ".mcp.json"
 class TargetProjection:
     """The native surface a set of Agent Targets adds to a generated project."""
 
-    targets: tuple[AgentTarget, ...] = ()
+    selected_targets: tuple[AgentTarget, ...] = ()
+
+    @property
+    def skill_targets(self) -> tuple[AgentTarget, ...]:
+        """One representative target for each native skills destination."""
+        return _unique_targets_by_path(
+            self.selected_targets, lambda target: target.skills_dir
+        )
+
+    @property
+    def mcp_targets(self) -> tuple[AgentTarget, ...]:
+        """One representative target for each declared native MCP destination."""
+        return _unique_targets_by_path(
+            self.selected_targets, lambda target: target.mcp_file
+        )
 
     @property
     def rules_files(self) -> tuple[str, ...]:
         """Native rules-file paths that need a pointer to `AGENTS.md`."""
         return tuple(
-            target.rules_file for target in self.targets if target.rules_file is not None
+            target.rules_file
+            for target in _unique_targets_by_path(
+                self.selected_targets, lambda target: target.rules_file
+            )
+            if target.rules_file is not None
         )
 
     @property
     def mcp_files(self) -> tuple[str, ...]:
         """Native MCP configuration paths, for targets that declare one."""
         return tuple(
-            target.mcp_file for target in self.targets if target.mcp_file is not None
+            target.mcp_file for target in self.mcp_targets
+            if target.mcp_file is not None
         )
 
     def retarget_mcp(
@@ -78,7 +97,7 @@ class TargetProjection:
                     ),
                 ),
             )
-            for target in self.targets
+            for target in self.mcp_targets
             if target.mcp_file is not None
         )
 
@@ -99,6 +118,21 @@ class TargetProjection:
         if not needs_base_config:
             return ()
         return tuple(Path(mcp_file) for mcp_file in self.mcp_files)
+
+
+def _unique_targets_by_path(
+    targets: tuple[AgentTarget, ...],
+    path_for: Callable[[AgentTarget], str | None],
+) -> tuple[AgentTarget, ...]:
+    seen: set[str] = set()
+    unique: list[AgentTarget] = []
+    for target in targets:
+        path = path_for(target)
+        if path is None or path in seen:
+            continue
+        seen.add(path)
+        unique.append(target)
+    return tuple(unique)
 
 
 def project_targets(

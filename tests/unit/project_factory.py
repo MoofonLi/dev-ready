@@ -74,7 +74,7 @@ def materialize_project_structure(
                     entry.effect.apply(root)
 
     skill_names = canonical_skill_names(catalog, selection.skills)
-    for target in projection.targets:
+    for target in projection.skill_targets:
         if target.rules_file is not None:
             rules_file = root / target.rules_file
             rules_file.parent.mkdir(parents=True, exist_ok=True)

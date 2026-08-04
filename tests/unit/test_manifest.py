@@ -328,13 +328,60 @@ def test_default_set_ignores_the_retired_documentation_field() -> None:
 def test_default_manifest_declares_verified_claude_and_windsurf_targets() -> None:
     targets = load_default_manifest().agent_targets
 
-    assert set(targets) == {"claude", "windsurf"}
+    assert {"claude", "windsurf"} <= set(targets)
     assert targets["claude"].skills_dir == ".claude/skills"
     assert targets["claude"].rules_file == "CLAUDE.md"
     assert targets["claude"].mcp_file == ".mcp.json"
     assert targets["windsurf"].skills_dir == ".windsurf/skills"
     assert targets["windsurf"].rules_file is None
     assert targets["windsurf"].mcp_file is None
+    assert all(target.description is None for target in targets.values())
+
+
+def test_default_manifest_declares_the_derived_agent_partition() -> None:
+    manifest = load_default_manifest()
+
+    assert len(manifest.agent_targets) == 57
+    assert len(manifest.standard_compliant_agents) == 19
+    assert manifest.components.standard_compliant_agents == manifest.standard_compliant_agents
+    assert all(
+        target.skills_dir != ".agents/skills"
+        for target in manifest.agent_targets.values()
+    )
+    assert manifest.agent_targets["aider-desk"].skills_dir == ".aider-desk/skills"
+    assert manifest.agent_targets["astrbot"].skills_dir == "data/skills"
+    assert manifest.agent_targets["openclaw"].skills_dir == "skills"
+    assert {"codex", "cursor", "github-copilot", "zed"} <= set(
+        manifest.standard_compliant_agents
+    )
+
+
+def test_reference_installer_provenance_is_pathless() -> None:
+    pin = next(
+        entry
+        for entry in load_default_manifest().vendored
+        if entry.repo == "vercel-labs/skills"
+    )
+
+    assert pin.commit == "1164afa5f0e21ebd01e6fc11249759353f494ad1"
+    assert pin.license == "MIT"
+    assert pin.paths == ()
+
+
+def test_agent_target_description_is_optional_but_skills_directory_is_not() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["agent_targets"]["claude"]["description"] = None
+
+    target = parse_manifest(json.dumps(data)).agent_targets["claude"]
+
+    assert target.description is None
+
+    data["agent_targets"]["claude"].pop("description")
+    assert parse_manifest(json.dumps(data)).agent_targets["claude"].description is None
+
+    data["agent_targets"]["claude"].pop("skills_dir")
+    with pytest.raises(ManifestError, match="agent target 'claude'.*skills_dir"):
+        parse_manifest(json.dumps(data))
 
 
 def test_default_manifest_declares_category_assignments() -> None:

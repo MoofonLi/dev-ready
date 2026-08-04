@@ -82,6 +82,9 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
 
     categories = _parse_categories(data, source)
     agent_targets = _parse_agent_targets(data, source)
+    standard_compliant_agents = _parse_standard_compliant_agents(
+        data, agent_targets, source
+    )
     vendored = _parse_vendored(data, source)
     components = _parse_components(data, source, vendored, categories)
     _validate_non_empty_categories(components, categories, source)
@@ -103,6 +106,7 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
         agent_targets,
         categories,
         default_set,
+        standard_compliant_agents,
     )
     return Manifest(
         manifest_version=version,
@@ -112,6 +116,7 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
         agent_targets=agent_targets,
         categories=categories,
         default_set=default_set,
+        standard_compliant_agents=standard_compliant_agents,
         vendored=vendored,
     )
 
@@ -290,10 +295,12 @@ def _parse_agent_targets(data: dict, source: str) -> dict[str, AgentTarget]:
             raise ManifestError(f"{source}: agent target {target_id!r} must be an object")
 
         description = entry.get("description")
-        if not isinstance(description, str) or not description:
+        if description is not None and (
+            not isinstance(description, str) or not description
+        ):
             raise ManifestError(
                 f"{source}: agent target {target_id!r} field 'description' "
-                "must be a non-empty string"
+                "must be a non-empty string or null"
             )
         skills_dir = _parse_agent_target_path(
             target_id, "skills_dir", entry.get("skills_dir"), source, nullable=False
@@ -313,6 +320,39 @@ def _parse_agent_targets(data: dict, source: str) -> dict[str, AgentTarget]:
             mcp_file=mcp_file,
         )
     return targets
+
+
+def _parse_standard_compliant_agents(
+    data: dict,
+    agent_targets: dict[str, AgentTarget],
+    source: str,
+) -> tuple[str, ...]:
+    raw = data.get("standard_compliant_agents", [])
+    if not isinstance(raw, list):
+        raise ManifestError(
+            f"{source}: 'standard_compliant_agents' must be a list"
+        )
+    agents: list[str] = []
+    for identifier in raw:
+        if (
+            not isinstance(identifier, str)
+            or not _ITEM_ID_PATTERN.fullmatch(identifier)
+        ):
+            raise ManifestError(
+                f"{source}: standard-compliant agent id must match pattern, "
+                f"got {identifier!r}"
+            )
+        if identifier in agents:
+            raise ManifestError(
+                f"{source}: duplicate standard-compliant agent id {identifier!r}"
+            )
+        if identifier in agent_targets:
+            raise ManifestError(
+                f"{source}: agent id {identifier!r} cannot be both an Agent Target "
+                "and standard-compliant"
+            )
+        agents.append(identifier)
+    return tuple(agents)
 
 
 def _parse_agent_target_path(

@@ -15,6 +15,7 @@ from dev_ready.manifest.models import (
 )
 
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+_DEFAULT_AGENT_TARGETS = frozenset({"claude"})
 
 
 def validate_project_name(project_name: str) -> None:
@@ -74,6 +75,11 @@ class ProjectSelection:
         )
 
     @classmethod
+    def default_agent_targets(cls, catalog: ComponentCatalog) -> frozenset[str]:
+        """Return the validated default Agent Target selection."""
+        return _default_agent_targets(catalog.agent_target_ids)
+
+    @classmethod
     def empty(cls) -> ProjectSelection:
         """Return deliberately malformed intent for inspection and lifecycle tests."""
         return cls._create(
@@ -97,6 +103,10 @@ class ProjectSelection:
         agent_targets: frozenset[str] | None = None,
         handoff: bool = False,
     ) -> ProjectSelection:
+        """Build selection intent; ``None`` retains the lifecycle-fixture all-target sentinel.
+
+        Product construction paths must pass their Agent Target intent explicitly.
+        """
         _ = handoff  # Compatibility for internal v0.8 lifecycle fixtures only.
         return cls._from_items(
             catalog,
@@ -116,7 +126,7 @@ class ProjectSelection:
         skills: frozenset[str],
         mcp: frozenset[str],
         docs_items: frozenset[str],
-        agent_targets: frozenset[str] | None = None,
+        agent_targets: frozenset[str],
     ) -> ProjectSelection:
         """Reconstruct existing intent without applying Phase 4 migration policy."""
         return cls._from_items(
@@ -204,7 +214,7 @@ class ProjectSelection:
             skills=loop_skills,
             mcp=selected_by_component["mcp"],
             docs_items=selected_by_component["docs"],
-            agent_targets=catalog.agent_target_ids,
+            agent_targets=cls.default_agent_targets(catalog),
         )
 
     @classmethod
@@ -279,7 +289,7 @@ class ProjectSelection:
             mcp=selected_by_component["mcp"],
             docs_items=selected_by_component["docs"],
             categories=selected_categories,
-            agent_targets=_resolve_agent_targets(agents, catalog.agent_target_ids),
+            agent_targets=_resolve_agent_targets(agents, catalog),
         )
 
     def items(self, name: str) -> frozenset[str]:
@@ -400,21 +410,35 @@ def _resolve_development_loop(
 
 def _resolve_agent_targets(
     raw_value: str | None,
-    valid_ids: frozenset[str],
+    catalog: ComponentCatalog,
 ) -> frozenset[str]:
-    if raw_value is None or raw_value.strip().lower() == "all":
+    valid_ids = catalog.agent_target_ids
+    if raw_value is None:
+        return _default_agent_targets(valid_ids)
+    if raw_value.strip().lower() == "all":
         return valid_ids
     if raw_value.strip().lower() == "none":
         return frozenset()
     requested = frozenset(item.strip() for item in raw_value.split(",") if item.strip())
     if not requested:
         raise InvalidArgumentsError("empty agent target selection for --agents")
+    standard_agents = frozenset(catalog.standard_compliant_agents)
+    for target in sorted(requested):
+        if target in standard_agents:
+            raise InvalidArgumentsError(
+                f"Agent Target {target!r} reads standard '.agents/skills/' directly, "
+                "needs no Agent Target, and is already supported."
+            )
     unknown = sorted(requested - valid_ids)
     if unknown:
         raise InvalidArgumentsError(
-            f"unknown agent target ids: {unknown!r}; valid ids: {sorted(valid_ids)!r}"
+            f"unknown agent target ids: {unknown!r} (run interactively or pass valid targets)"
         )
     return requested
+
+
+def _default_agent_targets(valid_ids: frozenset[str]) -> frozenset[str]:
+    return _DEFAULT_AGENT_TARGETS & valid_ids
 
 
 def _validate_agent_targets(
@@ -422,10 +446,17 @@ def _validate_agent_targets(
     catalog: ComponentCatalog,
 ) -> None:
     valid = catalog.agent_target_ids
+    standard_agents = frozenset(catalog.standard_compliant_agents)
+    for target in sorted(selected):
+        if target in standard_agents:
+            raise InvalidArgumentsError(
+                f"Agent Target {target!r} reads standard '.agents/skills/' directly, "
+                "needs no Agent Target, and is already supported."
+            )
     unknown = sorted(selected - valid)
     if unknown:
         raise InvalidArgumentsError(
-            f"unknown agent target ids: {unknown!r}; valid ids: {sorted(valid)!r}"
+            f"unknown agent target ids: {unknown!r} (run interactively or pass valid targets)"
         )
 
 

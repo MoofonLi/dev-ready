@@ -54,6 +54,17 @@ jobs:
         run: |
           python3 scripts/check_notices_sync.py
 
+  # ADR-019 drift guard. The script is stdlib-only and fetches the pinned
+  # reference installer itself, so this job needs network but no project
+  # environment.
+  agent-target-drift:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run Agent Target Map drift check
+        run: python3 scripts/sync_agent_targets.py --check
+
   # Permanent N-1 -> N lifecycle gate (FR-22 / ADR-014). The test owns all
   # orchestration and assertions; this job only provides network access and
   # invokes it separately from the offline unit suite.

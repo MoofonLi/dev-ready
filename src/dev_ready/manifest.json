@@ -22,17 +22,178 @@
     }
   },
   "agent_targets": {
+    "aider-desk": {
+      "skills_dir": ".aider-desk/skills"
+    },
+    "astrbot": {
+      "skills_dir": "data/skills"
+    },
+    "autohand-code": {
+      "skills_dir": ".autohand/skills"
+    },
+    "augment": {
+      "skills_dir": ".augment/skills"
+    },
+    "bob": {
+      "skills_dir": ".bob/skills"
+    },
     "claude": {
-      "description": "Claude Code native project configuration.",
       "skills_dir": ".claude/skills",
       "rules_file": "CLAUDE.md",
       "mcp_file": ".mcp.json"
     },
+    "openclaw": {
+      "skills_dir": "skills"
+    },
+    "codearts-agent": {
+      "skills_dir": ".codeartsdoer/skills"
+    },
+    "codebuddy": {
+      "skills_dir": ".codebuddy/skills"
+    },
+    "codemaker": {
+      "skills_dir": ".codemaker/skills"
+    },
+    "codestudio": {
+      "skills_dir": ".codestudio/skills"
+    },
+    "command-code": {
+      "skills_dir": ".commandcode/skills"
+    },
+    "continue": {
+      "skills_dir": ".continue/skills"
+    },
+    "cortex": {
+      "skills_dir": ".cortex/skills"
+    },
+    "crush": {
+      "skills_dir": ".crush/skills"
+    },
+    "devin": {
+      "skills_dir": ".devin/skills"
+    },
+    "droid": {
+      "skills_dir": ".factory/skills"
+    },
+    "eve": {
+      "skills_dir": "agent/skills"
+    },
+    "forgecode": {
+      "skills_dir": ".forge/skills"
+    },
+    "goose": {
+      "skills_dir": ".goose/skills"
+    },
+    "grok": {
+      "skills_dir": ".grok/skills"
+    },
+    "hermes-agent": {
+      "skills_dir": ".hermes/skills"
+    },
+    "inference-sh": {
+      "skills_dir": ".inferencesh/skills"
+    },
+    "jazz": {
+      "skills_dir": ".jazz/skills"
+    },
+    "junie": {
+      "skills_dir": ".junie/skills"
+    },
+    "iflow-cli": {
+      "skills_dir": ".iflow/skills"
+    },
+    "kilo": {
+      "skills_dir": ".kilocode/skills"
+    },
+    "kimchi": {
+      "skills_dir": ".kimchi/skills"
+    },
+    "kiro-cli": {
+      "skills_dir": ".kiro/skills"
+    },
+    "kode": {
+      "skills_dir": ".kode/skills"
+    },
+    "lingma": {
+      "skills_dir": ".lingma/skills"
+    },
+    "mcpjam": {
+      "skills_dir": ".mcpjam/skills"
+    },
+    "minimax-code": {
+      "skills_dir": ".minimax/skills"
+    },
+    "mistral-vibe": {
+      "skills_dir": ".vibe/skills"
+    },
+    "moxby": {
+      "skills_dir": ".moxby/skills"
+    },
+    "mux": {
+      "skills_dir": ".mux/skills"
+    },
+    "openhands": {
+      "skills_dir": ".openhands/skills"
+    },
+    "ona": {
+      "skills_dir": ".ona/skills"
+    },
+    "pi": {
+      "skills_dir": ".pi/skills"
+    },
+    "qoder": {
+      "skills_dir": ".qoder/skills"
+    },
+    "qoder-cn": {
+      "skills_dir": ".qoder/skills"
+    },
+    "qwen-code": {
+      "skills_dir": ".qwen/skills"
+    },
+    "reasonix": {
+      "skills_dir": ".reasonix/skills"
+    },
+    "rovodev": {
+      "skills_dir": ".rovodev/skills"
+    },
+    "roo": {
+      "skills_dir": ".roo/skills"
+    },
+    "tabnine-cli": {
+      "skills_dir": ".tabnine/agent/skills"
+    },
+    "terramind": {
+      "skills_dir": ".terramind/skills"
+    },
+    "tinycloud": {
+      "skills_dir": ".tinycloud/skills"
+    },
+    "trae": {
+      "skills_dir": ".trae/skills"
+    },
+    "trae-cn": {
+      "skills_dir": ".trae/skills"
+    },
     "windsurf": {
-      "description": "Windsurf native project skill discovery.",
-      "skills_dir": ".windsurf/skills",
-      "rules_file": null,
-      "mcp_file": null
+      "skills_dir": ".windsurf/skills"
+    },
+    "zcode": {
+      "skills_dir": ".zcode/skills"
+    },
+    "zencoder": {
+      "skills_dir": ".zencoder/skills"
+    },
+    "zenflow": {
+      "skills_dir": ".zencoder/skills"
+    },
+    "neovate": {
+      "skills_dir": ".neovate/skills"
+    },
+    "pochi": {
+      "skills_dir": ".pochi/skills"
+    },
+    "adal": {
+      "skills_dir": ".adal/skills"
     }
   },
   "upstream": {
@@ -73,6 +234,11 @@
     }
   },
   "vendored": [
+    {
+      "repo": "vercel-labs/skills",
+      "commit": "1164afa5f0e21ebd01e6fc11249759353f494ad1",
+      "license": "MIT"
+    },
     {
       "repo": "JuliusBrussee/caveman",
       "commit": "0d95a81d35a9f2d123a5e9430d1cfc43d55f1bb0",
@@ -399,5 +565,26 @@
       ]
     }
   },
-  "overlay_version": "0.1.0"
+  "overlay_version": "0.1.0",
+  "standard_compliant_agents": [
+    "amp",
+    "antigravity",
+    "antigravity-cli",
+    "cline",
+    "codex",
+    "cursor",
+    "deepagents",
+    "dexto",
+    "firebender",
+    "gemini-cli",
+    "github-copilot",
+    "kimi-code-cli",
+    "loaf",
+    "opencode",
+    "replit",
+    "warp",
+    "zed",
+    "promptscript",
+    "universal"
+  ]
 }

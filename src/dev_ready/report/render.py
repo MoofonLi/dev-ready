@@ -65,13 +65,21 @@ def _render_agent_targets(
     answers: Answers,
     catalog: ComponentCatalog | None,
 ) -> list[str]:
+    lines: list[str] = []
+    if catalog is not None and catalog.standard_compliant_agents:
+        agents_str = ", ".join(sorted(catalog.standard_compliant_agents))
+        lines.append(
+            f"standard-compliant agents (read .agents/skills/ directly — no target selection needed): {agents_str}"
+        )
     if not answers.agent_targets:
-        return ["agent targets: (none)"]
+        lines.append("agent targets: (none)")
+        return lines
     if catalog is None:
-        return [f"agent targets: {', '.join(sorted(answers.agent_targets))}"]
+        lines.append(f"agent targets: {', '.join(sorted(answers.agent_targets))}")
+        return lines
     targets = catalog.agent_targets
 
-    lines = ["agent targets:"]
+    lines.append("agent targets:")
     for target_id in sorted(answers.agent_targets):
         target = targets[target_id]
         artifacts: list[str] = []
@@ -82,7 +90,7 @@ def _render_agent_targets(
         if answers.include_mcp and target.mcp_file is not None:
             artifacts.append(f"MCP configuration {target.mcp_file}")
         received = ", ".join(artifacts) if artifacts else "no target-specific files"
-        lines.append(f"  {target.description.rstrip('.')} ({target_id}): {received}")
+        lines.append(f"  {target_id}: {received}")
         if target.mcp_file is None:
             lines.append("    MCP configuration must be set up manually (user-global configuration).")
     return lines
