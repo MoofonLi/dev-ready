@@ -172,6 +172,17 @@ def test_sync_all_empty_vendored_returns_zero(tmp_path: Path) -> None:
     assert count == 0
 
 
+def test_pathless_provenance_entry_does_not_require_sync() -> None:
+    pathless = _pin(
+        "vercel-labs/skills",
+        "1164afa5f0e21ebd01e6fc11249759353f494ad1",
+        "MIT",
+        [],
+    )
+
+    assert sync_vendored.entries_requiring_sync([pathless]) == ()
+
+
 def test_sync_all_rejects_invalid_manifest(tmp_path: Path) -> None:
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text('{"manifest_version": 99}', encoding="utf-8")

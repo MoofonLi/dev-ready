@@ -138,7 +138,7 @@ def sync_all(
         return 0
 
     count = 0
-    for entry in vendored:
+    for entry in entries_requiring_sync(vendored):
         target_dir = clone_base / entry.repo.replace("/", "_")
         print(f"syncing {entry.repo} @ {entry.commit[:12]}...")
         clone_or_fetch(entry.repo, entry.commit, target_dir)
@@ -147,6 +147,13 @@ def sync_all(
         count += 1
 
     return count
+
+
+def entries_requiring_sync(
+    vendored: tuple[VendoredPin, ...] | list[VendoredPin],
+) -> tuple[VendoredPin, ...]:
+    """Return only entries that declare copied snapshot paths."""
+    return tuple(entry for entry in vendored if entry.paths)
 
 
 def _compare_trees(
