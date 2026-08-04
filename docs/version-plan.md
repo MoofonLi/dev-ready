@@ -822,3 +822,115 @@ Recorded here as a roadmap candidate rather than a rejection on merit — the
 architecture-report output is genuinely useful. Reconsidering it needs a
 resolved upstream identity, a pinnable commit carrying a verified license, and
 a launch path that does not write outside the project.
+
+---
+
+## 2026-08-04 amendment — FR-38 into v0.10, v0.11 defined, ADR-022 (CEO-confirmed, Moofon)
+
+Produced by a `grill-with-docs` session run against a project actually generated
+with the released v0.9.0, rather than against the manifest. Everything below was
+found by reading the generated tree. That method is the reason four of these are
+defects rather than features, and it is worth repeating before each release.
+
+### The prune list was wrong about two files
+
+FR-7 has pruned `deploy-production.yml` and `deploy-staging.yml` since v0.2 on
+the stated grounds that they "reference upstream's own servers and secrets."
+Read at the pinned commit, `deploy-production.yml` opens with
+`# Do not deploy in the main repository, only in user projects` and guards
+itself with `if: github.repository_owner != 'fastapi'`. Upstream wrote both
+**for downstream users**; they are the only two of the ten pruned workflows that
+were. The remaining eight — `issue-manager`, `labeler`, `add-to-project`,
+`latest-changes`, `smokeshow`, `detect-conflicts`, `zizmor`,
+`guard-dependencies` — are genuinely upstream's own and stay pruned.
+
+The consequence compounded quietly. dev-ready keeps `deployment.md`, and that
+document spends its Continuous Deployment sections teaching how to use the two
+workflows dev-ready had deleted. The documentation was never stale; the prune
+list was wrong, and the mismatch read as a documentation defect for four
+versions. Both files are restored under FR-38.
+
+This also dissolved a proposal made in the same session for a `to-prod`
+deployment skill. Its strongest justification was repairing that mismatch;
+restoring the workflows repairs it at the source, and `deployment.md`'s 352
+lines already cover the rest — Traefik's public network, secret generation, the
+required environment variables, and the deployment command. A skill would have
+become a second copy of an accurate document, free to drift. Rejected, with the
+`.env.prod` convention it would have introduced: upstream uses a single `.env`,
+so adopting `.env.prod` would be dev-ready inventing a convention it then has to
+own, document, and ignore in git, for no gain over the file that exists.
+
+### FR-38 lands in v0.10, not v0.11
+
+Four defects, all in shipped v0.9.0, detailed at FR-38: `.env` ignored by no
+`.gitignore` while dev-ready itself writes three random secrets into it; nothing
+anywhere naming the superuser login or where its password is; upstream's
+`localhost.tiangolo.com` in every project's CORS allowlist; and the prune-list
+correction above. The first is the one that decides the version: dev-ready
+generates a secret, tells the user nothing, and lets their first `git add .`
+commit it. A version that ships new capability while leaving that in place has
+its priorities backwards, and the v1.0 real-users gate wants exactly the users
+this would burn.
+
+`.gitignore` is repaired by prune-and-replace, the shape FR-7 and FR-8 already
+established for `README.md`. No new mechanism was accepted for it: an injected
+delimited block into upstream's own file was considered and rejected, because
+FR-32's injection operates on files `build_overlay_content` produces and an
+upstream file is not one of them.
+
+### v0.11 is FR-39 and FR-40
+
+**FR-39 `setup-project`** answers a question this repository had already
+answered for itself and never carried into generated projects: the loop's chain
+starts at `grill-with-docs` and never names the run-once setup step, so no agent
+knows one exists. It is an always-generated first chain entry rather than a
+Category or an Enhancement — a project whose owner cannot log in is not an
+optional problem — which also means the stamp is untouched and no Category
+identifier is added. Its interview is deliberately two questions and one gate:
+it must stay the same order of magnitude as the vendored setup skill it
+delegates to, because a run-once interview abandoned halfway is a project
+configured never.
+
+The values it refuses to ask for matter as much as the ones it asks. `DOMAIN`
+was proposed and rejected on measurement: it is interpolated into Traefik
+`Host()` router rules and into `VITE_API_URL`, a build argument baked into the
+frontend bundle, so writing a real domain at setup time breaks local
+development on day one and looks like a broken template rather than a wrong
+answer. `SECRET_KEY` and `POSTGRES_PASSWORD` are shown and never asked for,
+because a user-invented value is worse than `token_urlsafe(32)`.
+
+**FR-40** takes the whole `awesome-design-md` set. Two of 103 is arbitrary
+curation of content whose only purpose is choosing between directions. The
+delivery question was settled by measurement rather than by instinct: markdown
+compresses to about 30%, so the whole set costs roughly 766 KB in the wheel, and
+that price buys every existing mechanism working unchanged. Generation-time
+fetching was recommended in session and then withdrawn — ADR-002 forbids
+resolving anything but the pinned commit, so it fetches identical bytes, and an
+overlay path absent from `build_overlay_content` is classified obsolete by the
+ADR-014 rules, which would **delete** an untouched design document on the next
+`upgrade`. Single-select was also recommended and withdrawn: the two shipped
+references are already multi-select and recorded together in v5 stamps, so it
+would break the `--design` contract and strand those projects, to prevent a cost
+a user has to opt into.
+
+### ADR-022
+
+The footer of every generated project links to FastAPI's GitHub, X, and
+LinkedIn accounts and captions itself `Full Stack FastAPI Template`. Putting
+dev-ready's own repository link there was proposed and rejected;
+[ADR-022](decisions/adr-022-upstream-config-not-application-source.md) records
+the boundary the rejection implies — dev-ready rewrites upstream configuration
+and never edits upstream application source. The rule was already true in
+practice and stated nowhere, and the alternatives are recorded because the
+footer will be reported as a defect again.
+
+### Accepted residue
+
+`deployment.md` keeps roughly seven stale lines describing `LATEST_CHANGES` and
+`SMOKESHOW_AUTH_KEY`, whose workflows are correctly pruned. Repairing them means
+pruning and rewriting 352 otherwise-accurate lines. Recorded, not fixed.
+
+Restoring the deploy workflows means a user who publishes a release before
+setting up a self-hosted runner gets a job waiting on a runner label that does
+not exist. That is upstream's behaviour for its intended audience and
+`deployment.md` explains it.

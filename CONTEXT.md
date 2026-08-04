@@ -98,6 +98,17 @@ A catalog item that materializes multiple related assets selected as one unit
 because they are only valuable together, including the dependency closure those
 assets need.
 
+**Design Reference**:
+An [[Enhancement]] that is a whole design system written for an agent to build
+against — tokens, type scale, component rules — rather than guidance about how
+to work. Multi-select on purpose: a project legitimately wants one direction for
+its marketing surface and another for its dashboard, and the two shipped
+references are already recorded together in stamps, so single-select would break
+a contract to prevent a cost only a deliberate user incurs (FR-40). Which
+reference governs which surface is the user's to record in their own project
+documents; dev-ready declares no mapping and will not invent one.
+_Avoid_: theme, skin, style guide, brand pack, DESIGN.md (the file, not the concept)
+
 ### Agent targets
 
 **Agent Target**:
