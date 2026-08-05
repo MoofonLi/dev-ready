@@ -12,6 +12,22 @@ from dev_ready.prompts import Answers
 
 __all__ = ["render_report"]
 
+# FR-38. `admin@example.com` is upstream's own `first_superuser` default and
+# dev-ready does not override it, so it is a value this renderer knows without
+# reading anything. The password is generated per project and is named by key
+# only: a secret echoed to a terminal lands in scrollback, in CI logs, and in
+# whatever captured the command's output, and the file is already the right
+# place for it.
+_SUPERUSER_EMAIL = "admin@example.com"
+_CREDENTIAL_DISCLOSURE = (
+    "first login:",
+    f"  email:    {_SUPERUSER_EMAIL}",
+    "  password: generated per project; it is the FIRST_SUPERUSER_PASSWORD value in .env",
+    "  note:     the superuser is created on first start and is looked up by email,",
+    "            so editing FIRST_SUPERUSER_PASSWORD afterwards has no effect until",
+    "            the database is reset (docker compose down -v).",
+)
+
 
 def render_report(
     answers: Answers,
@@ -36,6 +52,8 @@ def render_report(
         # Update when a manifest bump changes the upstream workflow.
         "  2. docker compose watch   (see AGENTS.md for other commands)",
         "  3. read AGENTS.md for the full picture",
+        "",
+        *_CREDENTIAL_DISCLOSURE,
     ]
     return "\n".join(lines)
 

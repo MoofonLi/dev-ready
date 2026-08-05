@@ -562,6 +562,35 @@ def test_generated_ignore_file_is_inventoried_and_matches_the_bytes_on_disk(
     ).hexdigest()
 
 
+def test_readme_names_the_superuser_login_and_the_first_start_rule(
+    tmp_path: Path,
+) -> None:
+    """FR-38: the report scrolls away; the README is what survives the session."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    apply_overlay(_bare_answers(tmp_path), project_dir, CATALOG, PIN)
+
+    readme = (project_dir / "README.md").read_text(encoding="utf-8")
+    assert "admin@example.com" in readme
+    assert "FIRST_SUPERUSER_PASSWORD" in readme
+    assert "`.env`" in readme
+    assert "first start" in readme
+    assert "reset" in readme
+
+
+def test_readme_names_the_password_key_but_never_a_value(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    apply_overlay(_bare_answers(tmp_path), project_dir, CATALOG, PIN)
+
+    readme = (project_dir / "README.md").read_text(encoding="utf-8")
+    assert "FIRST_SUPERUSER_PASSWORD=" not in readme
+    assert "SECRET_KEY" not in readme
+    assert "POSTGRES_PASSWORD" not in readme
+
+
 def test_ignore_file_is_written_verbatim_without_template_markers(
     tmp_path: Path,
 ) -> None:
@@ -1400,3 +1429,8 @@ def test_manifest_only_project_mcp_path_retargets_catalog_effects(tmp_path: Path
     config = json.loads((project_dir / ".custom/mcp.json").read_text(encoding="utf-8"))
     assert "codebase-memory" in config["mcpServers"]
     assert not (project_dir / ".mcp.json").exists()
+
+
+
+
+

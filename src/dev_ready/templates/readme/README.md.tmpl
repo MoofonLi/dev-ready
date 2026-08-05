@@ -17,6 +17,17 @@
 - Frontend only: `cd frontend && npm install && npm run dev`
 - Backend tests: `cd backend && bash scripts/test.sh`
 
+## First login
+
+The backend creates one superuser the first time it starts.
+
+- **Email**: `admin@example.com`
+- **Password**: generated for this project — it is the `FIRST_SUPERUSER_PASSWORD` value in `.env`.
+
+`.env` also holds this project's database password and application signing key, and it is ignored by git so those never enter your history. Keep it that way.
+
+The superuser is looked up by email and created only when no user has that address, so **editing `FIRST_SUPERUSER_PASSWORD` after the first start changes nothing** — the row already exists and the create is skipped. To pick your own password, edit it before the first `docker compose up`, or reset the database afterwards with `docker compose down -v`.
+
 ## Documentation
 
 - Per-service setup lives in `backend/README.md` and `frontend/README.md`.
