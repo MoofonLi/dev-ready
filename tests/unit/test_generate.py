@@ -96,6 +96,152 @@ def test_generate_happy_path_merges_upstream_and_overlay(
     assert Path("CLAUDE.md") in written
 
 
+# Upstream's own `.env` at the manifest-pinned commit, reduced to the lines this
+# ticket reasons about. The Copier `_tasks` substitute the generated secrets, so
+# the fake below does the same thing at the same moment.
+_UPSTREAM_ENV = """\
+# Domain
+DOMAIN=localhost
+# To test the local Traefik config
+# DOMAIN=localhost.tiangolo.com
+
+BACKEND_CORS_ORIGINS="http://localhost,https://localhost,http://localhost.tiangolo.com"
+SECRET_KEY={secret_key}
+FIRST_SUPERUSER=admin@example.com
+FIRST_SUPERUSER_PASSWORD={first_superuser_password}
+POSTGRES_PASSWORD={postgres_password}
+POSTGRES_DB=app
+"""
+
+
+def _fetch_writing_env(env_body: str, seen: dict[str, str]):
+    """Return a fetch fake that also writes the `.env` Copier's tasks would."""
+
+    def _fetch(
+        pin: UpstreamPin, dest: Path, template_data: dict[str, str] | None = None
+    ) -> Path:
+        _fake_fetch_ok(pin, dest, template_data)
+        seen.update(template_data or {})
+        (dest / ".env").write_text(env_body.format_map(seen), encoding="utf-8")
+        return dest
+
+    return _fetch
+
+
+def _cors_value(env_text: str) -> str:
+    for line in env_text.splitlines():
+        if line.startswith("BACKEND_CORS_ORIGINS="):
+            return line.partition("=")[2].strip('"')
+    raise AssertionError("generated .env has no BACKEND_CORS_ORIGINS line")
+
+
+def test_generated_cors_allowlist_drops_the_third_party_hostname(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, str] = {}
+    monkeypatch.setattr(
+        generate_module, "fetch_snapshot", _fetch_writing_env(_UPSTREAM_ENV, seen)
+    )
+    target_dir = tmp_path / "my-app"
+
+    generate(_answers(target_dir), PIN, CATALOG)
+
+    env_text = (target_dir / ".env").read_text(encoding="utf-8")
+    assert _cors_value(env_text) == "http://localhost,https://localhost"
+
+
+def test_generated_cors_correction_leaves_the_secrets_and_the_rest_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, str] = {}
+    monkeypatch.setattr(
+        generate_module, "fetch_snapshot", _fetch_writing_env(_UPSTREAM_ENV, seen)
+    )
+    target_dir = tmp_path / "my-app"
+
+    generate(_answers(target_dir), PIN, CATALOG)
+
+    env_text = (target_dir / ".env").read_text(encoding="utf-8")
+    assert f"SECRET_KEY={seen['secret_key']}" in env_text
+    assert f"POSTGRES_PASSWORD={seen['postgres_password']}" in env_text
+    assert f"FIRST_SUPERUSER_PASSWORD={seen['first_superuser_password']}" in env_text
+    # Only the one key's value changes; every other line is byte-identical,
+    # including the commented DOMAIN line naming the same hostname.
+    original = _UPSTREAM_ENV.format_map(seen).splitlines()
+    generated = env_text.splitlines()
+    assert [
+        line for line in original if not line.startswith("BACKEND_CORS_ORIGINS=")
+    ] == [line for line in generated if not line.startswith("BACKEND_CORS_ORIGINS=")]
+    assert "# DOMAIN=localhost.tiangolo.com" in generated
+
+
+@pytest.mark.parametrize(
+    "env_body",
+    [
+        pytest.param(
+            _UPSTREAM_ENV.replace(
+                'BACKEND_CORS_ORIGINS="http://localhost,https://localhost,'
+                'http://localhost.tiangolo.com"\n',
+                "",
+            ),
+            id="key-absent",
+        ),
+        pytest.param(
+            _UPSTREAM_ENV.replace(",http://localhost.tiangolo.com", ""),
+            id="hostname-already-absent",
+        ),
+        pytest.param("", id="empty-env"),
+    ],
+)
+def test_generation_succeeds_when_there_is_nothing_to_correct(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, env_body: str
+) -> None:
+    """An upstream default that changed shape is the bump job's problem, not the user's."""
+    seen: dict[str, str] = {}
+    monkeypatch.setattr(
+        generate_module, "fetch_snapshot", _fetch_writing_env(env_body, seen)
+    )
+    target_dir = tmp_path / "my-app"
+
+    generate(_answers(target_dir), PIN, CATALOG)
+
+    assert (target_dir / ".env").read_text(encoding="utf-8") == env_body.format_map(seen)
+
+
+def test_an_env_file_without_the_key_passes_through_untouched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`.env` is a required upstream path, so the reachable no-op is a file with no key."""
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
+    target_dir = tmp_path / "my-app"
+
+    generate(_answers(target_dir), PIN, CATALOG)
+
+    assert (target_dir / ".env").read_text(encoding="utf-8") == "stub"
+    assert (target_dir / "AGENTS.md").is_file()
+
+
+def test_the_cors_correction_happens_inside_staging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A later failure must still leave no partial target behind."""
+    seen: dict[str, str] = {}
+    monkeypatch.setattr(
+        generate_module, "fetch_snapshot", _fetch_writing_env(_UPSTREAM_ENV, seen)
+    )
+
+    def _failing_verify(*args: object, **kwargs: object) -> None:
+        raise VerificationError("boom")
+
+    monkeypatch.setattr(generate_module, "verify_project", _failing_verify)
+    target_dir = tmp_path / "my-app"
+
+    with pytest.raises(VerificationError):
+        generate(_answers(target_dir), PIN, CATALOG)
+
+    assert not target_dir.exists()
+
+
 def test_generate_emits_typed_stage_events_in_pipeline_order(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -194,6 +194,67 @@ def _fetch_and_clean(pin: UpstreamPin, project_staging: Path, answers: Answers) 
     if copier_answers.exists():
         copier_answers.unlink()
 
+    _drop_third_party_cors_origin(project_staging)
+
+
+# FR-38. Upstream's `.env` ships its author's own local-testing hostname — a DNS
+# record a third party controls — in the backend's cross-origin allowlist. It is
+# a literal in that file rather than a Copier question, so it cannot be answered
+# away and is corrected here instead, in the same staging cleanup that removes
+# Copier's metadata.
+_CORS_KEY = "BACKEND_CORS_ORIGINS"
+_THIRD_PARTY_CORS_HOST = "localhost.tiangolo.com"
+
+
+def _drop_third_party_cors_origin(project_staging: Path) -> None:
+    """Remove the third-party hostname from the generated CORS allowlist.
+
+    Rewrites that one key's value and nothing else, so the generated secrets
+    beside it stay byte-identical. An unreadable file, an absent key, or a value
+    the hostname has already left is a no-op: generation must not start failing
+    because an upstream default changed shape — the weekly bump job (ADR-002) is
+    where that gets noticed.
+    """
+    env_path = project_staging / ".env"
+    try:
+        original = env_path.read_bytes().decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        return
+    rewritten = "".join(
+        _without_third_party_origin(line) for line in original.splitlines(keepends=True)
+    )
+    if rewritten == original:
+        return
+    # A write failure here is a real staging fault, not an upstream shape change,
+    # so it propagates like the Copier-metadata cleanup above it: generation is
+    # all-or-nothing and never leaves a partial target.
+    env_path.write_bytes(rewritten.encode("utf-8"))
+
+
+def _without_third_party_origin(line: str) -> str:
+    """Return one `.env` line with the third-party origin removed, if present."""
+    if not line.startswith(f"{_CORS_KEY}="):
+        return line
+    body = line.rstrip("\r\n")
+    ending = line[len(body) :]
+    raw_value = body.partition("=")[2]
+    quote = (
+        raw_value[0]
+        if len(raw_value) >= 2 and raw_value[0] in "\"'" and raw_value[-1] == raw_value[0]
+        else ""
+    )
+    value = raw_value[len(quote) : len(raw_value) - len(quote)] if quote else raw_value
+    origins = value.split(",")
+    kept = [origin for origin in origins if not _is_third_party_origin(origin)]
+    if len(kept) == len(origins):
+        return line
+    return f"{_CORS_KEY}={quote}{','.join(kept)}{quote}{ending}"
+
+
+def _is_third_party_origin(origin: str) -> bool:
+    host = origin.strip().rpartition("://")[2].split("/", 1)[0].partition(":")[0]
+    return host == _THIRD_PARTY_CORS_HOST
+
 
 def _finalize_project(
     project_staging: Path, target_dir: Path, *, restore_empty_target: bool
