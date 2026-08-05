@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import hashlib
+import re
 
 import pytest
 
@@ -485,6 +486,39 @@ def test_readme_is_about_the_project_not_the_template(tmp_path: Path) -> None:
     assert "{{" not in readme
     assert "MoofonLi/dev-ready" in readme
     assert "img/" not in readme
+
+
+# The root ignore file at the manifest-pinned upstream commit, in upstream's own
+# order. Restated here so a silent drop is a test failure; scripts/check_ignore_drift.py
+# is what keeps this honest against the real repository.
+_UPSTREAM_IGNORE_ENTRIES = [
+    ".vscode/*",
+    "!.vscode/extensions.json",
+    "node_modules/",
+    "backend/app/frontend/",
+    "/test-results/",
+    "/playwright-report/",
+    "/blob-report/",
+    "/playwright/.cache/",
+]
+
+
+def _ignore_entries(text: str) -> list[str]:
+    """Return the ignore patterns a git implementation would act on."""
+    return [
+        line for line in text.splitlines() if line.strip() and not line.startswith("#")
+    ]
+
+
+def _bare_answers(tmp_path: Path) -> Answers:
+    """A selection that takes nothing at all — the `--yes`-with-empty-Category case."""
+    return _answers(
+        tmp_path,
+        include_skills=False,
+        include_mcp=False,
+        include_docs=False,
+        agent_targets=frozenset({"claude"}),
+    )
 
 
 def test_collision_on_existing_readme_raises_overlay_error(tmp_path: Path) -> None:
@@ -1125,6 +1159,76 @@ def test_claude_md_contains_karpathy_guardrails(tmp_path: Path) -> None:
     assert "{{" not in claude_md
 
 
+def test_generated_agents_md_describes_stack_commands_and_standards_source(
+    tmp_path: Path,
+) -> None:
+    answers = Answers(
+        "my-app",
+        tmp_path / "project",
+        ProjectSelection.empty(),
+    )
+
+    agents_md = build_overlay_content(answers, CATALOG)["AGENTS.md"].decode("utf-8")
+
+    for fact in (
+        "Tailwind CSS",
+        "shadcn/ui",
+        "TanStack Query",
+        "TanStack Router",
+        "TanStack Table",
+        "react-hook-form",
+        "zod",
+        "Alembic",
+        "pytest",
+        "coverage",
+        "ruff check",
+        "ruff format",
+        "mypy",
+        "ty",
+        "Playwright",
+        "biome",
+        "tsc",
+        "Bun",
+        "90%",
+        "Standards Source",
+        "generated frontend API client",
+        "generated route tree",
+        "Alembic migration",
+        "backend tests mirror",
+        "live services required",
+    ):
+        assert fact in agents_md
+
+    for command in (
+        "docker compose up -d",
+        "docker compose watch",
+        "docker compose down",
+        "cd backend && uv run fastapi dev app/main.py",
+        "docker compose up -d db mailcatcher",
+        "bash scripts/prestart.sh",
+        "bash scripts/tests-start.sh",
+        "cd backend && bash scripts/lint.sh",
+        "cd backend && bash scripts/format.sh",
+        "bun install",
+        "cd frontend && bun run dev",
+        "cd frontend && bunx playwright test",
+        "cd frontend && bunx biome check ./",
+        "cd frontend && bunx tsc -p tsconfig.build.json",
+        "cd frontend && bunx biome format --write ./",
+    ):
+        assert command in agents_md
+
+    stack_and_commands = agents_md.split("## Repo layout", 1)[0]
+    assert not re.search(
+        r"\b(?:Python|Bun|Node|React|TypeScript|Vite|FastAPI)\s+v?\d",
+        stack_and_commands,
+    )
+    assert "frontend && npm install" not in agents_md
+    assert "frontend && npm run dev" not in agents_md
+    assert "biome check --write --unsafe" not in agents_md
+    assert "pre-commit run" not in agents_md
+
+
 def test_standalone_spec_loop_is_complete_and_role_neutral(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
@@ -1242,8 +1346,3 @@ def test_manifest_only_project_mcp_path_retargets_catalog_effects(tmp_path: Path
     config = json.loads((project_dir / ".custom/mcp.json").read_text(encoding="utf-8"))
     assert "codebase-memory" in config["mcpServers"]
     assert not (project_dir / ".mcp.json").exists()
-
-
-
-
-

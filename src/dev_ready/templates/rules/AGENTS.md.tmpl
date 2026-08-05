@@ -4,8 +4,8 @@
 
 ## Stack
 
-- **Backend**: FastAPI, SQLModel, PostgreSQL, Pydantic - `backend/`
-- **Frontend**: React, TypeScript, Vite - `frontend/`
+- **Backend**: FastAPI, SQLModel, PostgreSQL, Pydantic, Alembic - `backend/`
+- **Frontend**: React, TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, TanStack Router, TanStack Table, `react-hook-form` with `zod` - `frontend/`
 - **Infra**: Docker Compose, Traefik reverse proxy - `compose.yml`
 
 ## Commands
@@ -13,9 +13,12 @@
 - `docker compose up -d` - start the full stack (backend, frontend, database, proxy)
 - `docker compose watch` - start with live reload for local development
 - `docker compose down` - stop the stack
-- Backend only: `cd backend && uv run fastapi dev app/main.py`
-- Frontend only: `cd frontend && npm install && npm run dev`
-- Backend tests: `cd backend && bash scripts/test.sh`
+- Backend serve: `cd backend && uv run fastapi dev app/main.py`
+- Backend tests: run `docker compose up -d db mailcatcher`, then run `bash scripts/prestart.sh` and `bash scripts/tests-start.sh` from `backend/` (pytest with coverage; live services required)
+- Backend checks: `cd backend && bash scripts/lint.sh` (mypy strict, ty, ruff check, ruff format); format: `cd backend && bash scripts/format.sh`; coverage floor: 90%
+- Frontend install: use Bun: `bun install` from the repository root; serve: `cd frontend && bun run dev`
+- Frontend tests: `cd frontend && bunx playwright test` (Playwright)
+- Frontend checks: `cd frontend && bunx biome check ./`; type-check: `cd frontend && bunx tsc -p tsconfig.build.json`; format: `cd frontend && bunx biome format --write ./`
 
 ## Repo layout
 
@@ -26,6 +29,14 @@
 {{spec_loop_guidance}}
 
 {{documentation_guidance}}
+
+## Standards Source
+
+This `AGENTS.md` is the project's Standards Source. Keep the guardrails below and the rules here current; tools cannot enforce all of them.
+
+- Never hand-edit the generated frontend API client or the generated route tree; regenerate them with the upstream client-generation script.
+- A model change requires an Alembic migration.
+- The backend tests mirror the application package's layout.
 
 ## Development guardrails
 
