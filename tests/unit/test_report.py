@@ -4,6 +4,7 @@ from pathlib import Path
 
 from dev_ready.manifest import UpstreamPin, load_default_manifest
 from dev_ready.prompts import Answers, ProjectSelection
+from dev_ready.report import render
 from dev_ready.report import render_report
 
 PIN = UpstreamPin(
@@ -64,6 +65,44 @@ def test_report_does_not_touch_the_filesystem(tmp_path: Path) -> None:
 
     assert not ghost_dir.exists()
     assert str(ghost_dir) in report
+
+
+def test_report_names_the_superuser_login_and_where_its_password_is() -> None:
+    """FR-38: a user reaches a login form and must know what to type."""
+    answers = Answers(project_name="my-app", target_dir=Path("/does/not/exist/my-app"))
+
+    report = render_report(answers, PIN, [Path("CLAUDE.md")])
+
+    assert "admin@example.com" in report
+    assert "FIRST_SUPERUSER_PASSWORD" in report
+    assert ".env" in report
+
+
+def test_report_states_that_changing_the_password_after_first_start_does_nothing() -> None:
+    answers = Answers(project_name="my-app", target_dir=Path("/does/not/exist/my-app"))
+
+    report = render_report(answers, PIN, [Path("CLAUDE.md")])
+
+    assert "first start" in report
+    assert "reset" in report
+
+
+def test_report_names_the_password_key_but_never_a_value() -> None:
+    """The property that must survive the next edit to the renderer.
+
+    A secret echoed to a terminal lands in scrollback, in CI logs, and in
+    whatever captured the command's output. Naming the key is enough; together
+    with `test_report_does_not_touch_the_filesystem` this pins the renderer to
+    text it can compose without ever holding a secret.
+    """
+    answers = Answers(project_name="my-app", target_dir=Path("/does/not/exist/my-app"))
+
+    report = render_report(answers, PIN, [Path("CLAUDE.md")], CATALOG)
+
+    assert "FIRST_SUPERUSER_PASSWORD=" not in report
+    # The other two generated secrets have no reason to be mentioned at all.
+    assert "SECRET_KEY" not in report
+    assert "POSTGRES_PASSWORD" not in report
 
 
 def test_report_states_selected_target_artifacts_and_manual_windsurf_mcp() -> None:
@@ -146,4 +185,25 @@ def test_report_states_standard_compliant_agents_needing_no_target_selection() -
     assert "standard-compliant agents (read .agents/skills/ directly" in report
     assert "cursor" in report
     assert "codex" in report
+
+
+def test_report_and_readme_template_disclose_the_same_superuser_email() -> None:
+    """FR-38 states the login on two dev-ready-owned surfaces; they must agree.
+
+    Neither surface derives the address — it is upstream's own `first_superuser`
+    default, which `_template_data` deliberately does not override. This test is
+    what stops the two copies drifting apart; `scripts/check_stack_facts.py`
+    holds the README's copy to the pinned commit via the generated `.env`, so
+    together they keep both surfaces true without either one deriving the value.
+    """
+    template = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "dev_ready"
+        / "templates"
+        / "readme"
+        / "README.md.tmpl"
+    ).read_text(encoding="utf-8")
+
+    assert f"`{render._SUPERUSER_EMAIL}`" in template
 

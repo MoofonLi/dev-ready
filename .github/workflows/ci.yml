@@ -53,6 +53,12 @@ jobs:
       - name: Run NOTICES sync check
         run: |
           python3 scripts/check_notices_sync.py
+      # FR-38: dev-ready owns the generated project's root ignore file, and
+      # prune keeps upstream's out of the generated tree entirely — so an
+      # upstream change to it can only be noticed against the pinned commit.
+      - name: Run root ignore file drift check
+        run: |
+          python3 scripts/check_ignore_drift.py
 
   # ADR-019 drift guard. The script is stdlib-only and fetches the pinned
   # reference installer itself, so this job needs network but no project
@@ -97,6 +103,9 @@ jobs:
       - name: Generate demo project
         id: generate
         run: uv run dev-ready init demo-app --yes
+
+      - name: Check generated stack facts
+        run: python3 scripts/check_stack_facts.py demo-app
 
       - name: Build containers
         working-directory: demo-app
