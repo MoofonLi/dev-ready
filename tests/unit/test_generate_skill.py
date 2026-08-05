@@ -50,9 +50,39 @@ def _init_examples(text: str) -> list[str]:
 
 
 def _documented_ids(text: str, label: str) -> set[str]:
-    match = re.search(rf"^Current {re.escape(label)} ids: (.+)$", text, flags=re.MULTILINE)
+    if label == "Category":
+        heading = "Categories"
+    elif label == "development loop":
+        heading = "Development loops"
+    elif label == "Agent Target":
+        heading = "Agent Targets"
+    elif label == "standard-compliant agent":
+        heading = "Standard-compliant agents"
+    else:
+        assert label.endswith(" item")
+        heading = f"{label.removesuffix(' item')} items"
+
+    section = _mapping_section(text, heading)
+    if re.fullmatch(r"\s*- \(none\)\s*", section):
+        return set()
+    entries = re.findall(
+        r"^- `([^`]+)`:\s*(\S.*)$",
+        section,
+        flags=re.MULTILINE,
+    )
+    assert entries
+    assert len(entries) == len({identifier for identifier, _trigger in entries})
+    return {identifier for identifier, _trigger in entries}
+
+
+def _mapping_section(text: str, heading: str) -> str:
+    match = re.search(
+        rf"^### {re.escape(heading)}\r?\n(?P<section>.*?)(?=^### |^## |\Z)",
+        text,
+        flags=re.MULTILINE | re.DOTALL,
+    )
     assert match is not None
-    return _backticked_ids(match.group(1))
+    return match.group("section")
 
 
 def _backticked_ids(text: str) -> set[str]:
@@ -100,6 +130,32 @@ def test_skill_examples_cover_default_none_and_mixed_current_cli_contract() -> N
         build_answers(args, CATALOG)
 
 
+def test_skill_examples_pair_user_answers_with_commands() -> None:
+    text = _skill_text()
+    for command in _init_examples(text):
+        before_command = text[: text.index(command)].rstrip().splitlines()
+        while before_command and (
+            not before_command[-1].strip()
+            or before_command[-1].strip().startswith("```")
+        ):
+            before_command.pop()
+        assert before_command
+        assert not before_command[-1].lstrip().startswith(("#", "uvx "))
+        assert any(
+            word in before_command[-1].casefold()
+            for word in ("i ", "we ", "you ", "need", "want", "build")
+        )
+
+
+def test_skill_points_existing_projects_to_check_and_upgrade() -> None:
+    text = _skill_text().casefold()
+    assert "creates new projects only" in text
+    assert "check" in text
+    assert "upgrade" in text
+    assert "init" in text
+    assert "must never be aimed at" in text
+
+
 def test_skill_category_and_item_ids_match_the_current_manifest() -> None:
     text = _skill_text()
     assert _documented_ids(text, "Category") == set(MANIFEST.categories)
@@ -114,6 +170,9 @@ def test_skill_category_and_item_ids_match_the_current_manifest() -> None:
         CATALOG.development_loop_ids
     )
     assert _documented_ids(text, "Agent Target") == set(CATALOG.agent_target_ids)
+    assert _documented_ids(text, "standard-compliant agent") == set(
+        MANIFEST.standard_compliant_agents
+    )
     retired_ids = _documented_retired_ids(text)
     assert retired_ids == EXPECTED_RETIRED_DEV_IDS
     for retired_id in retired_ids:
@@ -165,6 +224,27 @@ def test_skill_documents_safe_failure_and_verification_behavior() -> None:
         assert required in text
     for removed in ("--skills", "--mcp", "--no-docs", "--no-handoff", "--no-agents"):
         assert removed in text
+
+
+def test_skill_leads_with_interview_before_selection_flags() -> None:
+    text = _skill_text()
+    body = text.split("---", 2)[2]
+    sections = re.split(r"^## ", body, flags=re.MULTILINE)
+    assert sections[1].startswith("Interview")
+
+    interview_start = body.index("## Interview")
+    pre_interview = body[:interview_start]
+    selection_flags = (
+        "--categories",
+        "--dev",
+        "--security",
+        "--quality",
+        "--design",
+        "--token-optimize",
+        "--agents",
+        "--development-loop",
+    )
+    assert not any(flag in pre_interview for flag in selection_flags)
 
 
 def test_distribution_skill_is_not_a_catalog_or_generated_overlay_asset(tmp_path: Path) -> None:
