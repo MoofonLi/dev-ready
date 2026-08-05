@@ -103,6 +103,17 @@ documentation skeletons, so they are not a [[Catalog Item]] (ADR-018,
 when a selected Enhancement needs it.
 _Avoid_: always-on item, implicit default, base overlay, core set
 
+**Standards Source**:
+The file a generated project offers to a review step asking what this repository
+documents about how its code should be written. It is the generated `AGENTS.md`,
+which says so in its own text — the project's tooling and the rules no tool
+enforces belong in the one file every agent session already loads, so the answer
+is never a hop away and never a second copy. Naming the linter does not make one:
+a reviewer is told to skip whatever tooling already enforces, so a tool list
+answers a different question than this one. Singular per project, and always
+[[Overlay Infrastructure]].
+_Avoid_: coding standards file, CONTRIBUTING.md, style guide, house style, conventions doc
+
 **Bundle**:
 A catalog item that materializes multiple related assets selected as one unit
 because they are only valuable together, including the dependency closure those
