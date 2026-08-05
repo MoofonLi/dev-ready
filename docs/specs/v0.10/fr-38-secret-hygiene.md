@@ -134,9 +134,13 @@ not repeat the reasoning that removed them.
 16. As a maintainer, I want `upgrade` to treat the new ignore file exactly like
     every other managed file — replaced when untouched, preserved and reported
     when edited — with no special case.
-17. As a user of an existing v0.9 project, I want `dev-ready upgrade` to give me
-    the ignore file I never had, without touching the `.env` I have since
-    edited.
+17. As a user of an existing v0.9 project, I want `dev-ready upgrade` to tell me
+    plainly that my root ignore file is one dev-ready will not touch, so that I
+    can adopt the `.env` entries myself, and without it touching the `.env` I
+    have since edited. (Corrected 2026-08-05 during implementation — this story
+    originally asked for "the ignore file I never had". A v0.9 project *has* a
+    root ignore file: upstream's own, unmanaged. See the Implementation
+    Decisions note on what upgrade does with it.)
 18. As a maintainer, I want no file under `frontend/src/` or `backend/app/`
     to differ from the pinned upstream commit after this work, so that ADR-022
     is observably held.
@@ -192,6 +196,20 @@ Both name the superuser email as a value dev-ready knows (it is upstream's
 `first_superuser` default, unchanged by dev-ready), name the `.env` key rather
 than the password itself, and state the first-start ordering rule.
 
+**The disclosed email is guarded against the pin.** (Added 2026-08-05 during
+implementation.) The address dev-ready discloses is not dev-ready's to choose —
+it is upstream's own `first_superuser` default in `copier.yml`, which
+`_template_data` deliberately does not override. It is nonetheless written
+literally on two dev-ready-owned surfaces, the report renderer's constant and
+the README template, so an upstream change to that default would leave both
+telling users to log in as an account that does not exist, with nothing failing.
+FR-37's `scripts/check_stack_facts.py` closes it: it already runs against a real
+generated project in CI, and the generated `.env` is where the resolved value
+lands, so it compares the README's disclosed email against `.env`'s
+`FIRST_SUPERUSER` and fails the build on disagreement. An offline test pins the
+renderer's constant to the README template, so the two copies cannot drift apart
+and holding one to the pin holds both.
+
 **The password is never printed.** The report names the file and the key. A
 secret echoed to a terminal lands in scrollback, in CI logs, and in whatever
 captured the command's output; the file is already the right place for it and
@@ -227,8 +245,24 @@ are unaffected.
 Category, an item, a flag, or a recorded field. The stamp stays at version 5, as
 the v0.10 plan requires. The ignore file enters the managed inventory as an
 ordinary path, which is what makes the ADR-014 rules apply to it with no special
-case: an untouched file is replaced on `upgrade`, an edited one is preserved and
-reported, and an existing v0.9 project that never had the file receives it.
+case: an untouched file is replaced on `upgrade`, and an edited one is preserved
+and reported.
+
+**An existing v0.9 project does not receive the file, and this is the correct
+outcome.** (Corrected 2026-08-05 during implementation; this paragraph
+originally claimed the opposite.) A v0.9 project already has a root `.gitignore`
+— **upstream's own**, written before this change pruned it, and absent from that
+project's recorded inventory because dev-ready never wrote it. ADR-014 forbids
+replacing a file dev-ready did not write, so `upgrade` reports a conflict the
+first time and `Skipped (user-modified)` every time after. The user keeps a file
+that does not ignore `.env`, and the report is what tells them so.
+
+Delivering the file to those projects would require recognising upstream's
+byte-exact v0.9 copy as unowned-but-replaceable — a special case, and precisely
+the kind this spec's own rule refuses. It is therefore **not** in FR-38's scope.
+Whether to add such a migration is a separate decision; until it is made, the
+mitigation for existing projects is the report line plus the `README.md` text,
+both of which name `.env` as the file holding the secrets.
 
 ## Testing Decisions
 
