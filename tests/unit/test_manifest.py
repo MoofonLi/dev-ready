@@ -785,6 +785,13 @@ def test_deployment_workflows_are_not_pruned(workflow: str) -> None:
     assert workflow not in pin.exclude
 
 
+def test_root_ignore_file_is_pruned_and_root_anchored() -> None:
+    """FR-38: dev-ready replaces the root ignore file; `backend/` and `frontend/` keep theirs."""
+    pin = load_default_manifest().upstream["base_template"]
+    assert "/.gitignore" in pin.prune
+    assert ".gitignore" not in pin.prune
+
+
 def test_repository_maintenance_workflows_stay_pruned() -> None:
     pin = load_default_manifest().upstream["base_template"]
     assert {
@@ -1241,3 +1248,7 @@ def test_vendored_repo_on_non_vendor_item_rejected() -> None:
     })
     with pytest.raises(ManifestError, match="only allowed for mode 'vendor'"):
         parse_manifest(json.dumps(data))
+
+
+
+

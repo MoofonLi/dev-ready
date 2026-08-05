@@ -59,6 +59,12 @@ def build_overlay_content(
     for rules_file in projection.rules_files:
         add_bytes(Path(rules_file), b"@AGENTS.md\n")
     add(templates_root.joinpath("readme", "README.md.tmpl"), Path("README.md"))
+    # Upstream's root ignore file is pruned so this replacement can own the path
+    # (FR-38, the shape FR-7/FR-8 already use for README.md). The source asset is
+    # dotless: a real dotfile in the package tree would be read by git as an
+    # ignore rule over its own directory and is the class most likely to be
+    # dropped by a build backend's default exclusions.
+    add(templates_root.joinpath("gitignore", "gitignore"), Path(".gitignore"))
 
     for target_path in projection.base_mcp_config_paths(catalog, answers.items("mcp")):
         collect(templates_root.joinpath("mcp", "mcp.json"), target_path)

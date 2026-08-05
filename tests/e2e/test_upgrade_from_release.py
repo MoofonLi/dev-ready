@@ -555,8 +555,15 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert action_counts and not any(action_counts.values()), (
         "second upgrade reported a nonzero action plan: " + repr(action_counts)
     )
-    assert "Skipped (user-modified) (1):" in idempotence_result.stdout
+    # Two, not one: the edited setup skill, plus the root ignore file. FR-38 made
+    # `.gitignore` a managed path, and an N-1 project already carries upstream's
+    # own copy there — a file dev-ready never wrote, so ADR-014 forbids replacing
+    # it. The first upgrade reports it as a conflict and leaves it alone; every
+    # upgrade after that reports it as user-modified, which is the honest steady
+    # state and the only one that does not overwrite a file the user may own.
+    assert "Skipped (user-modified) (2):" in idempotence_result.stdout
     assert edited_setup_relative.as_posix() in idempotence_result.stdout
+    assert ".gitignore" in idempotence_result.stdout
 
     _checkout_stage(
         "idempotence real upgrade",

@@ -1,0 +1,18 @@
+# Managed by dev-ready. Everything above the dev-ready section is upstream's
+# own root ignore file at the pinned commit; scripts/check_ignore_drift.py fails
+# the weekly bump when upstream changes it.
+.vscode/*
+!.vscode/extensions.json
+node_modules/
+backend/app/frontend/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# --- dev-ready ---
+# Generation wrote a per-project SECRET_KEY, POSTGRES_PASSWORD and
+# FIRST_SUPERUSER_PASSWORD into .env. Committing it publishes them, and a secret
+# cannot be quietly withdrawn from history.
+.env
+.env*

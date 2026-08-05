@@ -521,6 +521,60 @@ def _bare_answers(tmp_path: Path) -> Answers:
     )
 
 
+def test_generated_project_ignores_the_env_file_it_was_given_secrets_in(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    apply_overlay(_bare_answers(tmp_path), project_dir, CATALOG, PIN)
+
+    entries = _ignore_entries((project_dir / ".gitignore").read_text(encoding="utf-8"))
+    assert ".env" in entries
+    assert ".env*" in entries
+
+
+def test_generated_ignore_file_keeps_upstream_entries_and_adds_only_the_env_lines(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    apply_overlay(_bare_answers(tmp_path), project_dir, CATALOG, PIN)
+
+    entries = _ignore_entries((project_dir / ".gitignore").read_text(encoding="utf-8"))
+    assert entries == _UPSTREAM_IGNORE_ENTRIES + [".env", ".env*"]
+
+
+def test_generated_ignore_file_is_inventoried_and_matches_the_bytes_on_disk(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    written = apply_overlay(_bare_answers(tmp_path), project_dir, CATALOG, PIN)
+
+    assert Path(".gitignore") in written
+    stamp = json.loads((project_dir / ".dev-ready.json").read_text(encoding="utf-8"))
+    inventory = {entry["path"]: entry["sha256"] for entry in stamp["inventory"]}
+    assert inventory[".gitignore"] == hashlib.sha256(
+        (project_dir / ".gitignore").read_bytes()
+    ).hexdigest()
+
+
+def test_ignore_file_is_written_verbatim_without_template_markers(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    apply_overlay(_bare_answers(tmp_path), project_dir, CATALOG, PIN)
+
+    text = (project_dir / ".gitignore").read_text(encoding="utf-8")
+    assert "{{" not in text
+    assert text.endswith("\n")
+
+
 def test_collision_on_existing_readme_raises_overlay_error(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()

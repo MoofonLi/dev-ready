@@ -225,6 +225,7 @@
         "CONTRIBUTING.md",
         "release-notes.md",
         "/README.md",
+        "/.gitignore",
         "img/**",
         "scripts/add_latest_release_date.py",
         "hooks/**"

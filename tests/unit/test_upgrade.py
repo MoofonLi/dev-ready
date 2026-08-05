@@ -666,6 +666,71 @@ def test_upgrade_advances_overlay_currency_without_adding_new_enhancements(
     assert {item.id for item in upgraded.skills_items} == {"caveman", "spec-loop"}
 
 
+def _drop_from_inventory(project: Path, path: str) -> None:
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["inventory"] = [entry for entry in data["inventory"] if entry["path"] != path]
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def test_project_without_any_root_ignore_file_receives_it_on_upgrade(tmp_path: Path) -> None:
+    """FR-38: nothing at the managed path means the ordinary add rule applies."""
+    project = _make_project(tmp_path)
+    (project / ".gitignore").unlink()
+    _drop_from_inventory(project, ".gitignore")
+
+    report = upgrade_project(project)
+
+    assert ".env" in (project / ".gitignore").read_text(encoding="utf-8")
+    assert "Added (1):" in report
+    assert "  - .gitignore" in report
+
+
+def test_v09_projects_unmanaged_ignore_file_is_reported_as_a_conflict(tmp_path: Path) -> None:
+    """A v0.9 project carries upstream's own root ignore file, unmanaged and unrecorded.
+
+    ADR-014 forbids `upgrade` from overwriting a file dev-ready never wrote, and
+    FR-38 puts this path under the ordinary rules with no special case — so the
+    honest outcome is a reported conflict the user resolves, not a silent
+    replacement of a file that may hold their own rules.
+    """
+    project = _make_project(tmp_path)
+    upstream_ignore = b"node_modules/\n/test-results/\n"
+    (project / ".gitignore").write_bytes(upstream_ignore)
+    _drop_from_inventory(project, ".gitignore")
+
+    report = upgrade_project(project)
+
+    assert (project / ".gitignore").read_bytes() == upstream_ignore
+    assert "Conflict (1):" in report
+    assert "  - .gitignore" in report
+
+
+def test_untouched_ignore_file_is_replaced_on_upgrade(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    stale = b"node_modules/\n"
+    (project / ".gitignore").write_bytes(stale)
+    _set_inventory_hash(project, ".gitignore", stale)
+
+    report = upgrade_project(project)
+
+    assert (project / ".gitignore").read_bytes() != stale
+    assert ".env*" in (project / ".gitignore").read_text(encoding="utf-8")
+    assert "  - .gitignore" in report
+
+
+def test_edited_ignore_file_is_preserved_and_reported(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    edited = b"node_modules/\n.env\nmy-own-rule/\n"
+    (project / ".gitignore").write_bytes(edited)
+
+    report = upgrade_project(project)
+
+    assert (project / ".gitignore").read_bytes() == edited
+    assert "Skipped (user-modified) (1):" in report
+    assert "  - .gitignore" in report
+
+
 def test_untouched_obsolete_managed_file_is_deleted(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
     obsolete = _add_obsolete_managed_file(
