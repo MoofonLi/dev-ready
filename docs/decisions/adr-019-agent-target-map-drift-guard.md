@@ -49,6 +49,16 @@ the selection prompt and the generation report. The report matters as much as
 the prompt: a `--yes` user never sees a prompt and is the likeliest to conclude
 their agent is unsupported.
 
+*Amended 2026-08-04, in the v0.10 Phase 4 grilling:* there is a **third**
+surface, and it is the earliest one. FR-34 turns the Generation Skill into an
+interview that asks which coding agents will work in the repository, which
+happens before the CLI is invoked at all. It carries the same obligation and
+discharges it the same way — a named agent that is standard-compliant is
+answered with "it reads `.agents/skills/` directly, so it needs no target",
+never with silence and never by omitting it from the composed command without
+saying why. Two surfaces was the correct count when this amendment was written
+and is no longer.
+
 **`claude` stays `claude`.** Upstream's id is `claude-code`; the manifest has
 said `claude` since v0.8 and that identifier lives in every stamped project and
 in the `--agents` contract. The derivation script carries one declared

@@ -59,6 +59,16 @@ An individually selectable unit, declared as data in the manifest (ADR-010) and
 presented under exactly one Category.
 _Avoid_: skill entry, module, addon
 
+**Generation Skill**:
+The single skill this repository distributes for installation into a user's own
+coding agent, which interviews the user about what they are building and
+composes one `dev-ready init` command from the answers (FR-24, rewritten as an
+interview by FR-34). It is defined by three things it is not: never a
+[[Catalog Item]], never part of a generated project's overlay, and not one of
+this repository's own process skills. Singular by construction — the repository
+distributes exactly one.
+_Avoid_: setup skill, init skill, the dev-ready skill, bootstrap skill, generate skill
+
 **Enhancement**:
 A Catalog Item outside the Spec Loop, optionally declaring the [[Mount Point]]
 it attaches to. Everything a user can add or drop is an Enhancement.
@@ -142,7 +152,9 @@ _Avoid_: agent table, path map, target registry, transcription
 A coding agent that reads [[Canonical Content]] at `.agents/skills/` and is
 therefore never an [[Agent Target]] — it needs no Pointer Stub and no selection.
 Absence from the Agent Target Map means full support, not missing support, which
-is why the selection prompt and the generation report both name these agents.
+is why the selection prompt, the generation report, and the [[Generation Skill]]'s
+interview all name these agents. The interview is the earliest of the three: it
+runs before the CLI does, so it is where the misreading is cheapest to prevent.
 _Avoid_: standard agent, generic agent, default agent, unsupported agent
 
 ### Lifecycle
