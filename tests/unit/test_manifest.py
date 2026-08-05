@@ -774,6 +774,31 @@ def test_bundled_manifest_is_valid() -> None:
     assert ".github/workflows/test-backend.yml" not in manifest.upstream["base_template"].prune
 
 
+@pytest.mark.parametrize(
+    "workflow",
+    [".github/workflows/deploy-production.yml", ".github/workflows/deploy-staging.yml"],
+)
+def test_deployment_workflows_are_not_pruned(workflow: str) -> None:
+    """FR-38: upstream wrote both for downstream users, and `deployment.md` teaches them."""
+    pin = load_default_manifest().upstream["base_template"]
+    assert workflow not in pin.prune
+    assert workflow not in pin.exclude
+
+
+def test_repository_maintenance_workflows_stay_pruned() -> None:
+    pin = load_default_manifest().upstream["base_template"]
+    assert {
+        ".github/workflows/issue-manager.yml",
+        ".github/workflows/labeler.yml",
+        ".github/workflows/add-to-project.yml",
+        ".github/workflows/latest-changes.yml",
+        ".github/workflows/smokeshow.yml",
+        ".github/workflows/detect-conflicts.yml",
+        ".github/workflows/zizmor.yml",
+        ".github/workflows/guard-dependencies.yml",
+    } <= set(pin.prune)
+
+
 def test_missing_components_rejected() -> None:
     data = json.loads(json.dumps(VALID))
     del data["components"]
@@ -1216,7 +1241,3 @@ def test_vendored_repo_on_non_vendor_item_rejected() -> None:
     })
     with pytest.raises(ManifestError, match="only allowed for mode 'vendor'"):
         parse_manifest(json.dumps(data))
-
-
-
-

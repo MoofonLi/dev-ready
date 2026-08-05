@@ -213,8 +213,6 @@
         ".claude/skills/sqlmodel"
       ],
       "prune": [
-        ".github/workflows/deploy-production.yml",
-        ".github/workflows/deploy-staging.yml",
         ".github/workflows/issue-manager.yml",
         ".github/workflows/labeler.yml",
         ".github/workflows/add-to-project.yml",
