@@ -807,7 +807,7 @@ def test_selected_mount_appends_derived_guidance_to_the_loop_skill(
         "\n\n<!-- dev-ready:mounted-enhancements:start -->\n"
         "## Mounted enhancements\n\n"
         "When running this skill, also apply the enhancements selected for this project.\n\n"
-        "- **react-doctor** â€” Wrapper skill teaching the agent when to run "
+        "- **react-doctor** — Wrapper skill teaching the agent when to run "
         "react-doctor on the frontend and how to act on its findings. "
         "See `.agents/skills/react-doctor`.\n"
         "<!-- dev-ready:mounted-enhancements:end -->\n"
@@ -832,12 +832,12 @@ def test_review_mount_lists_both_selected_enhancements_in_identifier_order(
     assert code_review.count("<!-- dev-ready:mounted-enhancements:start -->") == 1
     assert code_review.count("<!-- dev-ready:mounted-enhancements:end -->") == 1
     react_entry = (
-        "- **react-doctor** â€” Wrapper skill teaching the agent when to run "
+        "- **react-doctor** — Wrapper skill teaching the agent when to run "
         "react-doctor on the frontend and how to act on its findings. "
         "See `.agents/skills/react-doctor`."
     )
     security_entry = (
-        "- **security-audit** â€” Multi-phase security auditing skill for "
+        "- **security-audit** — Multi-phase security auditing skill for "
         "vulnerability scanning and risk assessment. "
         "See `.agents/skills/security-audit`."
     )
@@ -860,7 +860,7 @@ def test_document_mount_points_to_its_generated_destination(tmp_path: Path) -> N
 
     implement = content[".agents/skills/implement/SKILL.md"].decode("utf-8")
     assert (
-        "- **design-linear** â€” Linear-inspired DESIGN.md reference for a "
+        "- **design-linear** — Linear-inspired DESIGN.md reference for a "
         "polished dark product interface system; omit it if that visual "
         "direction is not useful. See `docs/design-linear.md`."
     ) in implement

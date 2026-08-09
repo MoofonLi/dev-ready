@@ -89,7 +89,7 @@ def inject_mounted_enhancements(
                 f"mounted development-loop skill is missing: {mounted_path}"
             )
         entries = "\n".join(
-            f"- **{item.id}** â€” {item.description} See `{item.paths[0].dest}`."
+            f"- **{item.id}** — {item.description} See `{item.paths[0].dest}`."
             for item in items
         )
         block = (
