@@ -1,6 +1,10 @@
 # ADR-021: Internal process v3 — the Spec Loop only, no generated gate documents (supersedes ADR-007's protocol; amends ADR-011, ADR-013)
 
 - Status: Accepted (2026-07-31)
+- Status update (2026-08-09): the `release` skill still ordered a per-phase
+  execution report, the one surviving instance of the document set this ADR
+  retired. It now gates on the durable version overview instead; see the
+  amendment below.
 - Context: This repository's own development ran the ADR-007 handoff protocol,
   narrowed by ADR-013 into a four-layer loop. Every phase generated a document
   set — `03-review.md`, `04-qa-review.md`, `05-security-review.md`,
@@ -66,3 +70,32 @@
   skills it created. If the missing review depth ever costs a real defect, the
   designated upgrade path is to reinstate the lenses as an on-demand skill — not
   as a per-phase generated document (revisit by new ADR).
+
+## 2026-08-09 amendment — the release gate is the version overview, not a phase report
+
+Found while grilling v0.10 Phase 6. This ADR retired the phase document set and
+named `release` as a step that survives it, but nobody swept the `release` skill
+itself. Its Step 3 still required
+`docs/handoff/<version>/reports/phase-N-overview.md` — one per completed phase,
+gitignored, described in the skill's own words as "Moofon's record, not a repo
+doc" — and made Moofon's acceptance of it a hard gate before any commit. That is
+the execution report this ADR deleted, reintroduced once per release. Read
+literally at v0.10, it ordered six reconstructed reports for phases 1 through 5b.
+
+The skill now gates on `docs/version_overview/<version>-overview.md` instead: the
+durable, committed per-version record that Phase 6 already required and that the
+skill's own doc-status sweep already checked for. Nothing is lost. The gate's
+purpose was that Moofon reads and accepts a written account of the version before
+anything is tagged, and the version overview is a better instrument for it — it
+is written for readers who were not in the sessions, it survives the release, and
+it is reviewable in the pull request rather than only in a chat window. What the
+phase reports carried and the overview does not is per-ticket implementation
+narrative and test-command output; the first is recoverable from the commits and
+the accepted specs, and the second belongs in the session, where the person who
+must act on a red gate is already listening.
+
+Consequence: `docs/handoff/<version>/reports/` is retired for release phases as
+well, which makes this ADR's "no execution report" rule true without exception.
+`docs/version_overview/` is unaffected by the ADR-011 gitignore rules and stays a
+repo document. Historical `reports/` directories under past versions are left
+where they are; nothing is migrated.

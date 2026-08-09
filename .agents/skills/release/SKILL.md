@@ -1,6 +1,6 @@
 ---
 name: release
-description: Release a new version of the dev-ready repo (MoofonLi/dev-ready) end to end - bump version, verify locally, write the phase overview report, commit in stages, push, wait for CI, tag and publish to PyPI. Use whenever a dev-ready version is to be released, published, shipped, or tagged - e.g. "release v0.3.0", "ship it", "tag the release", "push to PyPI", "this phase is done, release it" - or to bump the version, re-tag after a failed CI run, or generate the phase overview report before release.
+description: Release a new version of the dev-ready repo (MoofonLi/dev-ready) end to end - bump version, verify locally, write the version overview, commit in stages, push, wait for CI, tag and publish to PyPI. Use whenever a dev-ready version is to be released, published, shipped, or tagged - e.g. "release v0.3.0", "ship it", "tag the release", "push to PyPI", "this phase is done, release it" - or to bump the version, re-tag after a failed CI run, or write the version overview before release.
 ---
 
 # dev-ready Release Workflow
@@ -47,18 +47,21 @@ uv run pytest -m network
 
 Every command must pass before continuing. If anything fails, stop the release: fix it through the Spec Loop (ADR-021), and restart from this step. Do not "release now, fix later" - the release pipeline publishes to PyPI, which cannot be unpublished.
 
-## Step 3 - Generate the phase overview report
+## Step 3 - Write the version overview
 
-Only after all tests pass. Reconstruct what the phase(s) this release completes actually did, from: the phase section of `docs/handoff/<version>/<version>-plan.md`, the accepted specs in `docs/specs/<version>/`, the ticket files under `docs/handoff/<version>/phase-N/tickets/`, and `git log` since the previous release tag.
+Only after all tests pass. `docs/version_overview/<version>-overview.md` is the durable, committed record of what the version ships, and it is the **only** per-version document this process produces: ADR-021 retired the gitignored per-phase `reports/` overviews along with the rest of the phase document set (see its 2026-08-09 amendment). Never write `docs/handoff/<version>/reports/` - that path is retired.
 
-Write `docs/handoff/<version>/reports/phase-N-overview.md` (one per completed phase, e.g. `phase-1-overview.md`) with:
+Reconstruct the version from: the phase sections of `docs/handoff/<version>/<version>-plan.md`, the accepted specs in `docs/specs/<version>/`, the ticket files under `docs/handoff/<version>/phase-N/tickets/`, and `git log` since the previous release tag. Follow the shape the existing overviews already use (`docs/version_overview/v0.9-overview.md` is the reference):
 
-- **Scope**: which FRs/ADRs this phase implemented (cite requirements.md / architecture.md / decisions/ numbers)
-- **What was built**: modules touched, behavior changes, per ticket
-- **Deviations**: anything the commits did that the spec did not ask for, or asked for and did not get
-- **Test evidence**: unit / lint / integration results from Step 2
+- **Header**: release version, `Status: Released`, and a scope line naming every FR and permanent gate the version covers
+- **What the version ships**: one section per FR, written as outcomes a user sees, citing the governing ADRs
+- **Upgrade from the previous version**: what `upgrade` migrates, what it preserves, and anything it cannot reach
+- **v1.0 real-users gate evidence**: observations against the decidable checklist, recorded as evidence rather than as a readiness judgment
+- **Deferred scope**: what this version deliberately does not ship
 
-This file stays in the gitignored handoff tree - it is Moofon's record, not a repo doc. Show it to him and get an explicit OK before moving on: this is the "confirm it's fine" gate.
+State deviations here rather than leaving them to the git log: anything the commits did that the accepted specs did not ask for, or asked for and did not get. Test evidence from Step 2 belongs in the session report to Moofon, not in this file.
+
+Show it to Moofon and get an explicit OK before moving on: this is the "confirm it's fine" gate. Unlike the retired phase reports, this file is a repo document and ships in the `docs:` commit below.
 
 ## Step 4 - Doc status sweep, then staged commits
 
@@ -66,7 +69,7 @@ Before staging anything, sweep the doc status lines so they cannot rot (added 20
 
 - `AGENTS.md` "Current phase" line — set to the version being released (and the next version in planning, if decided).
 - `docs/requirements.md` Future Roadmap — mark the released version DONE (vX.Y.Z).
-- `docs/version_overview/<version>-overview.md` exists and says Released.
+- `docs/version_overview/<version>-overview.md` — written and accepted in Step 3, and says Released.
 
 These belong in the `docs:` commit below.
 

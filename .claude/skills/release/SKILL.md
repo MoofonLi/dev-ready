@@ -1,6 +1,6 @@
 ---
 name: release
-description: Release a new version of the dev-ready repo (MoofonLi/dev-ready) end to end - bump version, verify locally, write the phase overview report, commit in stages, push, wait for CI, tag and publish to PyPI. Use whenever a dev-ready version is to be released, published, shipped, tagged, or re-tagged after a failed CI run.
+description: Release a new version of the dev-ready repo (MoofonLi/dev-ready) end to end - bump version, verify locally, write the version overview, commit in stages, push, wait for CI, tag and publish to PyPI. Use whenever a dev-ready version is to be released, published, shipped, tagged, or re-tagged after a failed CI run.
 ---
 
 # release (pointer)
