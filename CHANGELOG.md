@@ -2,6 +2,100 @@
 
 All notable changes to dev-ready are documented here.
 
+## [0.10.0] — 2026-08-09
+
+### Breaking changes
+
+- **An absent `--agents` no longer means every agent.** It used to resolve to
+  every declared Agent Target; it now resolves to `claude`, and `--yes` does the
+  same. Scripts that relied on the old default must name the targets they want.
+- **`--agents all` keeps its meaning, but its meaning grew.** v0.9 declared 2
+  Agent Targets, so `--agents all` wrote roughly 24 Pointer Stub files. v0.10
+  declares 57, so the same flag now writes roughly 684. To keep v0.9’s output
+  exactly, pass `--agents claude,windsurf` instead.
+- **`--dev setup-all` now exits 2.** The identifier is retired: the skill it
+  named is part of the always-generated development loop, so every project
+  receives it and nothing selects it. Remove the flag; a project stamp that
+  records the identifier still upgrades without manual editing.
+
+### Added
+
+- Enhancement guidance now appears inside the development-loop step that acts on
+  it. Selecting the security audit or the React quality check adds guidance to
+  the project’s code-review step, the web-app testing Enhancement adds it to the
+  testing step, and the design references add it to the implementation step. A
+  project that selects none of them gets loop skills identical to before.
+- Every generated project states its own tech stack, the exact commands to test,
+  lint, format, and type-check both halves of it, and that its `AGENTS.md` is
+  the project’s standards source — including rules no tool can enforce, such as
+  which files are generated rather than hand-edited. This is true even for a
+  project that selects nothing at all.
+- A generated project ignores `.env` and `.env*` from the first commit, so the
+  random secrets dev-ready itself writes into `.env` do not land in git history.
+- The generation report and the generated `README.md` now name the default
+  administrator login and where its password lives, together with the reason it
+  is urgent: the backend creates that user only when it is absent, so changing
+  the password after the first start changes the file and not the login.
+- Far more coding agents can find the generated guidance. dev-ready now declares
+  a target for every agent that its pinned reference list gives a project-level
+  directory of its own, and a CI job fails when the two diverge. Agents that
+  read the standard location were already supported and still need no target;
+  they are named in the prompt and in the generation report.
+- The deployment workflows are part of a generated project again. They were
+  written by upstream for downstream users, and the deployment guide dev-ready
+  keeps is about how to use them.
+
+### Changed
+
+- The AI-invokable generation skill is an interview. It asks what you are
+  building, maps the answer onto the catalog, and proposes one command with a
+  reason for each selection instead of asking you to choose flags.
+- Accepting the defaults now leads straight to the Enhancement menu. The
+  confirmation step that stood in front of it is gone, and pressing Enter
+  through the menus still produces the same lean project as `--yes`.
+- Every project receives its `architecture` and `requirements` documentation
+  skeletons, whichever Categories are selected. They are part of what dev-ready
+  always writes rather than something that can be declined by accident.
+- The generated project’s development-loop guidance names its execution step,
+  which was generated but never mentioned.
+- The generated `BACKEND_CORS_ORIGINS` no longer allows a third party’s
+  hostname.
+
+### Removed
+
+- The opt-in setup Enhancement as a selectable item. Its skill is now part of
+  the always-generated development loop.
+- The confirmation prompt that asked whether to add Enhancements to the defaults.
+
+### Upgrade from v0.9
+
+Run `dev-ready upgrade PATH` with v0.10; no new selection input is required, and
+the stamp stays at version 5.
+
+**The `.env` fix does not reach your existing project — this is the one thing to
+check.** An untouched `README.md` is replaced, because it has been an
+overlay-managed file since v0.2, so the credential disclosure does arrive. Your
+root `.gitignore` is a different case: a project generated before v0.10 carries
+upstream’s own copy at that path, a file dev-ready never wrote and has no record
+of, and dev-ready does not replace a file it did not write. `upgrade` reports it
+under `Skipped (user-modified)` and moves on.
+
+**Do this by hand:** add `.env` and `.env*` to the project’s root `.gitignore`.
+Adding the pattern does not remove an `.env` that is already committed — a secret
+that has been pushed has to be rotated, not ignored.
+
+That skipped line is the overlay lifecycle rule working, not failing. dev-ready
+reports what it did not touch rather than overwriting user-owned files, which is
+why the same run cannot silently discard your own edits either.
+
+A stamp that records the retired setup identifier migrates rather than being
+refused, and a project that never selected that Enhancement receives the skill
+anyway as part of the loop. A loop skill you edited survives untouched and is
+reported as divergent. `--dry-run` reports every planned write and deletion
+without mutation; a failure restores writes and deletions together; a repeated
+successful upgrade plans no further changes. Base Provenance and upstream
+application content remain unchanged.
+
 ## [0.9.0] — 2026-08-01
 
 ### Breaking changes
@@ -127,4 +221,5 @@ without mutation; failure restores writes and deletions together; a repeated
 successful upgrade plans no further changes. Base Provenance and upstream
 application content remain unchanged.
 
+[0.10.0]: https://github.com/MoofonLi/dev-ready/releases/tag/v0.10.0
 [0.9.0]: https://github.com/MoofonLi/dev-ready/releases/tag/v0.9.0
