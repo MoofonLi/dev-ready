@@ -934,3 +934,65 @@ Restoring the deploy workflows means a user who publishes a release before
 setting up a self-hosted runner gets a job waiting on a runner label that does
 not exist. That is upstream's behaviour for its intended audience and
 `deployment.md` explains it.
+
+---
+
+## 2026-08-09 amendment — the real-users gate has one live branch, and FR-41 (CEO-confirmed, Moofon)
+
+Produced by the `grill-with-docs` session on v0.10 Phase 6, the release phase.
+Two findings outlive that phase. Neither changes v0.10's scope.
+
+### Branch B of the real-users gate is structurally blocked
+
+The v0.7 release rider defined the gate as two independent branches: three
+attributable external identities, **or** strictly increasing adjusted PyPI
+downloads across four complete UTC weeks with maintainer and CI invocations
+conservatively subtracted. It also stated the failure condition plainly — *"If
+CI noise cannot be bounded, the download branch cannot satisfy the gate."*
+
+That condition is met, and by this repository's own design. The permanent
+`upgrade-from-release` CI job installs `dev-ready==<N-1>` from PyPI on every push
+and every pull request, so a meaningful share of the download aggregate is
+traffic dev-ready generates about itself, and PyPI's series cannot separate it.
+v0.9's overview recorded the consequence per week as "not computable" and v0.10
+would have recorded the same table again.
+
+The noise is not *unboundable in principle* — workflow-run counts are queryable
+through the GitHub API, and the installs per run are a constant this repository
+controls, so a conservative upper bound is available for roughly half an hour of
+release-day work. That work was weighed at v0.10 and declined: the raw series was
+already non-monotonic at v0.9 (730 falling to 669), so the expected outcome of
+computing the bound is a *definite no* rather than a pass.
+
+**Recorded consequence: v1.0's real-users gate is decided by Branch A alone**
+until someone chooses to bound the noise, and releases stop re-deriving the
+Branch B table. A version overview states the raw weekly totals it can observe,
+names this amendment, and moves on. Reopening Branch B needs the bound computed,
+not another release's worth of "not computable" rows.
+
+This is a narrowing of an evidence rule, not of the gate itself: three
+independent external non-maintainer identities remains exactly what it was, and
+FR-27 still may not start before it passes.
+
+### FR-41 — MIT notice propagation into generated projects
+
+The 2026-08-03 licensing observation above is promoted from recorded to
+scheduled, and lands in v0.11. The two Apache-2.0 skills carry their
+`LICENSE.txt` into every generated project; the twelve MIT `mattpocock/skills`
+loop skills carry no copyright or permission notice at all, while MIT's terms
+require the notice to travel with copies.
+
+What changed is not the facts but their standing. v0.10 is the first version
+whose own `THIRD_PARTY_NOTICES.md` states that the copies written into a
+generated project may be modified and are therefore derived works, and FR-32 now
+injects dev-ready's own text into those same files at generation time. A
+discrepancy the repository documents about itself is no longer one it can leave
+unscheduled.
+
+It did not land in v0.10 because the release phase carries no feature work: a
+vendored LICENSE is a new managed path, a stamp-inventory change, and drift-guard
+coverage. It is small, and it is not a release-day edit.
+
+No legal conclusion is drawn, here or in any user-facing document. The
+obligation, if it is one, predates v0.10 by three versions; what this amendment
+fixes is that nobody owned it.
