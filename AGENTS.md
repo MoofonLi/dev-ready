@@ -7,16 +7,21 @@ This file is the single source of truth for agent rules; `CLAUDE.md` imports it 
 
 dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus Canonical Content for coding agents, optional Agent Target Pointer Stubs and MCP configuration, and design docs.
 
-Current phase: v0.9 is released (`v0.9.0`). It shipped Category-first selection (FR-30), the mandatory Spec Loop and lean Default Set (FR-31), and retirement of the generated Handoff Protocol (FR-35; ADR-017, ADR-018, ADR-020). v0.10 is next: assembly and reach through Mount Points (FR-32), the Agent Target Map (FR-33), the interview-driven generation skill (FR-34; ADR-019), and the selection-reach and overlay-infrastructure corrections in FR-36 (the two 2026-08-02 amendments to ADR-018). v1.0 remains gated on the real-users evidence defined in `docs/version-plan.md`. Per-version plans live in `docs/handoff/<version>/<version>-plan.md`; the domain glossary is `CONTEXT.md`.
+Current phase: v0.10 is released (`v0.10.0`). It shipped Mount Points (FR-32), the Agent Target Map (FR-33), the interview-driven generation skill (FR-34), the selection-reach and overlay-infrastructure corrections (FR-36), the generated project's own stack and standards source (FR-37), and secret hygiene and credential disclosure (FR-38) — governed by ADR-018 as amended, ADR-019 as amended, ADR-022, and ADR-023. v0.11 is next: setup and design reach through `setup-project` (FR-39), the full awesome-design-md set as Design References (FR-40), and MIT notice propagation into generated projects (FR-41). v1.0 remains gated on the real-users evidence defined in `docs/version-plan.md`, which the 2026-08-09 amendment narrowed to Branch A alone. Per-version plans live in `docs/handoff/<version>/<version>-plan.md`; the domain glossary is `CONTEXT.md`.
 
-**Process note:** v0.9 stops *generating* the Handoff Protocol into user projects (ADR-020), and ADR-021 retires it here too — this repo now develops on the Spec Loop and nothing else. See "How this repo is developed" below.
+**Process note:** v0.9 stopped *generating* the Handoff Protocol into user projects (ADR-020), and ADR-021 retires it here too — this repo now develops on the Spec Loop and nothing else. See "How this repo is developed" below.
 
-The v0.9 release surface is fixed: Category is the user-facing selection axis;
-the Spec Loop is always generated; `--yes` accepts the lean Default Set; stamp
-version 5 records Categories and the resolved development loop; the generated
-Handoff Protocol and its flags are retired; and upgrades from v0.8 migrate
-untouched managed content transactionally while preserving edited obsolete
-files.
+The v0.10 release surface is fixed: Mount Points inject an Enhancement's guidance
+into its declared loop skill at generation time only, inside the overlay's
+whole-file rendering and never as a catalog effect; the Agent Target Map is
+derived from the pinned reference list and held to it by a CI drift check, with
+`claude` as what an absent `--agents` and `--yes` resolve to; the generation
+skill is an interview that composes one non-interactive command; the generated
+`AGENTS.md` states the project's stack, verification commands, and standards
+source, drift-guarded against the pinned base template; and generated projects
+ignore `.env` and `.env*` and disclose the superuser login and where its password
+lives. The stamp stays at version 5 — nothing in v0.10 added, removed, or
+re-typed a recorded field.
 
 ## Read before writing code
 

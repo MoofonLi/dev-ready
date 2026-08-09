@@ -8,6 +8,7 @@ Amended 2026-07-26 (later the same day): FR-25 (CLI i18n) withdrawn before imple
 Close-out 2026-07-27: v0.8 is released. FR-26 is shipped in `v0.8.0`, which is tagged and published to PyPI; Phase 4 documentation, review, release, and distribution verification are complete. FR-25 remains withdrawn settled history.
 Amended 2026-07-27: v0.9 and v0.10 added between v0.8 and v1.0 — see "2026-07-27 amendment" at the end of this document (ADR-017, ADR-018, ADR-019). v1.0 is unchanged.
 Close-out 2026-08-01: v0.9 is released. FR-30, FR-31, and FR-35 are shipped in `v0.9.0`; the Category selection model, lean Default Set, and generated Handoff Protocol retirement are complete. ADR-020 changed generated projects only; ADR-021 separately retired this repository's internal Handoff Protocol.
+Close-out 2026-08-09: v0.10 is released. FR-32, FR-33, FR-34, FR-36, FR-37, and FR-38 are shipped in `v0.10.0`; Mount Points, the derived and drift-guarded Agent Target Map, the interview-driven generation skill, the selection-reach and overlay-infrastructure corrections, the generated project's own stack and standards source, and the secret-hygiene repairs are complete. The stamp stayed at version 5, so there was no migration phase. v0.11 (FR-39, FR-40, FR-41) is next.
 Numbering continues from requirements.md (FR-1..FR-10 shipped in v0.1/v0.2).
 
 ## End goal
@@ -409,7 +410,8 @@ it?" — the same test as the curation principle.
 | v0.7 (DONE; v0.7.0 released) | FR-23 Handoff Protocol config, FR-28 Spec Loop, FR-24 generate skill, FR-29 progress reporting | FR-23×FR-28 share the generated rules surface; FR-29 landed before FR-25, which was subsequently withdrawn (D-3 rejected) |
 | v0.8 (DONE; v0.8.0 released) | FR-26 multi-agent render targets | Canonical Content, Agent Target Pointer Stubs, stamp v4, and the v0.7 migration are complete; FR-25 remains withdrawn and Traditional Chinese is served by repository documentation instead |
 | v0.9 (DONE; v0.9.0 released) | FR-30 Category-first selection, FR-31 Spec Loop always generated + Default Set, FR-35 retire the generated Handoff Protocol | Category selection, the lean Default Set, stamp v5, and the v0.8 migration are complete; ADR-020 changed generated projects only, while ADR-021 separately retired the internal protocol |
-| v0.10 (added 2026-07-27) | FR-32 Mount Points, FR-33 Agent Target Map, FR-34 interview-driven generation skill, FR-36 selection reach and overlay-infrastructure corrections (added 2026-08-02) | Assembly and reach, all non-breaking, and all downstream of v0.9's contract |
+| v0.10 (DONE; v0.10.0 released) | FR-32 Mount Points, FR-33 Agent Target Map, FR-34 interview-driven generation skill, FR-36 selection reach and overlay-infrastructure corrections (added 2026-08-02), FR-37 stack and standards sources (added 2026-08-03), FR-38 secret hygiene and credential disclosure (added 2026-08-04) | Assembly and reach, downstream of v0.9's contract; the stamp stayed at version 5, and the only user-facing breaks are the `--agents` default and the retired `setup-all` identifier |
+| v0.11 (added 2026-08-04; FR-41 added 2026-08-09) | FR-39 `setup-project`, FR-40 the full awesome-design-md set as Design References, FR-41 MIT notice propagation into generated projects | Setup and design reach: FR-39 closes the gap v0.10 left at the head of the generated loop, and FR-41 repairs a notice gap v0.10's own THIRD_PARTY_NOTICES made explicit |
 | v1.0 | FR-27 second template (Next.js — selected 2026-07-24, see D-5); Web UI decision revisited | Platform step; gated on real-user feedback and the D-5 hard gates |
 
 **2026-07-24 — v0.6 close-out re-confirmation (CEO-confirmed, Moofon):**
@@ -687,6 +689,13 @@ manifest `vendored` section at a pinned commit, a maintainer script derives
 to a second kind of content, which closes the unmitigated risk ADR-015
 recorded. Only `skills_dir` is derived; `rules_file` and `mcp_file` have no
 upstream source and stay hand-declared.
+
+**Corrected 2026-08-03** — the counts above were a planning-time estimate and
+were superseded when the pin was measured during the Phase 3 grilling. The
+shipped figures are recorded once, in
+`docs/version_overview/v0.10-overview.md`; the property CI actually enforces is
+that the manifest declares a target for every agent the pinned source gives a
+project-level skills directory other than `.agents/skills`.
 
 FR-34. **Interview-driven generation skill.** FR-24's skill teaches an agent to
 compose `dev-ready init` flags; it must be rewritten for FR-30's contract
