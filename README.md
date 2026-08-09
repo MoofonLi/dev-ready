@@ -35,23 +35,58 @@ overlay:
 - Optional Enhancements selected by Category: Dev, Security, Quality, Design,
   and Token Optimize. The catalog includes security auditing, React analysis,
   browser testing, frontend-design guidance, design-system references, concise
-  agent guidance, codebase memory, and post-generation Spec Loop setup.
-- Optional Agent Targets for Claude Code and Windsurf. Each receives ordinary
-  Pointer Stubs at its native discovery path; the stubs are neither symbolic
-  links nor copies of Canonical Content.
+  agent guidance, and codebase memory. A selected Enhancement adds its guidance
+  inside the loop step that acts on it, so the agent meets it while doing the
+  work rather than having to go looking.
+- An `AGENTS.md` that is the project’s standards source: the stack it actually
+  uses, the exact commands to test, lint, format, and type-check both halves of
+  it, and the rules no tool enforces.
+- Optional Agent Targets. dev-ready declares one for every coding agent that its
+  pinned reference list gives a project-level directory of its own, and CI fails
+  when the two diverge; the authoritative list is `agent_targets` in
+  [`src/dev_ready/manifest.json`](src/dev_ready/manifest.json). Each selected
+  target receives ordinary Pointer Stubs at its native discovery path; the stubs
+  are neither symbolic links nor copies of Canonical Content.
 - `.mcp.json` only when a selected Enhancement needs project-level MCP
   configuration.
+- Secret hygiene from the first commit: the generated `.env` holds per-project
+  random secrets and is ignored by git, and the project tells you its default
+  administrator login and where that password lives.
 - A `.dev-ready.json` stamp recording immutable Base Provenance and current
   Overlay Currency: Categories, development loop, Enhancements, Agent Targets,
   pins, and the managed-file inventory.
 
-v0.9 no longer generates the Handoff Protocol’s seven-role multi-agent
-scaffold, Protocol Configuration, gate templates, ticket scaffold, or execution
-report. Generated projects use the Spec Loop without a second process layer.
-
 Every project also receives a project-specific `README.md`. Upstream
-repository-maintenance files such as its contributing guide, release notes,
-deploy workflows, and screenshots are pruned.
+repository-maintenance files such as its contributing guide, release notes and
+screenshots are pruned; the deployment workflows upstream wrote for downstream
+users are kept.
+
+## The development workflow you get
+
+Every generated project carries one method, and the agent reads it from
+`AGENTS.md` on the first turn of every session. Four steps, each leaving
+something behind in your repository:
+
+1. **`grill-with-docs`** — the agent interrogates what you are asking for
+   against the project’s own `docs/architecture.md` and `docs/requirements.md`
+   instead of starting to type. *Leaves behind:* anything settled that outlives
+   the feature, written into those documents.
+2. **`to-spec`** — a durable spec you approve before any code exists. *Leaves
+   behind:* a committed document that is the only record of the work that
+   survives it, and the thing the code is later reviewed against.
+3. **`to-tickets`** — the spec is cut into tracer-bullet tickets, each declaring
+   what blocks it, which files it may touch, and whether it is safe to run in
+   parallel. *Leaves behind:* one file per ticket, wherever your tracker
+   configuration says they live.
+4. **`implement`** — one ticket at a time, test-first: a failing test, the
+   smallest change that passes it, then cleanup. Diagnosis is an action inside
+   this step when something breaks, and it ends with a two-axis review — does
+   this follow the project’s documented standards, and does it do what the spec
+   asked? *Leaves behind:* the change, its tests, and a review pass, inside the
+   ticket’s declared footprint.
+
+Between features, `improve-codebase-architecture` and `codebase-design` are
+there for the structural work that is nobody’s ticket.
 
 ## Requirements
 
@@ -122,17 +157,21 @@ The Category flags are:
 |---|---|
 | `--categories` | `dev`, `security`, `quality`, `design`, `token-optimize`, `all`, or `none` |
 | `--development-loop` | Mandatory loop; currently `spec-loop` |
-| `--dev` | Dev Enhancements, currently `setup-all` |
+| `--dev` | Dev Enhancements; the Category currently offers none |
 | `--security` | `security-audit` |
 | `--quality` | `react-doctor`, `webapp-testing` |
 | `--design` | `frontend-design`, `design-stripe`, `design-linear` |
 | `--token-optimize` | `caveman`, `code-memory` |
-| `--agents` | Agent Targets `claude`, `windsurf`, `all`, or `none` |
+| `--agents` | Agent Targets by identifier, `all`, or `none` |
 
 List flags accept `all`, `none`, or comma-separated identifiers. Dev remains
 selected because every project has a development loop. Use
 `--categories all` for the whole catalog; `--yes` by itself accepts only the
 lean Default Set.
+
+`--agents` defaults to `claude`, and so does `--yes`. `--agents all` selects
+every declared target, which is a great many Pointer Stub files — name the
+targets you want instead.
 
 The previous Component-shaped flags (`--skills`, `--no-skills`, `--mcp`,
 `--no-mcp`, and `--no-docs`) now exit 2 and name their Category-shaped
@@ -209,12 +248,10 @@ and published to PyPI through trusted publishing; see
 
 ## Roadmap
 
-v0.9 ships Category-first selection, the mandatory Spec Loop and lean Default
-Set, and retirement of the generated Handoff Protocol. v0.10 adds Mount Points,
-an expanded Agent Target Map, and an interview-driven generation skill. v1.0’s
-second template remains gated on attributable external-user evidence or four
-strictly increasing adjusted complete UTC weeks of PyPI downloads. See the
-[v0.9 overview](docs/version_overview/v0.9-overview.md).
+The current direction is reach: making the guidance a project already receives
+land where its agent is working, and making more agents able to find it. v1.0’s
+second template remains gated on attributable evidence of real external use. See
+the [v0.10 overview](docs/version_overview/v0.10-overview.md).
 
 ## License
 

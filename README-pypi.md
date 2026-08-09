@@ -26,16 +26,30 @@ A generated project based on
 - A lean Default Set: the Spec Loop plus the project’s own architecture and
   requirements skeletons. Every Enhancement is off by default.
 - Optional Enhancements selected through Dev, Security, Quality, Design, and
-  Token Optimize Categories.
-- Optional Claude Code and Windsurf Agent Targets, rendered as Pointer Stubs
-  over the one Canonical Content copy—not symbolic links or content copies.
+  Token Optimize Categories. A selected Enhancement adds its guidance inside the
+  loop step that acts on it.
+- An `AGENTS.md` that is the project’s standards source: its stack, the exact
+  test, lint, format, and type-check commands, and the rules no tool enforces.
+- Optional Agent Targets. dev-ready declares one for every coding agent that its
+  pinned reference list gives a project-level directory of its own, held to that
+  list by CI. Each selected target is rendered as Pointer Stubs over the one
+  Canonical Content copy—not symbolic links or content copies.
 - Project-level `.mcp.json` only when a selected Enhancement needs it.
+- A generated `.env` of per-project random secrets that git ignores, and a
+  project that tells you its default administrator login and where that password
+  lives.
 - A `.dev-ready.json` stamp recording immutable Base Provenance and current
   Overlay Currency.
 
-v0.9 no longer generates the Handoff Protocol’s seven-role multi-agent
-scaffold, Protocol Configuration, gate templates, ticket scaffold, or execution
-report. Generated projects use the Spec Loop without a second process layer.
+## The development workflow you get
+
+Every project carries one method its agent reads from `AGENTS.md`: grill the
+request against the project’s own architecture and requirements documents, write
+a durable spec you approve, cut it into tracer-bullet tickets with declared file
+footprints, then implement one ticket at a time test-first, ending in a review
+against both the project’s standards and the spec. Each step leaves a committed
+artifact behind. Full description:
+<https://github.com/MoofonLi/dev-ready#the-development-workflow-you-get>.
 
 ## Requirements
 
@@ -92,11 +106,13 @@ uvx dev-ready init my-app --yes --categories dev,token-optimize --dev none --tok
 Enhancement. Category selection accepts `all`, `none`, or comma-separated
 identifiers through `--categories`, `--dev`, `--security`, `--quality`,
 `--design`, and `--token-optimize`; `--development-loop` names the mandatory
-loop and `--agents` independently selects Agent Targets.
+loop and `--agents` independently selects Agent Targets. `--agents` defaults to
+`claude`, as does `--yes`; `--agents all` selects every declared target and
+writes a great many Pointer Stub files.
 
 | Category | Enhancement identifiers |
 |---|---|
-| Dev | `setup-all` |
+| Dev | none currently; the development loop is always generated |
 | Security | `security-audit` |
 | Quality | `react-doctor`, `webapp-testing` |
 | Design | `frontend-design`, `design-stripe`, `design-linear` |
@@ -133,7 +149,7 @@ upgrade failed and rolled back.
 
 - Source and issues: <https://github.com/MoofonLi/dev-ready>
 - CLI spec, architecture, and ADRs: <https://github.com/MoofonLi/dev-ready/tree/main/docs>
-- v0.9 overview: <https://github.com/MoofonLi/dev-ready/blob/main/docs/version_overview/v0.9-overview.md>
+- v0.10 overview: <https://github.com/MoofonLi/dev-ready/blob/main/docs/version_overview/v0.10-overview.md>
 
 ## License
 
