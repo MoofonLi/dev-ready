@@ -20,16 +20,15 @@ uvx dev-ready init my-app
 
 一個以 [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) 為基底的專案（FastAPI、React、SQLModel、PostgreSQL、Docker Compose），外加一層 AI 工具疊加內容，讓 coding agent 一開箱就能順利工作：
 
-- **專案指示與開發護欄** — 共用內容只寫一份在標準位置；支援標準的 agent 可直接讀取，另有需要的 agent 則透過指向共用內容的普通檔案使用同一份指示
+- **專案指示與開發護欄** — 共用內容只寫一份在標準位置；支援標準的 agent 可直接讀取，而凡是需要自己專屬目錄的 agent，只要固定參考清單裡有它，dev-ready 就會為它寫一份指向共用內容的普通檔案，讓它讀到同一份指示。專案的 `AGENTS.md` 也會寫明這個專案實際用了哪些技術、測試與檢查各該跑哪些指令，以及它本身就是這個專案的標準來源
 - **必備的 Spec Loop** — 每個專案都會帶入釐清需求、可留存的規格、tracer-bullet 工單、實作、TDD、除錯、審查與架構改善的完整循環
 - **精簡的預設內容** — 接受預設值時，只產生 Spec Loop 加上專案自己的架構與需求文件骨架；其他強化項目預設都不加入
 - **依用途挑選的強化項目** — 可依開發、安全、品質、設計與 token 最佳化等類別，選擇安全稽核、React 分析、瀏覽器測試、前端設計參考、精簡 agent 回應與 codebase-memory 等能力
 - **按需產生的 MCP 設定** — 只有選到需要專案層級 MCP 設定的強化項目時才會寫入設定檔，工具版本仍然固定
+- **一開始就顧好機密** — 產生的 `.env` 裡是這個專案專屬的隨機密鑰，而且從第一次 commit 就被 git 忽略；專案也會告訴你預設管理者帳號是什麼、密碼放在哪裡
 - **產生戳記 `.dev-ready.json`** — 記錄不可變的基底來源，以及目前選取的類別、開發循環、強化項目、agent 目標、版本固定值與受管理檔案清單
 
-v0.9 不再把七角色的多 agent 交接協議、角色設定、審查關卡、工單骨架與執行報告放進新專案。產生的專案只描述 Spec Loop，不會再多帶一套流程。
-
-每個產生的專案也會有自己的 `README.md`。上游範本自身的 repo 維護檔案（`CONTRIBUTING.md`、發布說明、部署 workflow、截圖等）會被清掉，不會有範本 repo 專屬的東西滲進你的專案。
+每個產生的專案也會有自己的 `README.md`。上游範本自身的 repo 維護檔案（`CONTRIBUTING.md`、發布說明、截圖等）會被清掉，不會有範本 repo 專屬的東西滲進你的專案。
 
 ## 環境需求
 
