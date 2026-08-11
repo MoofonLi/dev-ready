@@ -208,6 +208,13 @@ def _prompt_category_items(
         for item in catalog.all_items()
         if item.category in selected_categories and item.id not in development_loop_ids
     }
+    if not labels:
+        # Nothing to choose between — every item in the selected Categories is a
+        # development loop, already settled earlier. Reached by taking the Default
+        # Set and adding no Categories, which leaves only `dev`. Asking anyway
+        # would put an empty list in front of the user, and questionary raises on
+        # an empty choice list rather than rendering one.
+        return frozenset()
     try:
         selected = asker.checkbox(
             "Select items within the chosen Categories:",

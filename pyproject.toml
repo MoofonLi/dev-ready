@@ -15,6 +15,9 @@ dev-ready = "dev_ready.cli:main"
 
 [dependency-groups]
 dev = [
+    # Drives QuestionaryAsker headlessly in tests (pipe input + dummy output).
+    # questionary pulls it in anyway, but far too loosely (>=2.0,<4.0) to rely on.
+    "prompt-toolkit>=3.0.29,<4",
     "pytest>=8.0",
     "ruff>=0.8",
 ]

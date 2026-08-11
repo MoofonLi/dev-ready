@@ -1,13 +1,16 @@
 """Unit tests for dev_ready.prompts (no network, no real TTY, tmp_path only)."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 from pathlib import Path
+from typing import TypeVar
 
 import pytest
+from prompt_toolkit.application import create_app_session
+from prompt_toolkit.input import create_pipe_input
+from prompt_toolkit.output import DummyOutput
 
 import dev_ready.prompts.collect as collect_module
-import dev_ready.prompts._questionary_asker as questionary_asker_module
 from dev_ready.errors import AbortedError, InvalidArgumentsError
 from dev_ready.manifest import (
     AgentTarget,
@@ -23,6 +26,7 @@ from dev_ready.prompts import (
     collect_answers,
     confirm_generation,
 )
+from dev_ready.prompts._questionary_asker import QuestionaryAsker
 
 PIN = UpstreamPin(
     repo="fastapi/full-stack-fastapi-template",
@@ -241,7 +245,7 @@ def test_name_prompt_result_lands_in_answers() -> None:
 
 
 def test_interactive_defaults_produce_default_set_without_enhancement_selection() -> None:
-    asker = FakeAsker(confirms=[True], checkboxes=[[], [], CLAUDE_AGENT_LABELS])
+    asker = FakeAsker(confirms=[True], checkboxes=[[], CLAUDE_AGENT_LABELS])
 
     answers = collect_answers(
         _partial(selection_explicit=False), catalog=CATALOG, asker=asker
@@ -256,18 +260,20 @@ def test_interactive_defaults_produce_default_set_without_enhancement_selection(
         "Use the Default Set (development loop: spec-loop)?",
     ]
     assert asker.checkbox_calls[0] == "Select Categories to include:"
-    assert asker.checkbox_calls[1] == "Select items within the chosen Categories:"
-    assert asker.checkbox_calls[2].startswith(
+    # No item prompt: `dev` holds only the development loop, so there is nothing
+    # left to choose between and an empty list is never put in front of the user.
+    assert "Select items within the chosen Categories:" not in asker.checkbox_calls
+    assert asker.checkbox_calls[1].startswith(
         "Select Agent Targets (standard-compliant agents read .agents/skills/ directly"
     )
-    assert "cursor" in asker.checkbox_calls[2]
+    assert "cursor" in asker.checkbox_calls[1]
     assert answers.agent_targets == frozenset({"claude"})
     assert answers.selection == ProjectSelection.default_set(CATALOG)
-    assert asker.checkbox_initially_selected == [[], [], CLAUDE_AGENT_LABELS]
+    assert asker.checkbox_initially_selected == [[], CLAUDE_AGENT_LABELS]
 
 
 def test_interactive_custom_branch_preselects_the_same_agent_as_default_set() -> None:
-    asker = FakeAsker(confirms=[False], checkboxes=[[], [], CLAUDE_AGENT_LABELS])
+    asker = FakeAsker(confirms=[False], checkboxes=[[], CLAUDE_AGENT_LABELS])
 
     answers = collect_answers(
         _partial(selection_explicit=False), catalog=CATALOG, asker=asker
@@ -355,7 +361,7 @@ def test_category_and_item_choices_resolve_across_components() -> None:
 
 
 def test_empty_category_selection_produces_no_catalog_content() -> None:
-    asker = FakeAsker(confirms=[False], checkboxes=[[], [], ALL_AGENT_LABELS])
+    asker = FakeAsker(confirms=[False], checkboxes=[[], ALL_AGENT_LABELS])
 
     answers = collect_answers(
         _partial(selection_explicit=False), catalog=CATALOG, asker=asker
@@ -368,7 +374,7 @@ def test_empty_category_selection_produces_no_catalog_content() -> None:
     assert answers.include_docs is False
     assert answers.selection.development_loop == "spec-loop"
     assert answers.selection.categories == frozenset({"dev"})
-    assert asker.checkbox_initially_selected == [[], [], CLAUDE_AGENT_LABELS]
+    assert asker.checkbox_initially_selected == [[], CLAUDE_AGENT_LABELS]
 
 
 def test_interactive_agent_targets_remain_last_and_are_resolved() -> None:
@@ -392,28 +398,101 @@ def test_interactive_agent_targets_remain_last_and_are_resolved() -> None:
     assert asker.checkbox_choices[-1] == ALL_AGENT_LABELS
 
 
-def test_questionary_checkboxes_enable_type_to_filter(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    captured: dict[str, object] = {}
+# --- QuestionaryAsker against the real questionary, driven headlessly ---
+#
+# Every test above this point injects a FakeAsker, so none of them execute the
+# one module that talks to questionary. These do: they drive the real
+# QuestionaryAsker through real questionary and prompt_toolkit, over a pipe
+# instead of a TTY. Nothing here is monkeypatched — an argument combination
+# questionary rejects, or an API that drifts under a questionary upgrade, fails
+# here rather than on a user's terminal.
 
-    class _Question:
-        def ask(self) -> list[str]:
-            return []
+ENTER = "\r"
+SPACE = " "
 
-    def _checkbox(message: str, choices: list[object], **kwargs: object) -> _Question:
-        captured.update(message=message, choices=choices, **kwargs)
-        return _Question()
+_T = TypeVar("_T")
 
-    monkeypatch.setattr(questionary_asker_module.questionary, "checkbox", _checkbox)
 
-    questionary_asker_module.QuestionaryAsker().checkbox(
-        "Select choices:",
-        ["alpha", "beta"],
-        initially_selected=["alpha"],
+def _drive_asker(keystrokes: str, interaction: Callable[[QuestionaryAsker], _T]) -> _T:
+    """Run `interaction` against a real `QuestionaryAsker`, feeding `keystrokes`.
+
+    Headless: prompt_toolkit reads from a pipe and writes to a dummy output, so
+    this needs no console. The app session must wrap the whole call — questionary
+    builds its prompt_toolkit Application when the question is constructed, not
+    when it is asked.
+    """
+    with create_pipe_input() as pipe_input:
+        pipe_input.send_text(keystrokes)
+        with create_app_session(input=pipe_input, output=DummyOutput()):
+            return interaction(QuestionaryAsker())
+
+
+def test_questionary_checkbox_returns_the_initially_selected_items() -> None:
+    selected = _drive_asker(
+        ENTER,
+        lambda asker: asker.checkbox(
+            "Select choices:",
+            ["alpha", "beta"],
+            initially_selected=["alpha"],
+        ),
     )
 
-    assert captured["use_search_filter"] is True
+    assert selected == ["alpha"]
+
+
+def test_questionary_checkbox_narrows_choices_by_typing() -> None:
+    """Typing filters the list — the reason the Category and item checkboxes,
+    which offer the whole catalog, are usable at all."""
+    selected = _drive_asker(
+        "gamma" + SPACE + ENTER,
+        lambda asker: asker.checkbox(
+            "Select choices:",
+            ["alpha", "beta", "gamma"],
+            initially_selected=(),
+        ),
+    )
+
+    assert selected == ["gamma"]
+
+
+def test_default_set_flow_survives_pressing_enter_through_every_prompt() -> None:
+    """The reported v0.10.0 session: `dev-ready init my-app`, accept the Default
+    Set, then take the default at each remaining prompt.
+
+    Accepting no extra Categories leaves only `dev`, whose sole item is the
+    development loop itself — so the item prompt has nothing to offer and must
+    not be asked. This drives collect_answers through the real questionary, the
+    only arrangement that reproduces what users actually hit.
+    """
+    # Default Set offer, Category selection, Agent Target selection. Naming them
+    # means adding a prompt forces this list to be updated: a short count would
+    # otherwise read EOF from the pipe rather than fail on the missing answer.
+    default_flow_prompts = ("default-set", "categories", "agent-targets")
+
+    answers = _drive_asker(
+        ENTER * len(default_flow_prompts),
+        lambda asker: collect_answers(
+            _partial(selection_explicit=False), catalog=CATALOG, asker=asker
+        ),
+    )
+
+    assert answers.selection == ProjectSelection.default_set(CATALOG)
+    assert answers.agent_targets == frozenset({"claude"})
+
+
+def test_questionary_text_returns_what_was_typed() -> None:
+    assert _drive_asker("my-app" + ENTER, lambda asker: asker.text("Project name:")) == "my-app"
+
+
+def test_questionary_select_returns_the_highlighted_choice() -> None:
+    assert (
+        _drive_asker(ENTER, lambda asker: asker.select("Select one:", ["alpha", "beta"])) == "alpha"
+    )
+
+
+def test_questionary_confirm_returns_the_default_on_enter() -> None:
+    assert _drive_asker(ENTER, lambda asker: asker.confirm("Proceed?", default=True)) is True
+    assert _drive_asker(ENTER, lambda asker: asker.confirm("Proceed?", default=False)) is False
 
 
 def test_category_item_selection_can_be_narrowed_to_one_item() -> None:
@@ -446,8 +525,10 @@ def test_category_prompt_cancel_raises_aborted() -> None:
 
 
 def test_category_item_prompt_cancel_raises_aborted() -> None:
+    # `quality` rather than `dev`: the item prompt only appears for a Category
+    # that has items left to offer once the development loop is excluded.
     asker = FakeAsker(
-        confirms=[False], checkboxes=[_category_labels("dev"), None]
+        confirms=[False], checkboxes=[_category_labels("quality"), None]
     )
 
     with pytest.raises(AbortedError, match="Category item selection cancelled"):

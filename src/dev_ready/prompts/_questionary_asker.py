@@ -34,6 +34,9 @@ class QuestionaryAsker:
                 for choice in choices
             ],
             use_search_filter=True,
+            # questionary rejects the two together: with a prefix filter active,
+            # j and k are filter text, not movement. Arrow keys still move.
+            use_jk_keys=False,
         ).ask()
 
     def confirm(self, message: str, *, default: bool = True) -> bool | None:
