@@ -1,8 +1,9 @@
 # Requirements — dev-ready
 
-Status: v0.10 released (2026-08-09). FR-32, FR-33, FR-34, FR-36, FR-37, and
-FR-38 are shipped in v0.10.0. Historical scope and roadmap details are in
-docs/version-plan.md.
+Status: v0.10 released (2026-08-09; patched by v0.10.1 on 2026-08-11). FR-32,
+FR-33, FR-34, FR-36, FR-37, and FR-38 are shipped in v0.10.0; v0.10.1 repaired
+two crashes that made interactive `init` unusable and changed no requirement.
+Historical scope and roadmap details are in docs/version-plan.md.
 
 ## Problem Statement
 
@@ -114,7 +115,7 @@ NFR-5. Cross-platform: macOS, Linux, Windows.
 7. v0.7: Handoff Protocol config (FR-23), Spec Loop bundle (FR-28), generate skill (FR-24), progress reporting (FR-29). DONE — v0.7.0 tagged and published to PyPI.
 8. v0.8: multi-agent render targets (FR-26). CLI i18n (FR-25) was withdrawn 2026-07-26 (D-3 rejected); Traditional Chinese is served by repository documentation instead. DONE — v0.8.0 tagged and published to PyPI.
 9. v0.9: selection model — Category-first selection (FR-30), Spec Loop always generated + Default Set (FR-31), retire the generated Handoff Protocol (FR-35). DONE — v0.9.0 released.
-10. v0.10: assembly and reach — Mount Points (FR-32), Agent Target Map (FR-33), interview-driven generation skill (FR-34), selection reach and overlay-infrastructure corrections (FR-36), tech stack and standards sources in the generated `AGENTS.md` (FR-37), secret hygiene and credential disclosure (FR-38). DONE — v0.10.0 released.
+10. v0.10: assembly and reach — Mount Points (FR-32), Agent Target Map (FR-33), interview-driven generation skill (FR-34), selection reach and overlay-infrastructure corrections (FR-36), tech stack and standards sources in the generated `AGENTS.md` (FR-37), secret hygiene and credential disclosure (FR-38). DONE — v0.10.0 released, v0.10.1 patched.
 11. v0.11: setup and design reach — `setup-project` (FR-39), the full awesome-design-md set as Design References (FR-40), MIT notice propagation into generated projects (FR-41). PLANNED.
 12. v1.0: second template — Next.js (FR-27, gated on the defined real-users checklist); Web UI decision revisited.
 

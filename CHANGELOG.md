@@ -2,6 +2,33 @@
 
 All notable changes to dev-ready are documented here.
 
+## [0.10.1] — 2026-08-11
+
+### Fixed
+
+- **Interactive `dev-ready init` works again.** In 0.10.0 it could not get past
+  its own prompts: the first multi-select raised
+  `ValueError: Cannot use j/k keys with prefix filter search`, because
+  type-to-filter was enabled without disabling the j/k movement keys that
+  questionary refuses to combine with it. Every interactive run hit this — the
+  Category prompt, the item prompt, and the Agent Target prompt alike. Arrow
+  keys still move the selection; j/k now type into the filter, which is what
+  enabling the filter was for. `--yes` and the fully-flagged non-interactive
+  paths were never affected.
+- **The Category item prompt no longer crashes on an empty list.** Accepting the
+  Default Set and adding no Category leaves only `dev`, whose sole item is the
+  development loop itself — so the item prompt had nothing to offer and
+  questionary raised `AttributeError: 'InquirerControl' object has no attribute
+  'pointed_at'`. The prompt is now omitted when the chosen Categories offer no
+  item outside the development loop: there is nothing to choose between, and a
+  checkbox over an empty list is not a question. This sat directly behind the
+  first crash on the default path and would have surfaced the moment it was
+  fixed.
+
+No selection, flag, exit code, stamp version, or generated file changed. A
+default interactive run produces exactly the Default Set with the `claude` Agent
+Target, as before.
+
 ## [0.10.0] — 2026-08-09
 
 ### Breaking changes

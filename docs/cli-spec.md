@@ -1,6 +1,6 @@
 # CLI Specification — dev-ready
 
-Status: Current as of v0.10.0 (released 2026-08-09). This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
+Status: Current as of v0.10.1 (released 2026-08-11). This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
 
 ## Commands
 
@@ -168,7 +168,7 @@ construction and dispatch directly to their respective operations.
 2. Default Set offer, naming its resolved `spec-loop` development loop (yes by default)
 3. If the Default Set is declined and the manifest offers multiple development loops, mandatory development-loop single-selection (the Default Set loop is listed first)
 4. Category selection (`dev`, `security`, `quality`, `design`, and `token-optimize`; Dev remains selected because its development loop is mandatory); when the Default Set was accepted, the chosen Enhancements are layered onto it
-5. Enhancement selection across the chosen Categories (Dev currently offers none; the loop is not an optional item)
+5. Enhancement selection across the chosen Categories (Dev currently offers none; the loop is not an optional item) — **omitted entirely when the chosen Categories offer no item outside the development loop**, which is what accepting the Default Set and adding no Category does. There is nothing to choose between, and a checkbox over an empty list is not a question
 6. Agent Target selection (described multi-select, Claude Code on by default; plain Enter accepts Claude Code only)
 7. Confirmation summary naming the resolved Categories, Catalog Items, and Agent Targets before writing anything
 
