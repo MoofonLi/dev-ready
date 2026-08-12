@@ -1131,6 +1131,43 @@ agent session and installs Serena, and Codex instructions requiring an absolute
 binary path dev-ready cannot write. FR-49 states the conditions it must clear;
 until then it is a candidate, not a schedule entry.
 
+### headroom — gate measured, two conditions failed (2026-08-12)
+
+FR-49's gate was written in this session and closed in it, against
+`headroom-ai==0.34.0`, by installing and running the thing rather than by
+reading its README. Three of five conditions pass: it launches under `uvx`, it
+needs no API key, and it has real standalone value with no proxy — 54% token
+reduction on JSON, 26% on log lines, and `headroom_retrieve` returning the exact
+original by hash from a **fresh process**, which the `--help` text had implied
+required the proxy.
+
+Two fail. It writes `~/.headroom/` on any invocation, including `--help`, and
+running the MCP server fills it with a SQLite store of the **original content**
+of everything compressed plus a persistent `install_id` and two JSONL logs; the
+store is relocatable by environment variable but `~/.headroom` itself is
+hardcoded. And `BEACON_DEFAULT_ON = True` — anonymous session telemetry uploads
+to a third-party endpoint **by default**, fail-open by the code's own
+description, though `DO_NOT_TRACK` and `HEADROOM_BEACON=off` both stop it.
+
+The second failure was not in the gate and is the more important one, because it
+generalises: **a pinned-dependency item lands in every generated project's
+`.mcp.json`, so dev-ready would be the reason a user transmits anything.** That
+is the shape of failure FR-38 spent a version repairing — dev-ready doing
+something on a user's behalf and not saying so. "No outbound telemetry on by
+default" therefore joins the standard for pinned-dependency candidates, and
+`code-memory` should be measured against it too, since it never was.
+
+Also recorded because it narrows the item's value even if the gate is later
+reopened: headroom returns **code unchanged** (`router:protected:recent_code`)
+and **file listings unchanged** (`router:noop`). Its wins are on structured data
+and logs, not on the file contents a coding agent reads most.
+
+headroom stays a candidate on the same footing as Graphify. Reopening needs the
+store fully relocatable and telemetry defaulting off, or a deliberate decision to
+ship a hardened `.mcp.json` entry with disclosure in the generation report —
+which would leave dev-ready maintaining an opt-out against a moving upstream with
+no FR-16-style guard.
+
 ### Accepted against recommendation
 
 Unreleased flows are **listed in the menu** marked `(coming soon)`, which the

@@ -44,8 +44,11 @@ if third-party) → removed from this file.
 
 ### headroom (headroomlabs-ai/headroom)
 
-- Status: **deferred, not rejected** (2026-08-02, Moofon). Blocked on FR-32
-  Mount Points landing and on first-party measurement — see below.
+- Status: **deferred, not rejected** (2026-08-02, Moofon). Both original
+  blockers are now closed — FR-32 shipped in v0.10, and the first-party
+  measurement was run on 2026-08-12 — but **the measurement surfaced two new
+  blockers that outrank the old ones**, so it stays deferred. See "Measured
+  2026-08-12" below.
 - License: Apache-2.0. Pinned-dependency mode redistributes nothing, so no
   THIRD_PARTY_NOTICES entry is required. Distributed as `headroom-ai` on PyPI
   and npm, and as `ghcr.io/chopratejas/headroom` — verify at integration time
@@ -80,6 +83,65 @@ if third-party) → removed from this file.
   overwhelmingly in wrap mode, the honest outcome is a recommendation in the
   generated README rather than a catalog item — dev-ready would be installing
   the mode that does not deliver the benefit.
+
+#### Measured 2026-08-12 — `headroom-ai==0.34.0`, installed and run
+
+Run against the real package rather than its README, in a directory with no
+`*_API_KEY` and no `HEADROOM_*` variable set. Five conditions; three pass.
+
+- **Launches clean.** `uvx --from "headroom-ai[mcp]==0.34.0" headroom mcp serve`
+  completes an MCP handshake. The `mcp` extra declares only four dependencies
+  (`mcp`, `httpx`, `starlette`, `uvicorn`), but the base pulls ~69 packages and
+  ~65 MB — `litellm` alone is 23 MB, and it drags in `openai`, `tokenizers`, and
+  `hf-xet`.
+- **No API key.** Confirmed for `--help`, `mcp status`, `mcp serve`, and every
+  `tools/call`.
+- **Standalone value exists, and is better than the 2026-08-02 note assumed.**
+  With no proxy running, `headroom_compress` saved 54% of tokens on a 120-record
+  JSON payload and 26% on 400 log lines, and `headroom_retrieve` returned the
+  byte-exact original by hash — both in-session and from a **fresh process**
+  (`source: "local"`). The `mcp --help` text says the MCP server fetches
+  originals *from the proxy*; it falls back to a local store, so compression is
+  reversible without the proxy.
+- **NEW BLOCKER — writes outside the project.** Running `--help` alone creates
+  `~/.headroom/update_check.json`. Running the server grows that directory to
+  379 KB: `ccr_store.db` (SQLite, holding the **original content** of everything
+  compressed), `config/install_id`, `savings_events.jsonl`, `session_stats.jsonl`.
+  `HEADROOM_CCR_SQLITE_PATH` relocates the database and `HEADROOM_WORKSPACE_DIR`
+  the workspace, but `~/.headroom` is hardcoded in `cache/ttl_observations.py`.
+  dev-ready never writes outside the target project; here it would be the reason
+  something else does.
+- **NEW BLOCKER — outbound telemetry on by default.** `BEACON_DEFAULT_ON = True`
+  (`headroom/telemetry/beacon.py:56`), and `is_beacon_enabled()` returns `True`
+  in a clean environment, uploading anonymous session aggregates to
+  `https://headroom-beacon.headroom-beacon.workers.dev/v1/logs`. It is built
+  responsibly — `DO_NOT_TRACK`, `HEADROOM_OFFLINE`, and `HEADROOM_BEACON=off`
+  all disable it, and the payload is counts, not content — but the default is on
+  and the code documents itself as fail-open, so an unrecognised value uploads.
+  A pinned-dependency item lands in **every** generated project's `.mcp.json`,
+  which would make dev-ready the reason a user transmits anything. That is the
+  shape of failure FR-38 spent a version repairing.
+- **The 2026-08-02 net-cost argument survives the measurement and is still the
+  deepest objection.** The tool works when called; nothing here shows the agent
+  calls it. Three tool definitions cost every session unconditionally, while the
+  saving is conditional on the agent choosing to route content through them —
+  and the measurement adds that headroom returns **code unchanged**
+  (`router:protected:recent_code`) and **file listings unchanged**
+  (`router:noop`). Its wins are on structured data and logs, not on what a
+  coding agent reads most. A Mount Point pointing `diagnosing-bugs` at a large
+  log remains the strongest shape, and it is now the *only* remaining argument
+  for shipping it.
+- **What would unblock it now:** the store fully relocatable inside the project
+  and telemetry defaulting off — or an accepted decision to ship a hardened
+  `.mcp.json` entry (`HEADROOM_BEACON=off`, relocated store, the store path
+  gitignored) with explicit disclosure in the generation report. That second
+  route leaves dev-ready maintaining an opt-out against a moving upstream with no
+  FR-16-style guard: a rename upstream turns transmission back on silently.
+
+**Generalised from this measurement:** "no outbound telemetry enabled by
+default" joins the admission standard for every pinned-dependency candidate.
+`code-memory` shipped in v0.3 and has never been checked against it; that check
+is owed.
 
 ### graphify (Graphify-Labs/graphify)
 
