@@ -53,6 +53,10 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | [ADR-019](decisions/adr-019-agent-target-map-drift-guard.md) | Agent Target Map derived from the reference installer and drift-guarded (v0.10) | Accepted (2026-07-27) |
 | [ADR-020](decisions/adr-020-handoff-protocol-not-generated.md) | The Handoff Protocol is dev-ready's own process, not a generated artifact (v0.9) | Accepted (2026-07-27) |
 | [ADR-021](decisions/adr-021-internal-process-v3-spec-loop-only.md) | Internal process v3 — the Spec Loop only, no generated gate documents (supersedes ADR-007's protocol) | Accepted (2026-07-31) |
+| [ADR-022](decisions/adr-022-upstream-config-not-application-source.md) | dev-ready modifies upstream configuration, never upstream application source (v0.10+) | Accepted (2026-08-04) |
+| [ADR-023](decisions/adr-023-upstream-facts-drift-guard.md) | Generated content may state facts about upstream only under a pinned-commit drift guard (v0.10+) | Accepted (2026-08-05) |
+| [ADR-024](decisions/adr-024-engineering-flow-selection-spine.md) | Engineering Flow is the user-facing selection spine, named after its source (v0.11) | Accepted (2026-08-12), amends ADR-012/017/018 |
+| [ADR-025](decisions/adr-025-skill-delivery-mode.md) | Agent Targets receive a chosen Skill Delivery Mode — symlink or copy — replacing Pointer Stubs (v0.12) | Accepted (2026-08-12), partly supersedes ADR-015 |
 
 ## Module Boundary
 

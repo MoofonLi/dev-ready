@@ -1,6 +1,6 @@
 # ADR-015: Agent Targets render as Pointer Stubs over one Canonical Content copy
 
-- Status: **Accepted** (2026-07-26, CEO Moofon). Implements FR-26 (v0.8); amends ADR-010 (adds a selection dimension) and ADR-014 (extends obsolete-file retirement to a layout migration).
+- Status: **Accepted** (2026-07-26, CEO Moofon). Implements FR-26 (v0.8); amends ADR-010 (adds a selection dimension) and ADR-014 (extends obsolete-file retirement to a layout migration). **Partly superseded by [ADR-025](adr-025-skill-delivery-mode.md) (2026-08-12): the Canonical Content decision stands unchanged and ADR-025 depends on it, but Pointer Stubs are retired in favour of a user-selected Skill Delivery Mode — `symlink` or `copy`. See the 2026-08-12 note below before citing the symlink rejections.**
 - Context: The overlay renders for Claude Code only — `CLAUDE.md`, `.claude/skills/`, `.mcp.json`. FR-26 (D-4) adds user-selected coding agents as a second selection axis. The ecosystem has since converged: the Agent Skills standard location is `.agents/skills/`, and the reference installer (`vercel-labs/skills`, which distributes mattpocock/skills) maps 70+ agents to paths — most standard-compliant harnesses (Cursor, Cline, Zed, OpenCode, Codex) read `.agents/skills/` directly, while a minority use uniquely-named directories (Claude Code `.claude/skills/`, Windsurf `.windsurf/skills/`). That installer offers symlinks-to-a-canonical-copy or per-agent copies. This repo already solved the same problem for itself in ADR-011: authoritative skills in `.agents/skills/`, thin discovery stubs in `.claude/skills/`.
 - Decision: productize the ADR-011 pattern.
   - **Canonical Content** is always written, independent of selection: skills at `.agents/skills/<id>/`, project rules at `AGENTS.md`. Every Agent Target reads the same bytes.
@@ -49,3 +49,25 @@ Three findings settled it beyond the original three mechanics:
 Reopening this needs a change in the underlying facts — Windows symlinks
 without elevation, or a generated-project layout where the canonical copy is
 genuinely external — not another appeal to the installer's recommendation.
+
+## 2026-08-12 note — the first of those facts changed; see ADR-025
+
+The condition this amendment set for reopening was met, on the first clause.
+**Windows junctions require no elevation**, and the reference installer creates
+them for exactly this purpose (`installer.ts:255-256`). The mechanic stated
+above — "symlinks require developer mode on Windows" — is wrong for directory
+links and should not be cited again.
+
+The second clause was *not* met: a generated project's Canonical Content is
+still inside it, so a link still deduplicates nothing. [ADR-025](adr-025-skill-delivery-mode.md)
+therefore does not overturn the deduplication reasoning; it retires Pointer
+Stubs on a different basis, and offers `symlink` as a user-selected mode
+alongside `copy` rather than as the default.
+
+Two findings from this amendment are **carried forward into ADR-025 as costs,
+not as reversals**: a link degrades badly across `git clone` (worse than stated
+here — a Windows junction has no git representation at all), and a
+platform-conditional hybrid violates NFR-1. ADR-025 answers the second by making
+the mode an explicit recorded input rather than a detected fallback, and the
+first by defaulting to `copy` and reporting the consequence when `symlink` is
+chosen.

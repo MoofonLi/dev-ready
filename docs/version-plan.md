@@ -1005,3 +1005,147 @@ coverage. It is small, and it is not a release-day edit.
 No legal conclusion is drawn, here or in any user-facing document. The
 obligation, if it is one, predates v0.10 by three versions; what this amendment
 fixes is that nobody owned it.
+
+---
+
+## 2026-08-12 amendment — v0.11 expanded, v0.12 and v0.13 defined (CEO-confirmed, Moofon)
+
+Produced by a `grill-with-docs` session run against the shipped v0.10.1 selection
+path and against the reference installer's source at its pinned commit, rather
+than against either project's documentation. That method is why four of the eight
+new requirements are defects and why two proposals reversed direction mid-session.
+**v1.0 is unchanged** — FR-27, the same D-5 hard gates, and the Branch A-only
+evidence rule the 2026-08-09 amendment left in place. Decision records: ADR-024,
+ADR-025, plus amendments to ADR-003, ADR-012, ADR-015, and ADR-017.
+
+### The interactive selection path was largely theatre
+
+Three findings, all from reading `src/dev_ready/prompts/collect.py` against what
+FR-30 and FR-31 designed:
+
+- `_prompt_development_loop` returns early when the catalog declares one loop
+  (`:258`). **The loop question has never been asked in any released version.**
+- Both branches of `Use the Default Set?` (`:69-85`) produce byte-identical
+  selections — `default_set.enhancements` is empty and one loop exists. **The
+  first question in the flow changes nothing.**
+- `dev` is offered among the five Category checkboxes and then force-added
+  whether or not it was checked (`:186-197`), in a Category holding no
+  Enhancement. **An option whose selection has no effect.**
+
+FR-36 corrected this class of defect in v0.10 by grilling the shipped v0.9
+surface. Repeating that exercise one version later found three more, which
+argues for making it a standing pre-release step rather than a thing that
+happens when someone thinks of it.
+
+### `spec-loop` is renamed `mattpocock`, and the recommendation that lost
+
+The session recommended keeping the id and changing only its display title:
+the loop's twelve skills are `mattpocock/skills` verbatim, so the name is
+accurate, while FR-39's `setup-project` and FR-32's injection are making the
+content a blend, so an author-shaped id would drift toward false.
+
+That was overruled by a better argument. **An id's job in a multi-flow catalog
+is to say which flow**, and all three scheduled candidates are spec-driven —
+`spec-loop` states the property they share, so it discriminates nothing. The
+accuracy defence only established that the name was not a lie; it never
+established that it was useful. The rename also costs less now than it ever
+will again: the v1.0 real-users gate is unmet, so no external project needs
+migrating. ADR-012 recorded this exact cost in v0.7 and it is being paid on
+purpose, with a permanent `spec-loop` to `mattpocock` alias and no stamp version
+change.
+
+### Pointer Stubs are retired, and the cheaper half lost
+
+ADR-015 rejected symlinks twice. One of its three mechanics is measurably wrong:
+a Windows **junction** requires no elevation, and the reference installer creates
+exactly that (`installer.ts:255-256`). Reading `add.ts:770-800` also showed the
+convention is an explicit `InstallMode = 'symlink' | 'copy'` prompt, not a
+default.
+
+The session recommended adopting **`copy` only**. That remains the cheaper half
+by a wide margin — copies are more entries in the same path-to-bytes mapping
+`apply_overlay` already writes and `content_inventory` already hashes, needing
+no new write primitive, no second inventory shape, and no change to the
+traversal guard at `upgrade.py:33-42`, which refuses any path crossing a symlink
+and would otherwise refuse dev-ready's own managed files. The CEO chose to offer
+both modes, because the convention being adopted offers both. ADR-025 records
+the design that makes `symlink` safe: the mode is an explicit recorded input
+rather than a detected fallback (so NFR-1 holds), and links are excluded from
+the stamp inventory (so the traversal guard never meets one).
+
+The costs ADR-015 recorded are carried forward rather than dismissed. A junction
+has **no git representation at all**, and its target is absolute, so a
+`symlink`-mode project's agent directories are machine-local and break on move.
+`copy` is therefore the non-interactive default, and the report states the
+consequence when `symlink` is chosen.
+
+### npx was rejected as a channel; the complaint underneath it was not
+
+Proposed on two grounds — easier installation, and plainer-looking screens than
+Node-ecosystem installers. The first is rejected: every route to `npx dev-ready`
+adds a prerequisite, discards ADR-005's Copier foundation, or fails NFR-2. The
+second is real and has nothing to do with npx — the polish belongs to
+`@clack/prompts`, not to the launcher — so it becomes FR-44 and ships with the
+prompt rewrite it shares a surface with.
+
+Kept distinct, because the two were conflated once and will be again:
+`npx skills add MoofonLi/dev-ready --skill dev-ready` publishes nothing to npm.
+It runs the cross-agent installer, which fetches the Generation Skill from this
+repository's GitHub source. Rejecting npx as dev-ready's distribution channel
+says nothing about it.
+
+### Discovery is the binding constraint on v1.0, so storefronts are worth a small FR
+
+With Branch B structurally blocked (2026-08-09) the gate is three attributable
+external identities and nothing else, which makes discovery the only lever left.
+Both ecosystems accept a thin manifest over an existing directory —
+`.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` — and Codex
+discovers skills by the `skills/<name>/SKILL.md` layout this repository already
+has, so FR-45 duplicates no content. An in-session claim that Codex has no
+plugin format was **wrong** and is corrected here: it was inferred from the
+pinned `vercel-labs/skills` source, which knows only `.claude-plugin/`, and that
+proves what one installer consumes, not what an ecosystem offers. Codex's plugin
+system postdates that reasoning.
+
+### Flow recommendation is blocked on there being flows to recommend
+
+A comparison of the three frameworks was offered as material for a skill that
+would recommend one. It cannot precede the second flow, and it does not become a
+new skill: FR-34's interview already questions the user, maps answers onto a
+selection, and composes `--development-loop`, and its own rules forbid composing
+a command that asks a second set of selection questions. It is written as
+**selection criteria** rather than as a comparison — vendored content is held to
+upstream by FR-16's byte-equality guard, while a claim about a project dev-ready
+does not ship has no guard and goes quietly false when that project changes.
+
+### Provenance results
+
+Checked against ADR-009's standard during the session. `obra/superpowers` (MIT),
+`addyosmani/agent-skills` (MIT), and `ayghri/i-have-adhd` (MIT) all resolve to a
+single identity with a verified license and are schedulable; `i-have-adhd`
+needed the check, because four repositories share that name and one carries no
+license at all. `headroomlabs-ai/headroom` is Apache-2.0 and resolves cleanly,
+but it is **not a skill** — it is a library, proxy, and MCP server — and it
+carries the profile that disqualified Graphify: a documented flow that wraps the
+agent session and installs Serena, and Codex instructions requiring an absolute
+binary path dev-ready cannot write. FR-49 states the conditions it must clear;
+until then it is a candidate, not a schedule entry.
+
+### Accepted against recommendation
+
+Unreleased flows are **listed in the menu** marked `(coming soon)`, which the
+session argued against and the CEO decided. The cost is named rather than
+hidden: `status` is a third catalog state that prompts, every selection flag,
+and the Generation Skill's trigger list must each handle, for entries nobody can
+select, and every such entry must be removed as its flow ships or the menu
+accumulates promises. Placeholder text carries no version number — a shipped
+menu that names v0.12 starts lying the moment the roadmap moves.
+
+### Sequencing
+
+| Version | Contents | Rationale |
+|---|---|---|
+| v0.11 | FR-39, FR-40, FR-41, **FR-42** Engineering Flow selection and interactive rework, **FR-43** Flow Chain guidance, **FR-44** CLI presentation, **FR-45** plugin manifests | FR-42/43/44 rewrite one surface — the prompts and the generated loop guidance — so splitting them edits the same files twice. FR-39 puts `setup-project` at the head of the chain FR-43 describes; apart, that sentence is written twice. FR-45 is thin and serves the only live branch of the v1.0 gate |
+| v0.12 | **FR-46** Skill Delivery Mode, **FR-47** `superpowers` + flow recommendation | FR-46 takes a version largely to itself for FR-26's reason: write path, stamp inventory, `verify`, `upgrade`, and a migration off Pointer Stubs |
+| v0.13 | **FR-48** `addyosmani/agent-skills`, **FR-49** Token Optimize additions | The third flow retires the last `status` placeholder; FR-49's second item is gated and may not ship with its first |
+| v1.0 | FR-27 second template; Web UI decision revisited | Unchanged. Still gated on Branch A |

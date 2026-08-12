@@ -14,4 +14,35 @@
   - **Category as a presentation layer over an unchanged contract** — rejected: it delivers the menu and nothing else. The flags stay Component-shaped, `docs` stays boolean, and `mcp-config` stays a selectable item, so all three symptoms survive.
   - **Category as a grouping inside `skills` only** — rejected: the two groupings that motivated the change, Design and Token Optimize, both need non-skill items, so this cannot express the requirement it exists to serve.
   - **Keeping both axes user-facing** — rejected: two overlapping vocabularies for one selection is exactly the ambiguity ADR-012 spent a decision removing from the word "workflow".
+- Status update (2026-08-12): amended by [ADR-024](adr-024-engineering-flow-selection-spine.md) — Dev leaves the *presented* Category set (it becomes the Engineering Flow question, asked first and under its own name), the remaining four Categories are walked one at a time with no preceding filter, and the `token-optimize` description widens. See the amendment below; the axis decision itself is unchanged.
 - Consequences: This is the largest CLI break since FR-14. `--skills`, `--mcp`, `--no-docs`, and `--no-handoff` are replaced; the FR-24 skill that composes those flags must be rewritten; the permanent N-1 lifecycle gate must assert the v4→v5 stamp migration as well as content currency. Category names enter the flag contract and the stamp, so renaming one later carries the same cost ADR-012 recorded for `spec-loop`. Assigning every item exactly one Category is a curation judgement with no mechanical check; `react-doctor` is the case worth recording, because it reads as a security concern and is not one — it is a React quality analyzer and belongs under Quality.
+
+## 2026-08-12 amendment — Dev leaves the presented set; Categories are walked one at a time
+
+Decided in the `grill-with-docs` session of 2026-08-12 (ADR-024). Category
+remains the axis; what changes is how the axis is presented and one description.
+
+**Dev is no longer offered in a checkbox.** This ADR made Dev "a mandatory
+single-select", and the implementation listed it alongside the four optional
+Categories and then force-added it whether or not it was checked
+(`collect.py:186-197`) — an option whose selection has no effect. Dev also holds
+no Enhancement: its only member is the development loop. It becomes the
+**Engineering Flow** question, asked first and under its own name. The Category
+id `dev` is unchanged in the manifest, the flag contract, and every stamp;
+nothing migrates. Only the checkbox loses a row that could not matter.
+
+**The "which Categories?" filter is removed.** The four optional Categories are
+now walked in a fixed order, each with its own item list, and declining one is
+pressing Enter on it. The filter asked the same axis twice, and it reproduced
+one level up the failure FR-36 was created to fix: a user who did not check
+Design never learned what Design held.
+
+**`token-optimize` widens its description, and keeps its id.** The Category is
+gaining `i-have-adhd`, whose value is that an agent's output stays legible
+rather than that fewer tokens are spent — while `caveman`, already in the
+Category, has always straddled both ("Token-discipline **and concise response
+guidance**"). The id enters the flag contract and every stamp and is expensive
+to change; the description enters neither and is free. So the description grows
+to cover both halves and the id stays. A new Category was considered and
+rejected: it would split two closely related items across two menus to fix a
+wording problem.
