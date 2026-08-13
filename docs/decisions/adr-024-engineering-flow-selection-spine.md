@@ -21,3 +21,79 @@
   - **Omitting unreleased flows from the menu** — recommended in session and overruled by the CEO. The cost is real and is accepted deliberately: `status` is a third catalog state that the prompts, every selection flag, and the [[Generation Skill]]'s authored trigger list must each handle, for an entry that cannot be chosen. It is accepted to signal that the flow axis is plural before the second flow exists. Placeholder text says only `(coming soon)` — naming a version in shipped UI makes the menu lie the moment the roadmap moves.
   - **Keeping a "which Categories?" filter before the per-Category walk** — rejected: it asks the same axis twice, and a user who does not check Design never learns what Design holds.
 - Consequences: The `--development-loop` flag contract changes value, and the FR-24/FR-34 Generation Skill, `docs/cli-spec.md`, and `README.md` change with it; `README.zh-TW.md` changes only if a product fact it states changes (ADR-016). The alias is permanent compatibility surface — `spec-loop` must resolve for as long as v5 stamps exist. `status` entries are dead weight by construction and must be removed as each flow ships, or the menu accumulates promises. Adding a fourth flow is now a data change plus assets, which is the property this decision exists to buy.
+- Status update (2026-08-13): amended below — an [[Announced Flow]] is partitioned out of the catalog by the loader rather than carried as an ordinary Catalog Item, the alias is scoped to stamps, and `--flow` becomes the flag spelling.
+
+---
+
+## 2026-08-13 amendment — announced flows leave the catalog, the alias is stamp-scoped, `--flow`
+
+Decided in the `grill-with-docs` session of 2026-08-13 on v0.11 Phase 1, run
+against the code this decision names rather than against the decision. Three
+corrections; the decision itself is unchanged.
+
+### An Announced Flow is not a Catalog Item, and the loader is what makes that true
+
+This ADR wrote "Catalog Items gain `title` and `status` fields", which reads as:
+an announced flow is an ordinary item carrying one extra field. Taken literally
+it does not load. A `status` entry declares no `steps`, and `manifest/loader.py`
+requires a development loop to declare a non-empty `steps` list, requires every
+item to define `paths` or `inject`, and — under ADR-018's deliberate strictness —
+requires every mounted Enhancement's mount to name a step of *every* declared
+loop. Declaring `superpowers` with no steps therefore fails all six mounted
+Enhancements at load and `load_default_manifest()` raises before any command
+runs. That is not a broken menu; it is a CLI that cannot start.
+
+`status` stays a manifest field, and **the loader partitions on it**. An entry
+carrying `status` is parsed into `ComponentCatalog.announced_loops` and never
+enters the component tuples, so `all_items`, `item_ids`, `by_component`,
+`ids_in_category`, and `development_loop_ids` cannot see it. Exactly two
+consumers read `announced_loops`: the Engineering Flow prompt, and the error
+path for a `--flow` value that names one.
+
+- **Considered: declaring them as ordinary loops and exempting them** at each of
+  the eight sites that consume `development_loop_ids` — rejected. A missed
+  exemption does not fail loudly; it generates a project whose declared flow
+  materializes nothing, in front of a user.
+- **Considered: a separate top-level manifest key** — rejected as equally safe
+  but more expensive later: shipping a flow would become a move between two
+  manifest shapes rather than removing one field.
+
+This is why an announced flow is not a [[Catalog Item]] in the glossary's sense:
+a Catalog Item is individually selectable, and non-selectability is the whole
+point of this one. ADR-018's "every declared development loop" rule is untouched
+— an announced flow is not a declared loop.
+
+The prompt makes such an entry genuinely unselectable rather than selectable-then-scolded:
+the `Asker` protocol grows a disabled-choice parameter, which questionary
+supports natively, so the cursor skips the row.
+
+### The alias is scoped to stamps
+
+This ADR wrote that "`upgrade` carries a `spec-loop` → `mattpocock` alias so
+existing v5 stamps resolve." That scope is now explicit and exclusive: the alias
+resolves values **read from a stamp**, and a typed `--flow spec-loop` exits 2
+with a message naming `mattpocock`, distinguishable from both the unknown-id and
+the not-yet-available errors. A stamp records a fact about a project that
+already exists and cannot be re-typed; a command can. Absorbing the old value on
+the flag path would make the CHANGELOG's one breaking-change entry describe a
+break that did not happen, and would leave the retired name in circulation
+indefinitely.
+
+The alias lives in `recorded`, once. `docs/architecture.md` already states that
+`recorded` is the only place a stamp is resolved against the current catalog and
+that stamp-migration rules live there once; `upgrade` was reaching around it to
+validate `stamp.development_loop` against the catalog directly, and that check
+moves onto the resolved `RecordedProject`. Without the alias every v0.10 project
+fails `upgrade` with exit 6, and `check` silently stops inspecting the twelve
+loop skills the project actually has.
+
+### `--flow` becomes the flag spelling
+
+This ADR renamed the concept and its value while leaving the flag reading
+`--development-loop`, which splits one concept across three names — prompt,
+flag, and stamp field. `--flow` and `--development-loop` become two option
+strings on one argparse argument, both permanently accepted, with `--flow`
+documented. This costs nothing and breaks nothing, and it is cheapest now for
+this ADR's own stated reason: the v1.0 real-users gate is unmet. The stamp field
+stays `development_loop` — the stamp does not advance in v0.11 and the field is
+not user-facing.

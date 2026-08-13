@@ -44,6 +44,18 @@ is never shown their project's development method does not know it has one.
 _Avoid_: development loop (as a user-facing word), workflow, methodology,
 pipeline, spine
 
+**Announced Flow**:
+An [[Engineering Flow]] listed in the menu as `(coming soon)` before it ships,
+marked by a `status` field in the manifest. It is **not** a [[Catalog Item]] —
+selectability is a Catalog Item's defining property and non-selectability is an
+Announced Flow's whole point — so the loader partitions it into a separate
+`announced_loops` collection that the selection machinery cannot see (ADR-024,
+as amended 2026-08-13). Read by exactly two consumers: the flow prompt, which
+renders it unselectable, and the `--flow` error path, which says *not yet
+available* rather than *unknown*. Placeholder text carries no version number,
+and each entry is deleted as its flow ships or the menu accumulates promises.
+_Avoid_: placeholder item, disabled item, stub flow, future flow
+
 **Flow Chain**:
 The ordered steps of an [[Engineering Flow]] as a generated project describes
 them. A **default path, not a rule** — every step is user-invoked
@@ -81,7 +93,10 @@ _Avoid_: agents (as a component name); using it for anything a user picks
 
 **Catalog Item**:
 An individually selectable unit, declared as data in the manifest (ADR-010) and
-presented under exactly one Category.
+presented under exactly one Category. **Selectable is the defining word**: an
+entry a user cannot choose is not a Catalog Item however it is declared, which
+is what puts an [[Announced Flow]] outside the type and outside the catalog the
+loader builds.
 _Avoid_: skill entry, module, addon
 
 **Generation Skill**:

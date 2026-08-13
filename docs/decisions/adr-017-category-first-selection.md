@@ -46,3 +46,59 @@ to change; the description enters neither and is free. So the description grows
 to cover both halves and the id stays. A new Category was considered and
 rejected: it would split two closely related items across two menus to fix a
 wording problem.
+
+---
+
+## 2026-08-13 amendment — a selection flag answers only its own question
+
+Decided in the `grill-with-docs` session of 2026-08-13 on v0.11 Phase 1, and
+measured before it was decided. This ADR made Category the flag axis. It never
+said what an *unmentioned* Category resolves to, and the implementation chose
+"everything".
+
+Measured through `ProjectSelection.from_flags` against the shipped v0.10.1
+catalog, which holds nine selectable items:
+
+| typed | selected |
+|---|---|
+| `--agents windsurf` | all 9 items, and no prompt is asked |
+| `--security security-audit` | all 9 items |
+| `--development-loop mattpocock` | all 9 items |
+| nothing | prompts run |
+
+Two rules combine to produce that. Any selection flag marks the whole selection
+resolved, so `collect_answers` asks nothing; and an absent `--categories`
+resolves to every Category, whose absent per-Category item flags each resolve to
+every item. So a user narrowing Security to one skill silently receives every
+Enhancement in the catalog, and a user naming an Agent Target is never shown a
+Category at all. That is the failure ADR-024 corrected inside the prompt flow,
+arriving one door over through the flag path. FR-40 makes it an order of
+magnitude worse: `--security security-audit` would select 110 items once the
+full `awesome-design-md` set is vendored.
+
+**A flag answers only its own question.**
+
+- A Category unmentioned by `--categories` and by its own item flag resolves to
+  the **Default Set**, not to everything. `--categories all` still means all,
+  and a Category named without an item flag still means all of that Category.
+- **`--agents` is an Agent Target flag, not a Category flag.** It no longer
+  marks the selection resolved: the Engineering Flow question and the four
+  Category walks still run. Only the Agent Target question is skipped, because
+  the flag answered that one.
+- A Category, item, or flow flag still marks the *catalog* selection resolved,
+  so a scripted `init` stays non-interactive.
+
+- **Considered: fixing only `--agents`** — rejected. It leaves standing the case
+  where a user asked for less and received everything, which is the more
+  surprising of the two.
+- **Considered: leaving both and documenting them** — rejected. Both are
+  *already* documented in `docs/cli-spec.md`. Being written down is what shows
+  the behaviour is indefensible rather than merely unnoticed.
+
+Consequences: `PartialAnswers` gains an Agent Target field, because the flag
+path can now answer one axis and leave the rest unanswered — it was previously
+all-or-nothing. A non-TTY `init` given only `--agents` and no `--yes` now exits
+2 asking for an interactive terminal, where it previously succeeded by selecting
+everything; this repository's own CI passes only `--yes` (`ci.yml`) and is
+unaffected, and no external user exists to break. The default column of every
+per-Category flag in `docs/cli-spec.md` changes, and the CHANGELOG names it.

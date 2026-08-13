@@ -1186,3 +1186,118 @@ menu that names v0.12 starts lying the moment the roadmap moves.
 | v0.12 | **FR-46** Skill Delivery Mode, **FR-47** `superpowers` + flow recommendation | FR-46 takes a version largely to itself for FR-26's reason: write path, stamp inventory, `verify`, `upgrade`, and a migration off Pointer Stubs |
 | v0.13 | **FR-48** `addyosmani/agent-skills`, **FR-49** Token Optimize additions | The third flow retires the last `status` placeholder; FR-49's second item is gated and may not ship with its first |
 | v1.0 | FR-27 second template; Web UI decision revisited | Unchanged. Still gated on Branch A |
+
+---
+
+## 2026-08-13 amendment — v0.11 Phase 1 grilling: FR-42 scope, FR-44 definition, `--flow` (CEO-confirmed, Moofon)
+
+Produced by the `grill-with-docs` session on v0.11 Phase 1, run against
+`src/dev_ready/` at v0.10.1 and against measured output rather than against the
+phase plan. **v0.12, v0.13, and v1.0 are unchanged**, as is FR-39, FR-40, FR-41,
+FR-43, and FR-45. Decision records: amendments to ADR-017, ADR-018, and ADR-024;
+a new `CONTEXT.md` term, [[Announced Flow]].
+
+Two of the four findings below are defects the plan would have shipped, and both
+were found the same way the 2026-08-04 and 2026-08-12 sessions found theirs — by
+reading and running the code instead of the document about it.
+
+### The plan's `(coming soon)` declaration does not load
+
+v0.11's plan says to declare `superpowers` and `addyosmani` with no `paths` and
+no `steps`. Three loader validations reject that, and the third is not a menu
+problem: ADR-018's mount rule requires every mounted Enhancement's mount to name
+a step of *every* declared loop, so a step-less loop fails all six declared
+mounts and `load_default_manifest()` raises before any command runs. dev-ready
+would not start at all.
+
+`status` therefore stays a manifest field and the loader **partitions on it**,
+into a collection the selection machinery structurally cannot reach. An
+Announced Flow is consequently not a Catalog Item — see the ADR-024 amendment of
+this date for the reasoning and for the two alternatives rejected.
+
+### FR-42 gains a fourth defect: flag reach
+
+FR-42 was scoped to three shipped defects in `prompts/collect.py`. A fourth, of
+the same class and on the same surface, sits in `prompts/answers.py`. Measured
+against the shipped v0.10.1 catalog: `--agents windsurf` selects **all nine
+items and asks no question**; so do `--security security-audit` and
+`--development-loop mattpocock`. A user who narrows one Category receives the
+whole catalog; a user who names an Agent Target is never shown a Category.
+
+FR-40 turns this from surprising into serious in the very next phase:
+`--security security-audit` would select **110 items** once the full
+`awesome-design-md` set is vendored.
+
+The rule adopted is **a flag answers only its own question** — unmentioned
+Categories resolve to the Default Set, and `--agents` stops suppressing the
+prompt flow (ADR-017, as amended this date). It is in FR-42 rather than in a new
+FR because Phase 1 rewrites both functions anyway; scheduling it separately
+means editing `answers.py` and `collect.py` twice. It costs one more
+breaking-change line and a rewrite of the default column in `docs/cli-spec.md`.
+
+### FR-44 gets a definition, and it is narrower than "presentation"
+
+FR-44 shipped into the plan as "restyle the prompts and the generation report"
+with no acceptance criterion. Its origin narrows it: the 2026-08-12 amendment
+records the complaint as being about the **prompt screens**, and that "the
+polish belongs to `@clack/prompts`, not to the launcher."
+
+FR-44 is therefore: a unified `questionary` style across every prompt, with an
+Announced Flow rendered as a disabled row; and a **re-laid-out generation
+report**, in plain text. The report is not colourised. `render_report` is a pure
+function and terminal policy belongs to `cli`, so report colour would mean a new
+permanent policy surface — TTY detection plus a `NO_COLOR` convention, threaded
+down — bought for very little.
+
+The report's measured defect is real and is what FR-44 fixes there: the
+`overlay:` line joins every written path with commas onto **one line**, which is
+**2,398 characters for the leanest possible project** (58 paths) and **39,089
+characters** for `--categories all --agents all` (989 paths), before FR-40 adds
+101 more documents.
+
+### `--flow`
+
+ADR-024 renamed the concept to Engineering Flow and renamed its value, leaving
+the flag reading `--development-loop`: one concept, three names. `--flow` joins
+it as a second option string on the same argparse argument — both permanently
+accepted, `--flow` documented. The plan's "no other identifier is renamed in
+this version" constraint is deliberately relaxed for this one case only, because
+the change breaks nothing, costs nothing, and is cheapest now while the
+real-users gate is unmet. The stamp field stays `development_loop`.
+
+### Corrections carried into the spec rather than into a decision
+
+- The loader special case at `manifest/loader.py:133` is **deleted, not
+  renamed**. It exists only so the live catalog may declare an id that is also
+  in `RETIRED_LOOP_ITEM_IDS`; after the rename nothing declares `spec-loop`, and
+  renaming the string to `mattpocock` is worse than dead — `mattpocock` is not a
+  retired id at all.
+- `prompts/answers.py:359` hardcodes `'spec-loop'` as the name of the mandatory
+  loop inside the retired-Enhancement error and must change. The same string
+  then produces two different errors on two different flags, which is correct
+  and is an acceptance criterion, not an accident.
+- `ProjectSelection.categories` is derived from the selected items once the
+  Category checkbox is deleted. Nothing reads the stamp's `categories` field —
+  `recorded` always re-derives it — and deriving makes an all-Enter interactive
+  run and `--yes` produce byte-identical stamps, which is the parity FR-31 asked
+  for.
+- The plan's VERIFY note about `initially_selected=()` on a single-item checkbox
+  is closed: `_questionary_asker.py` sets `checked=choice in initially_selected`
+  and nothing else can check a row. The v0.10 note it descends from described
+  the state *before* that parameter existed. It stays as a test assertion, not
+  as an open risk.
+- `templates/claude/spec-loop/` is renamed to `templates/claude/mattpocock/`.
+  This is not cosmetic: FR-43 requires the per-flow document to be **keyed on
+  the flow id, not hardcoded**, which a source directory named after the retired
+  id cannot satisfy. Generated output is unchanged — the destination stays
+  `docs/agents`. Whether those three configuration files are per-flow or shared
+  infrastructure is deliberately **not** decided here; v0.12 decides it after
+  reading `superpowers`, per this plan's own rule about abstracting before a
+  second user exists.
+- The `--dev` flag is kept although it can only ever resolve to an empty set. It
+  is in the published contract, and removing it would be a second breaking
+  change bought for tidiness.
+- Prerequisite verified: `dev-ready 0.10.1` is published on PyPI, so Phase 1's
+  N-1 baseline rollover has its artifact. The most valuable new assertion in the
+  phase is that a project generated by the released 0.10.1 — recording
+  `spec-loop` — upgrades cleanly and comes out recording `mattpocock`.
