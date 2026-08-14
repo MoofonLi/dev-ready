@@ -58,12 +58,26 @@ _Avoid_: placeholder item, disabled item, stub flow, future flow
 
 **Flow Chain**:
 The ordered steps of an [[Engineering Flow]] as a generated project describes
-them. A **default path, not a rule** — every step is user-invoked
-(`disable-model-invocation: true` upstream), and a small change may start at
-`implement`. Steps a chain entry calls internally are not chain entries: `tdd`
-and `code-review` belong to `implement`, which invokes both, and listing them as
-peers turns tools into phases.
+them, beginning with its [[Setup Step]]. A **default path, not a rule** — every
+chain entry is user-invoked (`disable-model-invocation: true`), and a change
+adding no observable behaviour may start at `implement`. Steps a chain entry
+calls internally are not chain entries: `tdd` and `code-review` belong to
+`implement`, which invokes both, and listing them as peers turns tools into
+phases. Upstream draws the same line: measured 2026-08-14, exactly the chain
+entries declare `disable-model-invocation: true` and the tools they reach for do
+not.
 _Avoid_: pipeline, stages, the seven steps, phase order
+
+**Setup Step**:
+The first entry of a [[Flow Chain]] — the run-once configuration a generated
+project needs before any other step. Written into every project whichever
+[[Engineering Flow]] is selected, because most of what it configures belongs to
+the base template rather than to the flow (ADR-026). It **explains and stops**:
+it never runs a destructive command itself, and it warns only where a section
+can actually destroy data rather than at the top of every run. Re-running it is
+normal rather than exceptional — it reads current state and offers each section
+separately, so a user may configure email alone months later.
+_Avoid_: init step, bootstrap, first-run wizard, install step, setup wizard
 
 **Workflow**:
 Reserved exclusively for GitHub Actions workflow files (`ci.yml`, `release.yml`,

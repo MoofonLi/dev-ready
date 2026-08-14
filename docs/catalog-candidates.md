@@ -222,6 +222,65 @@ plan for anything.
 - Implementation note: Must check `sys.stdout.isatty()` and gracefully fallback
   to plain text log lines in non-interactive/CI environments.
 
+### D-4. Audience-tiered Claude Code Output Styles, offered by `setup-project`
+
+- Raised 2026-08-14 by Moofon, during the v0.11 Phase 2 `grill-with-docs`
+  session, from [this walkthrough](https://www.youtube.com/watch?v=E8Bx9OlpmdM).
+  **Deferred the same session, by Moofon, to be decided as its own FR.** It is
+  not v0.11 scope and no Phase 2 ticket touches it.
+- Decision to make later: whether `setup-project` (FR-39) offers a generated
+  project a choice of Claude Code Output Style, written to the generated
+  project's `.claude/output-styles/`.
+- Proposed shape, recorded as raised:
+  - Three audience tiers — **Beginner** (never drop a term, always explain it
+    with a plain-language analogy; pause and warn in plain language before a
+    destructive, costly, or environment-changing action); **Vibe Coder / PM**
+    (ASD-STE100 register — short sentences, active voice, one word one meaning;
+    common terms unexplained, deeper ones given a one-line gloss; lead with
+    product impact; state a trade-off on every decision); **Senior Engineer**
+    (minimal output — what changed and whether it works; mechanism only on
+    request; any unconfirmed judgement call stated in the first line, never
+    buried at the end).
+  - A language axis — Traditional Chinese (Taiwan technical usage), English
+    STE100, or bilingual (term in English, explanation in Chinese).
+  - An optional per-project term map, so a project can fix its own vocabulary
+    (for example `member` rather than `user`).
+- **Verified 2026-08-14 against the Claude Code documentation** — check these
+  again when this is scheduled, because the feature has already moved once:
+  - Style files live at `.claude/output-styles/` (project), `~/.claude/output-styles/`
+    (user), or a managed-policy directory. The file name is the style name
+    unless frontmatter sets `name`.
+  - The **active selection** is written to `.claude/settings.local.json` — the
+    per-developer, per-machine file. Project-level files are therefore shared
+    while the choice is not, unless dev-ready writes `outputStyle` into the
+    checked-in `.claude/settings.json` and forces one style on every
+    collaborator.
+  - `keep-coding-instructions: true` must be set, or Claude Code's built-in
+    software-engineering instructions are dropped along with the tone change.
+    All three tiers change communication only, so all three need it.
+  - The standalone `/output-style` command was deprecated in v2.1.73 and
+    removed in v2.1.91. `/config` replaces it. Any generated document naming
+    the old command is already wrong.
+  - Plugins may ship an `output-styles/` directory, which is a second delivery
+    route once FR-45 adds this repo's plugin manifests.
+- **Two binding decisions must be reopened before this can be specced, and
+  neither belongs inside a `setup-project` ticket:**
+  - **[ADR-016](decisions/adr-016-language-boundary.md).** The language axis is
+    locale selection over a message catalog, whatever it is called, and ADR-016
+    forbids exactly that. See also D-1 above, which is the same axis, rejected
+    in 2026-07-26 on solo-maintainer cost. The tier axis on its own is English
+    content and touches ADR-016 not at all — the two axes are separable and
+    should be decided separately.
+  - **[ADR-015](decisions/adr-015-agent-targets-canonical-content-pointer-stubs.md).**
+    An Output Style serves one Agent Target out of roughly seventy. It has no
+    canonical form to hold in `.agents/skills/` and no equivalent to point at
+    from any other agent, so a project generated with `--agents codex` would
+    receive nothing. This would be dev-ready's first single-target content
+    class. ADR-015 is already scheduled to reopen in v0.12 for
+    [ADR-025](decisions/adr-025-skill-delivery-mode.md) / FR-46, which is the
+    cheapest place to answer the question once for both features.
+- Target: decide alongside FR-46 in v0.12. Nothing here is approved yet.
+
 ---
 
 ## Init flow (agreed shape, v0.3 baseline + preserved decisions)
