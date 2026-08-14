@@ -81,11 +81,25 @@ indefinitely.
 
 The alias lives in `recorded`, once. `docs/architecture.md` already states that
 `recorded` is the only place a stamp is resolved against the current catalog and
-that stamp-migration rules live there once; `upgrade` was reaching around it to
-validate `stamp.development_loop` against the catalog directly, and that check
-moves onto the resolved `RecordedProject`. Without the alias every v0.10 project
+that stamp-migration rules live there once. Without the alias every v0.10 project
 fails `upgrade` with exit 6, and `check` silently stops inspecting the twelve
 loop skills the project actually has.
+
+**Corrected 2026-08-13, during implementation.** An earlier wording of this
+paragraph said the fix "restores" that invariant by moving `upgrade`'s direct
+validation onto the resolved `RecordedProject`. That was one module short.
+`check` bypasses `recorded` too: it resolves its *structural* expectations
+through the resolved record and then reads the **raw** record for its per-item
+pin comparison, which reports the renamed identifier as a removed catalog item on
+a project that has nothing wrong with it. Two modules were reaching around
+`recorded`, not one, and the invariant is restored only when both stop.
+
+The general shape is worth naming, because it recurred twice in one rename:
+`recorded` answers *which items a project selected, in identifiers the current
+catalog knows*, and any consumer needing more than the identifiers — the recorded
+pin alongside each — must have `recorded` answer that too rather than fetch the
+raw record for the remainder. A partial consumer is how a resolution rule
+silently acquires a second and a third implementation.
 
 ### `--flow` becomes the flag spelling
 
