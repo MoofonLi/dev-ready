@@ -1,6 +1,8 @@
 # CLI Specification — dev-ready
 
-Status: Current as of v0.10.1 (released 2026-08-11). This replaces the REST `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
+Status: v0.11 development contract (unreleased). This replaces the REST
+`api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with
+no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
 
 ## Commands
 
@@ -12,36 +14,46 @@ Generate a new project.
 |---|---|---|---|
 | `--yes` / `-y` | bool | false | Accept the lean Default Set, no prompts |
 | `--dir PATH` | path | `./PROJECT_NAME` | Target directory (must not exist or be empty) |
-| `--categories IDS` | string | Default Set; `all` when another selection flag is supplied | Category selection: comma-separated ids, `all`, or `none` |
-| `--development-loop ID` | string | `spec-loop` | Mandatory development-loop single-select; valid ids come from the manifest |
-| `--dev IDS` | string | `all` when Dev is explicitly selected | Dev Enhancements: none currently; accepts `all` or `none`; the development loop is mandatory |
-| `--security IDS` | string | `all` when Security is selected | Security items: `security-audit`, `all`, or `none` |
-| `--quality IDS` | string | `all` when Quality is selected | Quality items: `react-doctor`, `webapp-testing`, `all`, or `none` |
-| `--design IDS` | string | `all` when Design is selected | Design items: `frontend-design`, `design-stripe`, `design-linear`, `all`, or `none` |
-| `--token-optimize IDS` | string | `all` when Token Optimize is selected | Token Optimize items: `caveman`, `code-memory`, `all`, or `none` |
+| `--categories IDS` | string | Default Set | Category selection: comma-separated ids, `all`, or `none` |
+| `--flow ID` | string | `mattpocock` | Mandatory Engineering Flow single-select; `--development-loop` is a permanently accepted alias |
+| `--dev IDS` | string | Default Set when unnamed; `all` when named | Dev Enhancements: none currently; accepts `all` or `none`; the Engineering Flow is mandatory |
+| `--security IDS` | string | Default Set when unnamed; `all` when named | Security items: `security-audit`, `all`, or `none` |
+| `--quality IDS` | string | Default Set when unnamed; `all` when named | Quality items: `react-doctor`, `webapp-testing`, `all`, or `none` |
+| `--design IDS` | string | Default Set when unnamed; `all` when named | Design items: `frontend-design`, `design-stripe`, `design-linear`, `all`, or `none` |
+| `--token-optimize IDS` | string | Default Set when unnamed; `all` when named | Token Optimize items: `caveman`, `code-memory`, `all`, or `none` |
 | `--agents IDS` | string | `claude` | Agent Target selection: comma-separated identifiers, `all`, or `none` |
 
 The Category identifiers accepted by `--categories` are `dev`, `security`,
-`quality`, `design`, and `token-optimize`. If `--categories` is omitted while
-another selection flag is supplied, all Categories are selected and each
-per-Category flag narrows only its named Category. A per-Category flag
-conflicts with an explicit `--categories` value that omits that Category.
+`quality`, `design`, and `token-optimize`. If `--categories` is omitted, an
+unnamed Category resolves to the Default Set and a per-Category flag replaces
+the Default Set answer for only its named Category. A per-Category flag
+conflicts with an explicit `--categories` value that omits that Category. The
+explicit `--categories all` selection still selects every Category, and naming
+a Category without its item flag still selects all items in that Category.
 
-Dev is mandatory and currently has one development-loop option: `spec-loop`.
+Dev is mandatory and currently has one Engineering Flow option: `mattpocock`.
 It is resolved for every generation, including `--categories none` and
 `--dev none`. Dev currently has no selectable Enhancements, so both `--dev all`
-and `--dev none` select no optional items. `--development-loop` is the
-structural single-select and remains data-driven if the manifest adds another
-loop; development-loop ids are never Dev Enhancement ids.
+and `--dev none` select no optional items. `--flow` is the structural
+single-select and remains data-driven if the manifest adds another flow;
+`--development-loop` is a permanently accepted alias. Engineering Flow ids are
+never Dev Enhancement ids.
 
 Unknown Category ids, unknown item ids, empty comma-separated selections, and
 conflicting Category/item flags fail before generation with an
 invalid-arguments error (exit 2). Unknown errors list the valid identifiers.
 Unknown Agent Target identifiers in `--agents` follow the same exit-2 policy.
+Engineering Flow failures also exit 2 and distinguish these cases:
+
+- `spec-loop` supplied to `--flow` or `--development-loop` says that the id was
+  renamed to `mattpocock`.
+- An announced but unreleased Flow, such as `superpowers`, says that it is not
+  yet available.
+- Any other unrecognised Flow id says that the Engineering Flow id is unknown.
 
 The former selectable loop identifiers are retired. Supplying any of them to
 `--dev` fails with an invalid-arguments error (exit 2) naming the mandatory Dev
-development loop, `spec-loop`, as its replacement:
+Engineering Flow, `mattpocock`, as its replacement:
 
 | Retired identifier |
 |---|
@@ -69,10 +81,11 @@ declines the named optional Enhancements; it never removes the development
 loop.
 
 Accepting every default, including `--yes` with no selection flags, produces
-the lean Default Set: the Spec Loop with no Enhancements. Independently of that
-selection, every project receives the `architecture` and `requirements`
-documentation skeletons as generation infrastructure. Use the explicit
-whole-catalog selection `--categories all` to select every Enhancement.
+the lean Default Set: the `mattpocock` Engineering Flow with no Enhancements.
+Independently of that selection, every project receives the `architecture` and
+`requirements` documentation skeletons as generation infrastructure. Use the
+explicit whole-catalog selection `--categories all` to select every
+Enhancement.
 
 Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification; 6 stamp missing or unparseable/invalid; 7 drift detected; 8 upgrade not supported (pre-v3 stamp); 9 upgrade failed (rolled back).
 
@@ -165,19 +178,36 @@ This flow applies only to `init`. `check` and `upgrade` are non-interactive by
 construction and dispatch directly to their respective operations.
 
 1. Project name (if not given as argument)
-2. Default Set offer, naming its resolved `spec-loop` development loop (yes by default)
-3. If the Default Set is declined and the manifest offers multiple development loops, mandatory development-loop single-selection (the Default Set loop is listed first)
-4. Category selection (`dev`, `security`, `quality`, `design`, and `token-optimize`; Dev remains selected because its development loop is mandatory); when the Default Set was accepted, the chosen Enhancements are layered onto it
-5. Enhancement selection across the chosen Categories (Dev currently offers none; the loop is not an optional item) — **omitted entirely when the chosen Categories offer no item outside the development loop**, which is what accepting the Default Set and adding no Category does. There is nothing to choose between, and a checkbox over an empty list is not a question
-6. Agent Target selection (described multi-select, Claude Code on by default; plain Enter accepts Claude Code only)
-7. Confirmation summary naming the resolved Categories, Catalog Items, and Agent Targets before writing anything
+2. Engineering Flow single-selection, even while only `mattpocock` is
+   selectable. Announced Flows are shown with a `Not yet available` explanation
+   and cannot be selected.
+3. Security item selection
+4. Quality item selection
+5. Design item selection
+6. Token Optimize item selection
+7. Agent Target selection (described multi-select, Claude Code on by default;
+   plain Enter accepts Claude Code only)
+8. Confirmation summary naming the resolved Engineering Flow, Categories,
+   Catalog Items, and Agent Targets before writing anything
 
-Steps 2–6 are skipped as a unit if any selection flag (`--development-loop`, `--categories`, any
-per-Category item flag, or `--agents`) was passed. An omitted project name is
-still prompted for, and confirmation still occurs.
+The four optional Category questions are always asked on an unresolved
+interactive content path, in the order above, with nothing pre-selected. Each
+multi-select says that Space selects, Enter continues, and typing filters the
+list. There is no Default Set question, no Category pre-filter, and no combined
+item list.
+
+A Category flag, per-Category item flag, or Flow flag resolves the catalog
+selection non-interactively, so the Engineering Flow and four Category questions
+are skipped; the Agent Target takes its documented `claude` default unless
+`--agents` also supplies it. An Agent Target flag answers only the Agent Target
+question: the Engineering Flow and all four Category questions are still asked.
+An omitted project name is still prompted for, and confirmation still occurs.
 
 All answers collect into a single `Answers` model shared with the flag-based path.
 
 Declining the confirmation, or cancelling any prompt (Ctrl-C), prints `aborted: nothing was written` to stderr and exits 1 — nothing has been written at that point by construction. `--yes` bypasses every prompt in this flow, including confirmation. A non-TTY stdin with missing inputs and no `--yes` fails fast with an invalid-arguments error (exit 2) instead of hanging.
+An Agent Target flag by itself still leaves the Engineering Flow and Category
+answers missing, so that invocation also exits 2 on a non-TTY stdin unless
+`--yes` supplies the Default Set.
 
 **Windows compatibility:** interactive prompts are tested against Windows Terminal. Legacy `cmd.exe` may render the checkbox prompt incorrectly (missing VT/ANSI support). In environments where terminal support is uncertain, use `--yes`, optionally with explicit selection flags, instead of relying on prompts.
