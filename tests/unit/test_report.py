@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from dev_ready.manifest import UpstreamPin, load_default_manifest
 from dev_ready.prompts import Answers, ProjectSelection
 from dev_ready.report import render
@@ -16,20 +18,31 @@ PIN = UpstreamPin(
 CATALOG = load_default_manifest().components
 
 
-def test_report_contains_target_path_pin_and_written_paths() -> None:
+def test_report_summarises_written_paths_with_a_count_and_breakdown() -> None:
     answers = Answers(project_name="my-app", target_dir=Path("/does/not/exist/my-app"))
     written = [
         Path("CLAUDE.md"),
-        Path(".claude") / "skills" / "caveman" / "SKILL.md",
+        Path(".agents") / "skills" / "caveman" / "SKILL.md",
         Path(".mcp.json"),
+        Path("docs") / "requirements.md",
+        Path(".windsurf") / "skills" / "caveman" / "SKILL.md",
     ]
 
     report = render_report(answers, PIN, written)
 
     assert str(answers.target_dir) in report
     assert f"{PIN.repo}@{PIN.commit[:12]}" in report
+    assert "overlay files written: 5" in report
+    assert "root files: 2" in report
+    assert "canonical agent content: 1" in report
+    assert "documentation: 1" in report
+    assert "Agent Target artifacts: 1" in report
     for path in written:
-        assert str(path) in report
+        assert str(path) not in report
+    assert '"inventory" entries in .dev-ready.json' in report
+    # FR-44 as amended 2026-08-14: the report points at the stamp's inventory,
+    # not at `dev-ready check`, which renders a drift verdict and never the paths.
+    assert "dev-ready check" not in report
 
 
 def test_report_contains_runnable_next_steps() -> None:
@@ -39,7 +52,17 @@ def test_report_contains_runnable_next_steps() -> None:
 
     assert "next steps" in report
     assert f"cd {answers.target_dir}" in report
-    assert "CLAUDE.md" in report
+    assert "AGENTS.md" in report
+
+
+def test_location_next_steps_and_login_precede_overlay_summary() -> None:
+    answers = Answers(project_name="my-app", target_dir=Path("/does/not/exist/my-app"))
+
+    report = render_report(answers, PIN, [Path("CLAUDE.md")])
+
+    assert report.index("location:") < report.index("next steps:")
+    assert report.index("next steps:") < report.index("first login:")
+    assert report.index("first login:") < report.index("overlay files written:")
 
 
 def test_report_omits_flag_names_when_component_disabled() -> None:
@@ -187,6 +210,34 @@ def test_report_states_standard_compliant_agents_needing_no_target_selection() -
     assert "codex" in report
 
 
+@pytest.mark.parametrize(
+    "selection",
+    [ProjectSelection.default_set(CATALOG), ProjectSelection.all(CATALOG)],
+)
+def test_report_is_plain_text_for_default_and_whole_catalog(
+    selection: ProjectSelection,
+) -> None:
+    answers = Answers(
+        project_name="my-app",
+        target_dir=Path("/does/not/exist/my-app"),
+        selection=selection,
+    )
+
+    report = render_report(
+        answers,
+        PIN,
+        [Path("CLAUDE.md"), Path("docs") / "requirements.md"],
+        CATALOG,
+    )
+
+    assert "\x1b" not in report
+    assert [
+        line
+        for line in report.splitlines()
+        if line in {"next steps:", "first login:", "overlay summary:"}
+    ] == ["next steps:", "first login:", "overlay summary:"]
+
+
 def test_report_and_readme_template_disclose_the_same_superuser_email() -> None:
     """FR-38 states the login on two dev-ready-owned surfaces; they must agree.
 
@@ -206,4 +257,3 @@ def test_report_and_readme_template_disclose_the_same_superuser_email() -> None:
     ).read_text(encoding="utf-8")
 
     assert f"`{render._SUPERUSER_EMAIL}`" in template
-

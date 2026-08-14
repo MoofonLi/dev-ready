@@ -36,12 +36,10 @@ def render_report(
     catalog: ComponentCatalog | None = None,
 ) -> str:
     """Render the full success message `cli.py` prints verbatim after generation."""
-    overlay_paths = ", ".join(str(path) for path in written) if written else "(none)"
     lines = [
         f"project generated: {answers.project_name}",
         f"location:  {answers.target_dir}",
         f"upstream:  {pin.repo}@{pin.commit[:12]} ({pin.ref})",
-        f"overlay:   {overlay_paths}",
         *_render_selection(answers, catalog),
         *_render_agent_targets(answers, catalog),
         "",
@@ -54,8 +52,39 @@ def render_report(
         "  3. read AGENTS.md for the full picture",
         "",
         *_CREDENTIAL_DISCLOSURE,
+        "",
+        *_render_overlay_summary(written),
     ]
     return "\n".join(lines)
+
+
+def _render_overlay_summary(written: list[Path]) -> list[str]:
+    counts = {
+        "root files": 0,
+        "canonical agent content": 0,
+        "documentation": 0,
+        "Agent Target artifacts": 0,
+    }
+    for path in written:
+        if len(path.parts) == 1:
+            counts["root files"] += 1
+        elif path.parts[0] == ".agents":
+            counts["canonical agent content"] += 1
+        elif path.parts[0] == "docs":
+            counts["documentation"] += 1
+        else:
+            counts["Agent Target artifacts"] += 1
+    breakdown = "; ".join(f"{label}: {count}" for label, count in counts.items())
+    # FR-44 as amended 2026-08-14. The stamp's `inventory` is the authoritative
+    # managed-file list, so the report names it. `dev-ready check` is a drift
+    # verdict, not an inventory query: it does not print the paths, and it exits
+    # 7 on drift. Naming it here would promise output that command never gives.
+    return [
+        "overlay summary:",
+        f"  overlay files written: {len(written)}",
+        f"  breakdown: {breakdown}",
+        '  full managed-file list: the "inventory" entries in .dev-ready.json',
+    ]
 
 
 def _render_selection(
