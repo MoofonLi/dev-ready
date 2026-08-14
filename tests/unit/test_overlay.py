@@ -133,7 +133,7 @@ def test_shared_agent_target_directory_writes_one_stub_tree_and_inspects_cleanly
     catalog = ComponentCatalog(CATALOG, shared_targets)
     selection = ProjectSelection.from_items(
         catalog,
-        skills=frozenset({"spec-loop"}),
+        skills=frozenset({"mattpocock"}),
         agent_targets=frozenset(shared_targets),
     )
     project_dir = tmp_path / "project"
@@ -175,7 +175,7 @@ def test_overlay_still_rejects_a_genuine_duplicate_destination(tmp_path: Path) -
     )
     selection = ProjectSelection.from_items(
         catalog,
-        skills=frozenset({"spec-loop"}),
+        skills=frozenset({"mattpocock"}),
         agent_targets=frozenset({"collision"}),
     )
 
@@ -188,7 +188,7 @@ def test_real_shared_directory_pair_generates_one_stub_tree(tmp_path: Path) -> N
     project_dir.mkdir()
     selection = ProjectSelection.from_items(
         CATALOG,
-        skills=frozenset({"spec-loop"}),
+        skills=frozenset({"mattpocock"}),
         agent_targets=frozenset({"qoder", "qoder-cn"}),
     )
 
@@ -235,7 +235,7 @@ def test_no_selection_writes_handoff_protocol_paths(
     else:
         selection = ProjectSelection.from_items(
             CATALOG,
-            skills=frozenset({"spec-loop"}),
+            skills=frozenset({"mattpocock"}),
             mcp=frozenset(),
             agent_targets=frozenset({"claude"}),
         )
@@ -702,10 +702,10 @@ def test_render_stamp_structure(tmp_path: Path) -> None:
     assert data["components"]["skills"]["included"] is True
     assert data["components"]["skills"]["items"] == [
         {"id": "caveman", "pin": None},
+        {"id": "mattpocock", "pin": None},
         {"id": "react-doctor", "pin": "0.8.1"},
-        {"id": "spec-loop", "pin": None},
     ]
-    assert data["development_loop"] == "spec-loop"
+    assert data["development_loop"] == "mattpocock"
     assert data["components"]["mcp"]["included"] is True
     assert data["components"]["mcp"]["items"] == [{"id": "code-memory", "pin": "0.9.0"}]
     assert data["components"]["docs"]["included"] is True
@@ -904,7 +904,7 @@ def test_unmounted_enhancements_do_not_change_loop_skills(tmp_path: Path) -> Non
         ),
         CATALOG,
     )
-    loop = next(item for item in CATALOG.loops() if item.id == "spec-loop")
+    loop = next(item for item in CATALOG.loops() if item.id == "mattpocock")
     loop_skill_paths = {
         f"{item_path.dest}/SKILL.md"
         for item_path in loop.paths
@@ -929,7 +929,7 @@ def test_default_set_leaves_every_loop_skill_byte_identical_to_its_template(
 
     content = build_overlay_content(answers, CATALOG)
     templates_root = resources.files("dev_ready").joinpath("templates")
-    loop = next(item for item in CATALOG.loops() if item.id == "spec-loop")
+    loop = next(item for item in CATALOG.loops() if item.id == "mattpocock")
     template_bytes = {
         f"{item_path.dest}/SKILL.md": templates_root.joinpath(
             *item_path.src.split("/"), "SKILL.md"
@@ -1317,7 +1317,7 @@ def test_standalone_spec_loop_is_complete_and_role_neutral(tmp_path: Path) -> No
     project_dir.mkdir()
     answers = _answers(
         tmp_path,
-        skills_items=frozenset({"spec-loop"}),
+        skills_items=frozenset({"mattpocock"}),
         include_mcp=False,
         include_docs=False,
     )
@@ -1378,7 +1378,7 @@ def test_spec_loop_stamp_records_the_resolved_selection_and_complete_inventory(
     project_dir.mkdir()
     answers = _answers(
         tmp_path,
-        skills_items=frozenset({"spec-loop"}),
+        skills_items=frozenset({"mattpocock"}),
         include_mcp=False,
         include_docs=False,
     )
@@ -1386,9 +1386,9 @@ def test_spec_loop_stamp_records_the_resolved_selection_and_complete_inventory(
     apply_overlay(answers, project_dir, CATALOG, PIN, load_default_manifest().vendored)
 
     stamp = json.loads((project_dir / ".dev-ready.json").read_text(encoding="utf-8"))
-    assert stamp["development_loop"] == "spec-loop"
+    assert stamp["development_loop"] == "mattpocock"
     assert {item["id"] for item in stamp["components"]["skills"]["items"]} == {
-        "spec-loop"
+        "mattpocock"
     }
     assert stamp["components"]["docs"] == {"included": False, "items": []}
     inventory_paths = {entry["path"] for entry in stamp["inventory"]}

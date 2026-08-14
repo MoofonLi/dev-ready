@@ -1,7 +1,9 @@
 """Stamp rehydration: one migration policy, two lifecycle views."""
 
+from dataclasses import replace
+
 from dev_ready.manifest import load_default_manifest
-from dev_ready.recorded import RecordedProject
+from dev_ready.recorded import RecordedProject, ResolvedRecordedItem
 from dev_ready.stamp import InventoryEntry, Stamp, StampItem, UpstreamStampInfo
 
 MANIFEST = load_default_manifest()
@@ -88,20 +90,31 @@ def test_ids_the_current_catalog_no_longer_declares_are_dropped() -> None:
     assert recorded.selection.mcp == frozenset()
 
 
-def test_a_v5_record_with_retired_setup_all_resolves_through_its_loop() -> None:
+def test_a_v5_record_with_the_retired_loop_id_resolves_in_both_views() -> None:
     stamp = _stamp(
         version=5,
         skills=("spec-loop", "setup-all"),
         development_loop="spec-loop",
     )
+    stamp = replace(
+        stamp,
+        skills_items=(
+            StampItem(id="spec-loop", pin="recorded-pin"),
+            StampItem(id="setup-all"),
+        ),
+    )
 
     observed = RecordedProject.observed(stamp, MANIFEST)
     migrated = RecordedProject.migrated(stamp, MANIFEST)
 
-    assert observed.selection.skills == frozenset({"spec-loop"})
-    assert observed.selection.development_loop == "spec-loop"
-    assert migrated.selection.skills == frozenset({"spec-loop"})
-    assert migrated.selection.development_loop == "spec-loop"
+    assert observed.selection.skills == frozenset({"mattpocock"})
+    assert observed.selection.development_loop == "mattpocock"
+    assert migrated.selection.skills == frozenset({"mattpocock"})
+    assert migrated.selection.development_loop == "mattpocock"
+    assert observed.recorded_skills_items == (
+        ResolvedRecordedItem(id="mattpocock", pin="recorded-pin"),
+        ResolvedRecordedItem(id="setup-all", pin=None),
+    )
 
 
 def test_a_removed_agent_target_is_reported_rather_than_silently_dropped() -> None:

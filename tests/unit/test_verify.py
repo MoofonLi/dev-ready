@@ -209,13 +209,13 @@ def test_verify_selection_matrix_mixed_and_negative(tmp_path: Path) -> None:
 
 
 def test_verify_rejects_missing_selected_spec_loop_configuration(tmp_path: Path) -> None:
-    ans = _answers(tmp_path, skills_items=frozenset({"spec-loop"}), mcp_items=frozenset())
+    ans = _answers(tmp_path, skills_items=frozenset({"mattpocock"}), mcp_items=frozenset())
     _make_complete_project(tmp_path, ans)
     shutil.rmtree(tmp_path / "docs" / "agents")
 
     with pytest.raises(
         VerificationError,
-        match="selected development loop item 'spec-loop' is missing",
+        match="selected development loop item 'mattpocock' is missing",
     ):
         verify_project(tmp_path, ans, CATALOG)
 
@@ -229,7 +229,7 @@ def test_verify_rejects_a_project_record_missing_the_mandatory_loop(
 
     with pytest.raises(
         VerificationError,
-        match="development loop item 'spec-loop'.*missing",
+        match="development loop item 'mattpocock'.*missing",
     ):
         verify_project(tmp_path, answers, CATALOG)
 
@@ -246,13 +246,13 @@ def _make_generated_project(root: Path, answers: Answers) -> None:
 
 
 def test_verify_detects_a_missing_nested_spec_loop_asset(tmp_path: Path) -> None:
-    ans = _answers(tmp_path, skills_items=frozenset({"spec-loop"}), mcp_items=frozenset())
+    ans = _answers(tmp_path, skills_items=frozenset({"mattpocock"}), mcp_items=frozenset())
     _make_generated_project(tmp_path, ans)
     (tmp_path / ".agents" / "skills" / "domain-modeling" / "ADR-FORMAT.md").unlink()
 
     with pytest.raises(
         VerificationError,
-        match="selected development loop item 'spec-loop'.*ADR-FORMAT.md.*missing",
+        match="selected development loop item 'mattpocock'.*ADR-FORMAT.md.*missing",
     ):
         verify_project(tmp_path, ans, CATALOG)
 
@@ -269,7 +269,7 @@ def test_verify_rejects_a_partial_loop_for_a_malformed_empty_selection(
 
     with pytest.raises(
         VerificationError,
-        match="development loop item 'spec-loop'.*missing",
+        match="development loop item 'mattpocock'.*missing",
     ):
         verify_project(tmp_path, ans, CATALOG)
 

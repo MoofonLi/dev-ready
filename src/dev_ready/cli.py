@@ -181,9 +181,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Category selection: comma-separated ids, or 'all' / 'none'.",
     )
     init_parser.add_argument(
+        "--flow",
         "--development-loop",
+        dest="development_loop",
+        metavar="ID",
         default=None,
-        help="Mandatory development-loop id (defaults to the manifest Default Set).",
+        help="Mandatory Engineering Flow id (defaults to the manifest Default Set).",
     )
     for category in _CATEGORY_FLAGS:
         init_parser.add_argument(
@@ -251,9 +254,13 @@ def build_answers(
         catalog=catalog,
         categories=args.categories,
         category_items=_category_items_from_args(args),
-        agents=args.agents,
         development_loop=getattr(args, "development_loop", None),
     ) or ProjectSelection.default_set(catalog)
+    if args.agents is not None:
+        selection = selection.with_agent_targets(
+            catalog,
+            ProjectSelection.agent_targets_from_flag(catalog, args.agents),
+        )
 
     target_dir = args.target_dir if args.target_dir is not None else Path.cwd() / name
     return Answers(
@@ -275,14 +282,22 @@ def _build_partial_answers(
         catalog=catalog,
         categories=args.categories,
         category_items=_category_items_from_args(args),
-        agents=args.agents,
         development_loop=getattr(args, "development_loop", None),
     )
+    agent_targets = (
+        ProjectSelection.agent_targets_from_flag(catalog, args.agents)
+        if args.agents is not None
+        else None
+    )
+    if selection is not None and agent_targets is not None:
+        selection = selection.with_agent_targets(catalog, agent_targets)
+        agent_targets = None
 
     return PartialAnswers(
         project_name=name,
         target_dir=args.target_dir,
         selection=selection,
+        agent_targets=agent_targets,
         assume_yes=args.yes,
     )
 

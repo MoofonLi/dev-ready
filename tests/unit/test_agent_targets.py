@@ -117,8 +117,8 @@ def test_base_mcp_config_is_requested_only_when_a_selected_effect_needs_it() -> 
 def test_stub_path_places_the_pointer_under_the_targets_own_skills_dir() -> None:
     projection = project_targets(_catalog(), {"alpha"})
 
-    assert projection.stub_path(_ALPHA, "spec-loop") == Path(
-        ".alpha/skills/spec-loop/SKILL.md"
+    assert projection.stub_path(_ALPHA, "mattpocock") == Path(
+        ".alpha/skills/mattpocock/SKILL.md"
     )
 
 
@@ -130,12 +130,12 @@ def test_projection_yields_each_shared_skill_destination_once() -> None:
 
     projection = project_targets(catalog, {"alpha", "gamma", "beta"})
     stub_paths = [
-        projection.stub_path(target, "spec-loop") for target in projection.skill_targets
+        projection.stub_path(target, "mattpocock") for target in projection.skill_targets
     ]
 
     assert stub_paths == [
-        Path(".alpha/skills/spec-loop/SKILL.md"),
-        Path(".beta/skills/spec-loop/SKILL.md"),
+        Path(".alpha/skills/mattpocock/SKILL.md"),
+        Path(".beta/skills/mattpocock/SKILL.md"),
     ]
     assert projection.rules_files == ("ALPHA.md", "GAMMA.md")
 
@@ -173,7 +173,7 @@ def test_canonical_skill_names_reads_only_canonical_skill_destinations() -> None
 
 def test_the_real_catalog_projects_a_stub_for_every_canonical_spec_loop_skill() -> None:
     projection = project_targets(CATALOG, CATALOG.agent_target_ids)
-    names = canonical_skill_names(CATALOG, {"spec-loop"})
+    names = canonical_skill_names(CATALOG, {"mattpocock"})
 
     assert "to-spec" in names
     for target in projection.skill_targets:

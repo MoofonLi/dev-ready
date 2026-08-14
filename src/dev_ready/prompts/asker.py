@@ -19,7 +19,13 @@ class Asker(Protocol):
 
     def text(self, message: str) -> str | None: ...
 
-    def select(self, message: str, choices: Sequence[str]) -> str | None: ...
+    def select(
+        self,
+        message: str,
+        choices: Sequence[str],
+        *,
+        disabled_choices: Sequence[str],
+    ) -> str | None: ...
 
     def checkbox(
         self,

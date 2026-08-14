@@ -15,6 +15,7 @@ from dev_ready.manifest.models import (
 )
 
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+_RENAMED_DEVELOPMENT_LOOP_ID = "spec-loop"
 _DEFAULT_AGENT_TARGETS = frozenset({"claude"})
 
 
@@ -80,6 +81,29 @@ class ProjectSelection:
         return _default_agent_targets(catalog.agent_target_ids)
 
     @classmethod
+    def agent_targets_from_flag(
+        cls,
+        catalog: ComponentCatalog,
+        raw_value: str | None,
+    ) -> frozenset[str]:
+        """Resolve one Agent Target flag independently of catalog content."""
+        return _resolve_agent_targets(raw_value, catalog)
+
+    def with_agent_targets(
+        self,
+        catalog: ComponentCatalog,
+        agent_targets: frozenset[str],
+    ) -> ProjectSelection:
+        """Return this content selection with its Agent Target answer replaced."""
+        return self.from_items(
+            catalog,
+            skills=self.skills,
+            mcp=self.mcp,
+            docs_items=self.docs_items,
+            agent_targets=agent_targets,
+        )
+
+    @classmethod
     def empty(cls) -> ProjectSelection:
         """Return deliberately malformed intent for inspection and lifecycle tests."""
         return cls._create(
@@ -99,7 +123,6 @@ class ProjectSelection:
         skills: frozenset[str] = frozenset(),
         mcp: frozenset[str] = frozenset(),
         docs_items: frozenset[str] = frozenset(),
-        categories: frozenset[str] | None = None,
         agent_targets: frozenset[str] | None = None,
         handoff: bool = False,
     ) -> ProjectSelection:
@@ -113,7 +136,6 @@ class ProjectSelection:
             skills=skills,
             mcp=mcp,
             docs_items=docs_items,
-            categories=categories,
             agent_targets=agent_targets,
             require_development_loop=True,
         )
@@ -134,7 +156,6 @@ class ProjectSelection:
             skills=skills,
             mcp=mcp,
             docs_items=docs_items,
-            categories=None,
             agent_targets=agent_targets,
             require_development_loop=False,
         )
@@ -147,7 +168,6 @@ class ProjectSelection:
         skills: frozenset[str],
         mcp: frozenset[str],
         docs_items: frozenset[str],
-        categories: frozenset[str] | None,
         agent_targets: frozenset[str] | None,
         require_development_loop: bool,
     ) -> ProjectSelection:
@@ -163,21 +183,19 @@ class ProjectSelection:
             skills,
             required=require_development_loop,
         )
-        resolved_categories = (
-            _categories_for_items(
-                catalog,
-                skills=resolved_skills,
-                mcp=mcp,
-                docs=docs_items,
-            )
-            if categories is None
-            else categories
-            | (frozenset({"dev"}) if development_loop else frozenset())
+        resolved_skills = _resolve_requirements("skills", resolved_skills, catalog)
+        resolved_mcp = _resolve_requirements("mcp", mcp, catalog)
+        resolved_docs = _resolve_requirements("docs", docs_items, catalog)
+        resolved_categories = _categories_for_items(
+            catalog,
+            skills=resolved_skills,
+            mcp=resolved_mcp,
+            docs=resolved_docs,
         )
         return cls._create(
-            skills=_resolve_requirements("skills", resolved_skills, catalog),
-            mcp=_resolve_requirements("mcp", mcp, catalog),
-            docs_items=_resolve_requirements("docs", docs_items, catalog),
+            skills=resolved_skills,
+            mcp=resolved_mcp,
+            docs_items=resolved_docs,
             categories=resolved_categories,
             development_loop=development_loop,
             agent_targets=resolved_targets,
@@ -195,7 +213,6 @@ class ProjectSelection:
             ),
             mcp=catalog.item_ids("mcp"),
             docs_items=catalog.item_ids("docs"),
-            categories=catalog.category_ids,
             agent_targets=catalog.agent_target_ids,
         )
 
@@ -224,7 +241,6 @@ class ProjectSelection:
         catalog: ComponentCatalog,
         categories: str | None,
         category_items: Mapping[str, str | None],
-        agents: str | None = None,
         development_loop: str | None = None,
     ) -> ProjectSelection | None:
         """Resolve CLI selection flags, or return ``None`` when unspecified."""
@@ -233,13 +249,12 @@ class ProjectSelection:
             for category, value in category_items.items()
             if value is not None
         }
-        explicit = (
+        content_explicit = (
             categories is not None
             or bool(explicit_category_items)
-            or agents is not None
             or development_loop is not None
         )
-        if not explicit:
+        if not content_explicit:
             return None
 
         valid_categories = catalog.category_ids
@@ -249,7 +264,11 @@ class ProjectSelection:
                 f"unknown Category ids: {unknown_categories!r}; "
                 f"valid ids: {sorted(valid_categories)!r}"
             )
-        requested_categories = _resolve_category_ids(categories, valid_categories)
+        requested_categories = (
+            frozenset(explicit_category_items)
+            if categories is None
+            else _resolve_category_ids(categories, valid_categories)
+        )
         selected_categories = requested_categories | (
             frozenset({"dev"}) if "dev" in valid_categories else frozenset()
         )
@@ -261,7 +280,17 @@ class ProjectSelection:
                         "select the Category or remove its item flag."
                     )
 
-        selected_ids: set[str] = set()
+        default_enhancements = (
+            catalog.default_set.enhancements
+            if categories is None and catalog.default_set is not None
+            else ()
+        )
+        item_categories = {item.id: item.category for item in catalog.all_items()}
+        selected_ids = {
+            item_id
+            for item_id in default_enhancements
+            if item_categories[item_id] not in explicit_category_items
+        }
         for category in selected_categories:
             category_ids = catalog.ids_in_category(category)
             if category == "dev":
@@ -279,7 +308,7 @@ class ProjectSelection:
         selected_by_component = catalog.by_component(selected_ids)
         selected_loop = _resolve_development_loop_id(
             development_loop,
-            catalog.development_loop_ids,
+            catalog,
         )
 
         return cls.from_items(
@@ -288,8 +317,7 @@ class ProjectSelection:
             | (frozenset({selected_loop}) if selected_loop else frozenset()),
             mcp=selected_by_component["mcp"],
             docs_items=selected_by_component["docs"],
-            categories=selected_categories,
-            agent_targets=_resolve_agent_targets(agents, catalog),
+            agent_targets=cls.default_agent_targets(catalog),
         )
 
     def items(self, name: str) -> frozenset[str]:
@@ -327,13 +355,23 @@ def _resolve_category_ids(
 
 def _resolve_development_loop_id(
     requested: str | None,
-    valid_ids: tuple[str, ...],
+    catalog: ComponentCatalog,
 ) -> str:
     if requested is None:
         return ""
+    if requested == _RENAMED_DEVELOPMENT_LOOP_ID:
+        raise InvalidArgumentsError(
+            f"Engineering Flow id {requested!r} was renamed to "
+            f"{catalog.default_development_loop!r}"
+        )
+    if requested in {flow.id for flow in catalog.announced_loops}:
+        raise InvalidArgumentsError(
+            f"Engineering Flow {requested!r} is not yet available"
+        )
+    valid_ids = catalog.development_loop_ids
     if requested not in valid_ids:
         raise InvalidArgumentsError(
-            f"unknown development loop id {requested!r}; valid ids: {sorted(valid_ids)!r}"
+            f"unknown Engineering Flow id {requested!r}; valid ids: {sorted(valid_ids)!r}"
         )
     return requested
 
@@ -356,7 +394,7 @@ def _resolve_category_items(
         joined = ", ".join(repr(item_id) for item_id in retired)
         raise InvalidArgumentsError(
             f"retired Dev item id(s) {joined}; each is now part of the mandatory "
-            "Dev development loop 'spec-loop'"
+            "Dev development loop 'mattpocock'"
         )
     unknown = sorted(requested - valid_ids)
     if unknown:
@@ -544,6 +582,7 @@ class PartialAnswers:
     project_name: str | None
     target_dir: Path | None
     selection: ProjectSelection | None
+    agent_targets: frozenset[str] | None = None
     assume_yes: bool = False
 
     def __post_init__(self) -> None:

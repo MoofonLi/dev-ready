@@ -116,7 +116,7 @@ def test_skill_examples_cover_default_none_and_mixed_current_cli_contract() -> N
     assert any("--categories none" in command and "--agents none" in command for command in examples)
     assert any(
         "--categories dev,design,token-optimize" in command
-        and "--development-loop spec-loop" in command
+        and "--development-loop mattpocock" in command
         and "--dev none" in command
         and "--design frontend-design,design-stripe" in command
         and "--token-optimize code-memory" in command

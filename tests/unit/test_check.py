@@ -116,6 +116,46 @@ def test_check_fresh_v5_project(tmp_path: Path, capsys: pytest.CaptureFixture[st
     assert "Status: CLEAN" in capsys.readouterr().out
 
 
+def test_check_resolves_a_retired_recorded_item_id_before_comparing_pins(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=5)
+    manifest = load_default_manifest()
+    loop = next(item for item in manifest.components.loops() if item.id == "mattpocock")
+    vendored_pins = {vendor.repo: vendor.commit for vendor in manifest.vendored}
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["development_loop"] = "spec-loop"
+    data["components"]["skills"]["items"].append(
+        {"id": "spec-loop", "pin": vendored_pins[loop.vendored_repo]}
+    )
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    assert main(["check", str(tmp_path)]) == 0
+    output = capsys.readouterr()
+    assert "Status: CLEAN" in output.out
+    assert "removed catalog item" not in output.err
+
+
+def test_check_still_reports_a_genuinely_removed_recorded_item(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=5)
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["components"]["skills"]["items"].append(
+        {"id": "missing-forever", "pin": None}
+    )
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    assert main(["check", str(tmp_path)]) == 7
+    error = capsys.readouterr().err
+    assert "removed catalog item" in error
+    assert "missing-forever" in error
+
+
 @pytest.mark.parametrize(
     ("stamp_version", "component_key"),
     [(3, "agents"), (4, "handoff")],

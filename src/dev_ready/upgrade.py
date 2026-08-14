@@ -116,16 +116,21 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         )
 
     manifest = load_default_manifest()
-    recorded_skills = frozenset(item.id for item in stamp.skills_items)
+    recorded_project = RecordedProject.migrated(stamp, manifest)
     if (
         stamp.stamp_version >= 5
-        and stamp.development_loop not in manifest.components.development_loop_ids
+        and recorded_project.recorded_development_loop
+        not in manifest.components.development_loop_ids
     ):
         raise StampInvalidError(
             ".dev-ready.json records unknown development_loop "
-            f"{stamp.development_loop!r}"
+            f"{recorded_project.recorded_development_loop!r}"
         )
-    if stamp.stamp_version >= 5 and stamp.development_loop not in recorded_skills:
+    if (
+        stamp.stamp_version >= 5
+        and recorded_project.recorded_development_loop
+        != recorded_project.selection.development_loop
+    ):
         raise StampInvalidError(
             ".dev-ready.json development_loop must also appear in "
             "components.skills.items"
@@ -140,7 +145,6 @@ def upgrade_project(project_dir: Path, dry_run: bool = False) -> str:
         exclude=manifest_pin.exclude,
         prune=manifest_pin.prune,
     )
-    recorded_project = RecordedProject.migrated(stamp, manifest)
     if recorded_project.removed_agent_targets:
         raise UpgradeError(
             "cannot upgrade a project that records a removed Agent Target: "

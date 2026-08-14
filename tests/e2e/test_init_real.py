@@ -42,7 +42,7 @@ def test_init_real_end_to_end(
     assert not (target_dir / ".agents/skills/caveman").exists()
     assert not (target_dir / ".mcp.json").exists()
     stamp = json.loads((target_dir / ".dev-ready.json").read_text(encoding="utf-8"))
-    assert stamp["development_loop"] == "spec-loop"
+    assert stamp["development_loop"] == "mattpocock"
 
     captured = capsys.readouterr()
     assert "[1/4] Fetching base template" in captured.err

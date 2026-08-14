@@ -73,7 +73,7 @@ def _render_selection(
         if item.kind == "enhancement" and item.id in selected_ids
     )
     return [
-        f"development loop (required): {answers.selection.development_loop}",
+        f"Engineering Flow (required): {answers.selection.development_loop}",
         "documentation skeletons: architecture, requirements",
         "enhancements: " + (", ".join(selected_enhancements) or "(none)"),
     ]

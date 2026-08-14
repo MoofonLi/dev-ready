@@ -114,6 +114,93 @@ def test_parse_valid_manifest() -> None:
     assert mcp.paths[0].dest == ".mcp.json"
 
 
+def test_catalog_item_display_name_falls_back_to_its_id() -> None:
+    data = json.loads(json.dumps(VALID))
+
+    fallback = parse_manifest(json.dumps(data)).components["skills"][0]
+    assert fallback.display_name == "sample-skill"
+
+    data["components"]["skills"]["items"][0]["title"] = "Sample Skill"
+    titled = parse_manifest(json.dumps(data)).components["skills"][0]
+    assert titled.title == "Sample Skill"
+    assert titled.display_name == "Sample Skill"
+
+
+def test_announced_flow_is_partitioned_out_of_every_selectable_catalog_view() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"].append(
+        {
+            "id": "future-flow",
+            "kind": "development-loop",
+            "category": "dev",
+            "title": "Future Flow",
+            "status": "coming-soon",
+            "description": "An Engineering Flow that has been announced but not shipped.",
+        }
+    )
+
+    catalog = parse_manifest(json.dumps(data)).components
+
+    assert [(flow.id, flow.display_name, flow.status) for flow in catalog.announced_loops] == [
+        ("future-flow", "Future Flow", "coming-soon")
+    ]
+    assert "future-flow" not in {item.id for item in catalog.all_items()}
+    assert "future-flow" not in catalog.item_ids("skills")
+    assert "future-flow" not in catalog.by_component({"future-flow"})["skills"]
+    assert "future-flow" not in catalog.ids_in_category("dev")
+    assert "future-flow" not in catalog.development_loop_ids
+
+
+@pytest.mark.parametrize("status", [None, 42, "available-later"])
+def test_announced_flow_status_has_exactly_one_legal_value(status: object) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"].append(
+        {
+            "id": "future-flow",
+            "category": "dev",
+            "status": status,
+            "description": "A future Engineering Flow.",
+        }
+    )
+
+    with pytest.raises(ManifestError, match="status.*coming-soon"):
+        parse_manifest(json.dumps(data))
+
+
+def test_announced_flow_cannot_declare_materialized_content() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"].append(
+        {
+            "id": "future-flow",
+            "category": "dev",
+            "status": "coming-soon",
+            "description": "A future Engineering Flow.",
+            "paths": [
+                {
+                    "src": "claude/skills/future-flow",
+                    "dest": ".agents/skills/future-flow",
+                }
+            ],
+        }
+    )
+
+    with pytest.raises(ManifestError, match="announced flow.*must not define.*paths"):
+        parse_manifest(json.dumps(data))
+
+
+def test_bundled_manifest_loads_with_two_announced_flows() -> None:
+    catalog = load_default_manifest().components
+
+    assert catalog.loops()[0].display_name == "Matt Pocock's skills"
+    assert [flow.id for flow in catalog.announced_loops] == [
+        "superpowers",
+        "addyosmani",
+    ]
+    assert all("coming soon" not in flow.display_name.casefold() for flow in catalog.announced_loops)
+    assert all(not any(char.isdigit() for char in flow.display_name) for flow in catalog.announced_loops)
+    assert all(not flow.paths and not flow.steps and flow.effect is None for flow in catalog.announced_loops)
+
+
 def test_catalog_item_requires_a_category() -> None:
     data = json.loads(json.dumps(VALID))
     del data["components"]["skills"]["items"][0]["category"]
@@ -399,7 +486,7 @@ def test_default_manifest_declares_category_assignments() -> None:
         "design",
         "token-optimize",
     }
-    assert items["spec-loop"].category == "dev"
+    assert items["mattpocock"].category == "dev"
     assert items["security-audit"].category == "security"
     assert items["react-doctor"].category == "quality"
     assert items["webapp-testing"].category == "quality"
@@ -541,8 +628,8 @@ def test_default_manifest_contains_complete_spec_loop_bundle() -> None:
     assert len(skills) == 6
     assert "project-orientation" not in skills
     assert {"tdd", "diagnosing-bugs", "code-review", "setup-all"}.isdisjoint(skills)
-    assert skills["spec-loop"].vendored_repo == "mattpocock/skills"
-    assert {path.dest for path in skills["spec-loop"].paths} == {
+    assert skills["mattpocock"].vendored_repo == "mattpocock/skills"
+    assert {path.dest for path in skills["mattpocock"].paths} == {
         ".agents/skills/tdd",
         ".agents/skills/diagnosing-bugs",
         ".agents/skills/code-review",
@@ -574,7 +661,7 @@ def test_default_manifest_contains_complete_spec_loop_bundle() -> None:
 
 def test_setup_skill_is_owned_by_the_mandatory_development_loop() -> None:
     manifest = load_default_manifest()
-    loop = next(item for item in manifest.components["skills"] if item.id == "spec-loop")
+    loop = next(item for item in manifest.components["skills"] if item.id == "mattpocock")
 
     assert "setup-all" not in manifest.components.item_ids("skills")
     assert "setup-matt-pocock-skills" in loop.steps

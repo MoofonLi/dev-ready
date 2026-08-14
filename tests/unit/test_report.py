@@ -153,7 +153,7 @@ def test_report_distinguishes_required_loop_from_selected_enhancements() -> None
 
     default_report = render_report(default_answers, PIN, [], CATALOG)
 
-    assert "development loop (required): spec-loop" in default_report
+    assert "Engineering Flow (required): mattpocock" in default_report
     assert "documentation skeletons: architecture, requirements" in default_report
     assert "enhancements: (none)" in default_report
 
@@ -168,7 +168,7 @@ def test_report_distinguishes_required_loop_from_selected_enhancements() -> None
     )
     enhanced_report = render_report(enhanced_answers, PIN, [], CATALOG)
 
-    assert "development loop (required): spec-loop" in enhanced_report
+    assert "Engineering Flow (required): mattpocock" in enhanced_report
     assert "documentation skeletons: architecture, requirements" in enhanced_report
     assert "enhancements: security-audit" in enhanced_report
 

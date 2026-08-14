@@ -63,7 +63,7 @@ start of each line is the value to place in the corresponding selection flag.
 
 ### Development loops
 
-- `spec-loop`: You want a staged workflow that starts with a written spec and ends with implementation and review.
+- `mattpocock`: You want a staged workflow that starts with a written spec and ends with implementation and review.
 
 ### dev items
 
@@ -191,7 +191,7 @@ Every selection flag accepts:
 - `none` selects no Category, item, or Agent Target on that flag.
 - A comma-separated list selects those ids. Do not add spaces inside the list.
 
-Every generated project resolves `spec-loop`; `--categories none` and
+Every generated project resolves `mattpocock`; `--categories none` and
 `--dev none` decline Enhancements without removing it. The former selectable
 ids `spec-loop`, `tdd`, `diagnosing-bugs`, `code-review`, and `setup-all` now
 exit 2 when passed to `--dev`, because their content is part of the mandatory
@@ -233,7 +233,7 @@ uvx dev-ready init minimal-app --yes --categories none --agents none --dir ./min
 A developer says, "I am building a polished design-focused app and want token-conscious agents with Claude."
 
 ```shell
-uvx dev-ready init focused-app --yes --development-loop spec-loop --categories dev,design,token-optimize --dev none --design frontend-design,design-stripe --token-optimize code-memory --agents claude --dir ./focused-app
+uvx dev-ready init focused-app --yes --development-loop mattpocock --categories dev,design,token-optimize --dev none --design frontend-design,design-stripe --token-optimize code-memory --agents claude --dir ./focused-app
 ```
 
 Run exactly one selected command. Do not invent flags for language, overwriting, or cleanup.

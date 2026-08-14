@@ -85,6 +85,8 @@ class CatalogItem:
     description: str
     mode: str
     license: str
+    title: str | None = None
+    status: str | None = None
     category: str = ""
     mount: str | None = None
     kind: str = "enhancement"
@@ -94,6 +96,11 @@ class CatalogItem:
     effect: CatalogEffect | None = None
     vendored_repo: str | None = None
     requires: tuple[str, ...] = ()
+
+    @property
+    def display_name(self) -> str:
+        """The user-facing name, falling back to the stable identifier."""
+        return self.title or self.id
 
 
 @dataclass(frozen=True)
@@ -122,12 +129,14 @@ class ComponentCatalog(dict[str, tuple[CatalogItem, ...]]):
         categories: Mapping[str, Category] | None = None,
         default_set: DefaultSet | None = None,
         standard_compliant_agents: Iterable[str] = (),
+        announced_loops: Iterable[CatalogItem] = (),
     ) -> None:
         super().__init__(components)
         self.agent_targets = dict(agent_targets)
         self.categories = dict(categories or {})
         self.default_set = default_set
         self.standard_compliant_agents = tuple(standard_compliant_agents)
+        self.announced_loops = tuple(announced_loops)
         loops = tuple(
             item for item in self.all_items() if item.kind == "development-loop"
         )

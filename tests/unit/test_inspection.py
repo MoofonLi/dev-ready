@@ -103,7 +103,7 @@ def test_generation_inspection_requires_the_development_loop_as_structure(
 
     assert any(
         issue.category == "missing item path"
-        and "development loop item 'spec-loop'" in issue.detail
+        and "development loop item 'mattpocock'" in issue.detail
         for issue in issues
     )
 
@@ -145,10 +145,10 @@ def test_inspection_reports_malformed_effect_target_as_a_fact(tmp_path: Path) ->
 def test_inspection_strips_template_suffix_from_catalog_assets(tmp_path: Path) -> None:
     selection = ProjectSelection.from_items(
         CATALOG,
-        skills=frozenset({"spec-loop"}),
+        skills=frozenset({"mattpocock"}),
     )
 
-    # Fake generation of spec-loop asset without .tmpl suffix (rendered destination path)
+    # Fake generation of mattpocock asset without .tmpl suffix (rendered destination path)
     asset_dir = tmp_path / "docs" / "agents"
     asset_dir.mkdir(parents=True)
     (asset_dir / "issue-tracker.md").write_text("tracker", encoding="utf-8")

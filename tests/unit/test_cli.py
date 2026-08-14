@@ -335,7 +335,7 @@ def test_init_flags_reach_generate_via_answers(
     assert answers.project_name == "my-app"
     assert answers.target_dir == target_dir
     assert answers.include_skills is True
-    assert answers.selection.development_loop == "spec-loop"
+    assert answers.selection.development_loop == "mattpocock"
     assert answers.include_mcp is False
     assert answers.include_docs is False
     assert answers.assume_yes is True
@@ -347,7 +347,7 @@ def test_build_answers_defaults() -> None:
     assert answers.target_dir == Path.cwd() / "my-app"
     assert answers.include_skills is True
     assert answers.include_mcp is False
-    assert answers.skills_items == frozenset({"spec-loop"})
+    assert answers.skills_items == frozenset({"mattpocock"})
     assert answers.mcp_items == frozenset()
     assert answers.include_docs is False
     assert answers.selection.docs_items == frozenset()
@@ -363,7 +363,7 @@ def test_build_answers_respects_flags(tmp_path) -> None:
     assert answers.include_skills is True
     assert answers.include_mcp is False
     assert answers.skills_items == frozenset(
-        {"spec-loop"}
+        {"mattpocock"}
     )
     assert answers.mcp_items == frozenset()
     assert answers.include_docs is False
@@ -457,6 +457,19 @@ def test_agents_flag_reaches_generation_as_resolved_target_selection(
         ]
     ) == 0
     assert captured["answers"].agent_targets == frozenset({"windsurf"})
+    answers = captured["answers"]
+    assert answers.skills_items == frozenset({"mattpocock"})
+    assert answers.mcp_items == frozenset()
+    assert answers.selection.docs_items == frozenset()
+
+
+def test_agents_only_non_tty_exits_2_with_unanswered_content_question(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["init", "my-app", "--agents", "windsurf"]) == 2
+
+    error = capsys.readouterr().err
+    assert "Engineering Flow and Category selection require an interactive terminal" in error
 
 
 def test_yes_without_selection_flags_generates_for_claude_only(
@@ -483,14 +496,56 @@ def test_development_loop_flag_uses_the_structural_selection_axis() -> None:
             "--categories",
             "none",
             "--development-loop",
-            "spec-loop",
+            "mattpocock",
         ]
     )
 
     answers = build_answers(args, CATALOG)
 
-    assert answers.selection.development_loop == "spec-loop"
-    assert answers.skills_items == frozenset({"spec-loop"})
+    assert answers.selection.development_loop == "mattpocock"
+    assert answers.skills_items == frozenset({"mattpocock"})
+
+
+@pytest.mark.parametrize("flag", ["--flow", "--development-loop"])
+def test_flow_flag_spellings_share_one_destination(flag: str) -> None:
+    args = build_parser().parse_args(
+        ["init", "my-app", "--yes", flag, "mattpocock"]
+    )
+
+    assert args.development_loop == "mattpocock"
+    assert build_answers(args, CATALOG).selection.development_loop == "mattpocock"
+
+
+def test_init_help_calls_the_public_concept_engineering_flow(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        build_parser().parse_args(["init", "--help"])
+
+    assert excinfo.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "--flow ID" in help_text
+    assert "Mandatory Engineering Flow id" in help_text
+    assert "development-loop id" not in help_text
+
+
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    [
+        (("--flow", "spec-loop"), "renamed to 'mattpocock'"),
+        (("--flow", "superpowers"), "not yet available"),
+        (("--flow", "nonesuch"), "unknown Engineering Flow id 'nonesuch'"),
+        (("--dev", "spec-loop"), "retired Dev item id(s) 'spec-loop'"),
+    ],
+)
+def test_flow_selection_failures_are_mutually_distinguishable(
+    arguments: tuple[str, str],
+    expected: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["init", "my-app", "--yes", *arguments]) == 2
+
+    assert expected in capsys.readouterr().err
 
 
 def test_unknown_agents_flag_fails_before_generation(
@@ -572,7 +627,7 @@ def test_category_item_flag_variations() -> None:
     )
     assert ans.skills_items == frozenset(
         {
-            "spec-loop",
+            "mattpocock",
         }
     )
     assert ans.mcp_items == frozenset()
@@ -587,7 +642,7 @@ def test_category_item_flag_variations() -> None:
         CATALOG,
     )
     assert ans2.skills_items == frozenset(
-        {"caveman", "spec-loop"}
+        {"caveman", "mattpocock"}
     )
     assert ans2.mcp_items == frozenset({"code-memory"})
 
@@ -623,7 +678,7 @@ def test_retired_loop_item_ids_exit_2_with_their_replacement(
     error = capsys.readouterr().err
     assert retired_id in error
     assert "mandatory Dev development loop" in error
-    assert "'spec-loop'" in error
+    assert "'mattpocock'" in error
 
 
 def test_dev_category_accepts_no_enhancement_items() -> None:
@@ -632,7 +687,7 @@ def test_dev_category_accepts_no_enhancement_items() -> None:
         CATALOG,
     )
 
-    assert answers.skills_items == frozenset({"spec-loop"})
+    assert answers.skills_items == frozenset({"mattpocock"})
 
 
 def test_conflicting_flags_exits_2(capsys) -> None:

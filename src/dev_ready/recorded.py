@@ -13,9 +13,19 @@ from dataclasses import dataclass
 
 from dev_ready.manifest import Manifest
 from dev_ready.prompts import ProjectSelection
-from dev_ready.stamp import Stamp
+from dev_ready.stamp import Stamp, StampItem
 
-__all__ = ["RecordedProject"]
+__all__ = ["RecordedProject", "ResolvedRecordedItem"]
+
+_RECORDED_ITEM_ALIASES = {"spec-loop": "mattpocock"}
+
+
+@dataclass(frozen=True)
+class ResolvedRecordedItem:
+    """A stamped catalog item after current record-id aliases are applied."""
+
+    id: str
+    pin: str | None
 
 
 @dataclass(frozen=True)
@@ -24,6 +34,10 @@ class RecordedProject:
 
     selection: ProjectSelection
     removed_agent_targets: tuple[str, ...]
+    recorded_development_loop: str
+    recorded_skills_items: tuple[ResolvedRecordedItem, ...]
+    recorded_mcp_items: tuple[ResolvedRecordedItem, ...]
+    recorded_docs_items: tuple[ResolvedRecordedItem, ...]
 
     @classmethod
     def observed(cls, stamp: Stamp, manifest: Manifest) -> RecordedProject:
@@ -52,9 +66,16 @@ def _resolve(
 ) -> RecordedProject:
     catalog = manifest.components
     known_docs = catalog.item_ids("docs")
+    recorded_skills_items = _resolve_recorded_items(
+        stamp.skills_items,
+        resolve_aliases=True,
+    )
+    recorded_mcp_items = _resolve_recorded_items(stamp.mcp_items)
+    recorded_docs_items = _resolve_recorded_items(stamp.docs_items)
 
     selected_skills = (
-        frozenset(item.id for item in stamp.skills_items) & catalog.item_ids("skills")
+        frozenset(item.id for item in recorded_skills_items)
+        & catalog.item_ids("skills")
     )
     if (
         adopt_default_development_loop
@@ -65,8 +86,8 @@ def _resolve(
 
     # Stamp version 5 is the first to record which documentation items were
     # chosen; earlier versions recorded only whether documentation was included.
-    docs_items = (
-        frozenset(item.id for item in stamp.docs_items) & known_docs
+    selected_docs_items = (
+        frozenset(item.id for item in recorded_docs_items) & known_docs
         if stamp.stamp_version >= 5
         else (known_docs if stamp.docs_included else frozenset())
     )
@@ -75,11 +96,34 @@ def _resolve(
         selection=ProjectSelection.from_recorded_items(
             catalog,
             skills=selected_skills,
-            mcp=frozenset(item.id for item in stamp.mcp_items) & catalog.item_ids("mcp"),
-            docs_items=docs_items,
+            mcp=frozenset(item.id for item in recorded_mcp_items)
+            & catalog.item_ids("mcp"),
+            docs_items=selected_docs_items,
             agent_targets=frozenset(stamp.agent_targets) & catalog.agent_target_ids,
         ),
         removed_agent_targets=tuple(
             sorted(set(stamp.agent_targets) - catalog.agent_target_ids)
         ),
+        recorded_development_loop=_resolve_recorded_id(stamp.development_loop),
+        recorded_skills_items=recorded_skills_items,
+        recorded_mcp_items=recorded_mcp_items,
+        recorded_docs_items=recorded_docs_items,
+    )
+
+
+def _resolve_recorded_id(item_id: str) -> str:
+    return _RECORDED_ITEM_ALIASES.get(item_id, item_id)
+
+
+def _resolve_recorded_items(
+    items: tuple[StampItem, ...],
+    *,
+    resolve_aliases: bool = False,
+) -> tuple[ResolvedRecordedItem, ...]:
+    return tuple(
+        ResolvedRecordedItem(
+            id=_resolve_recorded_id(item.id) if resolve_aliases else item.id,
+            pin=item.pin,
+        )
+        for item in items
     )

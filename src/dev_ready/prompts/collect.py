@@ -49,7 +49,7 @@ def collect_answers(
         )
     if needs_selection and asker is None and not _is_interactive():
         raise InvalidArgumentsError(
-            "Category selection requires an interactive terminal — pass "
+            "Engineering Flow and Category selection require an interactive terminal — pass "
             "--categories with per-Category item flags, or use --yes"
         )
 
@@ -66,30 +66,25 @@ def collect_answers(
         assert resolved_asker is not None
         if catalog is None:
             raise InvalidArgumentsError("catalog is required for Category selection")
-        if _prompt_use_default_set(resolved_asker, catalog):
-            base_selection = ProjectSelection.default_set(catalog)
-            enhancements = _prompt_custom_selection(
-                resolved_asker,
-                catalog,
-                development_loop=base_selection.development_loop,
+        development_loop = _prompt_development_loop(resolved_asker, catalog)
+        selected_item_ids = frozenset().union(
+            *(
+                _prompt_category_items(resolved_asker, catalog, category_id)
+                for category_id in catalog.categories
+                if category_id != "dev"
             )
-            base_selection = ProjectSelection.from_items(
-                catalog,
-                skills=base_selection.skills | enhancements.skills,
-                mcp=base_selection.mcp | enhancements.mcp,
-                docs_items=base_selection.docs_items | enhancements.docs_items,
-                categories=base_selection.categories | enhancements.categories,
-                agent_targets=frozenset(),
-            )
-        else:
-            base_selection = _prompt_custom_selection(resolved_asker, catalog)
-        agent_targets = _prompt_agent_targets(resolved_asker, catalog)
+        )
+        selected_by_component = catalog.by_component(selected_item_ids)
+        agent_targets = (
+            partial.agent_targets
+            if partial.agent_targets is not None
+            else _prompt_agent_targets(resolved_asker, catalog)
+        )
         selection = ProjectSelection.from_items(
             catalog,
-            skills=base_selection.skills,
-            mcp=base_selection.mcp,
-            docs_items=base_selection.docs_items,
-            categories=base_selection.categories,
+            skills=selected_by_component["skills"] | frozenset({development_loop}),
+            mcp=selected_by_component["mcp"],
+            docs_items=selected_by_component["docs"],
             agent_targets=agent_targets,
         )
     else:
@@ -146,6 +141,7 @@ def _render_confirmation_summary(answers: Answers, pin: UpstreamPin) -> str:
             f"  project name: {answers.project_name}",
             f"  target dir:   {answers.target_dir}",
             f"  upstream:     {pin.repo}@{pin.commit[:12]}",
+            f"  engineering flow: {answers.selection.development_loop}",
             f"  categories:   {categories_line}",
             f"  selected items: {items_line}",
             f"  agent targets: {targets_line}",
@@ -174,78 +170,28 @@ def _prompt_project_name(asker: Asker) -> str:
         )
 
 
-def _prompt_categories(
-    asker: Asker,
-    catalog: ComponentCatalog,
-) -> frozenset[str]:
-    categories = catalog.categories
-    labels = {
-        f"{category_id}: {category.description}": category_id
-        for category_id, category in categories.items()
-    }
-    try:
-        selected = asker.checkbox(
-            "Select Categories to include:",
-            tuple(labels),
-            initially_selected=(),
-        )
-    except KeyboardInterrupt:
-        selected = None
-    if selected is None:
-        raise AbortedError("Category selection prompt cancelled")
-    selected_ids = frozenset(labels[label] for label in selected)
-    return selected_ids | (frozenset({"dev"}) if "dev" in categories else frozenset())
-
-
 def _prompt_category_items(
     asker: Asker,
     catalog: ComponentCatalog,
-    selected_categories: frozenset[str],
+    category_id: str,
 ) -> frozenset[str]:
-    development_loop_ids = frozenset(catalog.development_loop_ids)
     labels = {
-        f"{item.category}: {item.id} — {item.description}": item.id
+        f"{item.id} — {item.description}": item.id
         for item in catalog.all_items()
-        if item.category in selected_categories and item.id not in development_loop_ids
+        if item.category == category_id
     }
-    if not labels:
-        # Nothing to choose between — every item in the selected Categories is a
-        # development loop, already settled earlier. Reached by taking the Default
-        # Set and adding no Categories, which leaves only `dev`. Asking anyway
-        # would put an empty list in front of the user, and questionary raises on
-        # an empty choice list rather than rendering one.
-        return frozenset()
+    category_name = category_id.replace("-", " ").title()
     try:
         selected = asker.checkbox(
-            "Select items within the chosen Categories:",
+            f"Select {category_name} items:",
             tuple(labels),
             initially_selected=(),
         )
     except KeyboardInterrupt:
         selected = None
     if selected is None:
-        raise AbortedError("Category item selection cancelled")
+        raise AbortedError(f"{category_name} item selection prompt cancelled")
     return frozenset(labels[label] for label in selected)
-
-
-def _prompt_custom_selection(
-    asker: Asker,
-    catalog: ComponentCatalog,
-    *,
-    development_loop: str | None = None,
-) -> ProjectSelection:
-    resolved_loop = development_loop or _prompt_development_loop(asker, catalog)
-    selected_categories = _prompt_categories(asker, catalog)
-    selected_item_ids = _prompt_category_items(asker, catalog, selected_categories)
-    selected_by_component = catalog.by_component(selected_item_ids)
-    return ProjectSelection.from_items(
-        catalog,
-        skills=selected_by_component["skills"] | frozenset({resolved_loop}),
-        mcp=selected_by_component["mcp"],
-        docs_items=selected_by_component["docs"],
-        categories=selected_categories,
-        agent_targets=frozenset(),
-    )
 
 
 def _prompt_development_loop(
@@ -255,8 +201,6 @@ def _prompt_development_loop(
     loop_ids = catalog.development_loop_ids
     if not loop_ids:
         raise InvalidArgumentsError("catalog does not declare a development loop")
-    if len(loop_ids) == 1:
-        return loop_ids[0]
     default_loop = catalog.default_development_loop
     ordered_ids = (
         (default_loop, *tuple(loop_id for loop_id in loop_ids if loop_id != default_loop))
@@ -264,33 +208,25 @@ def _prompt_development_loop(
         else loop_ids
     )
     items = {item.id: item for item in catalog.loops()}
-    labels = {f"{loop_id}: {items[loop_id].description}": loop_id for loop_id in ordered_ids}
+    labels = {
+        f"{items[loop_id].display_name} — {items[loop_id].description}": loop_id
+        for loop_id in ordered_ids
+    }
+    announced_labels = tuple(
+        f"{item.display_name} — Not yet available"
+        for item in catalog.announced_loops
+    )
     try:
-        selected = asker.select("Select one development loop:", tuple(labels))
-    except KeyboardInterrupt:
-        selected = None
-    if selected is None:
-        raise AbortedError("Development loop prompt cancelled")
-    return labels[selected]
-
-
-def _prompt_use_default_set(
-    asker: Asker,
-    catalog: ComponentCatalog,
-) -> bool:
-    default_set = catalog.default_set
-    if default_set is None:
-        raise InvalidArgumentsError("catalog does not declare a Default Set")
-    try:
-        selected = asker.confirm(
-            f"Use the Default Set (development loop: {default_set.development_loop})?",
-            default=True,
+        selected = asker.select(
+            "Select an Engineering Flow:",
+            (*tuple(labels), *announced_labels),
+            disabled_choices=announced_labels,
         )
     except KeyboardInterrupt:
         selected = None
     if selected is None:
-        raise AbortedError("Default Set prompt cancelled")
-    return selected
+        raise AbortedError("Engineering Flow prompt cancelled")
+    return labels[selected]
 
 
 def _prompt_agent_targets(

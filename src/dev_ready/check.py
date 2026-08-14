@@ -2,13 +2,11 @@
 
 import json
 from pathlib import Path
-from typing import Any
-
 from dev_ready import __version__
 from dev_ready.errors import DriftError
 from dev_ready.inspection import ProjectExpectation, inspect_project
 from dev_ready.manifest import CatalogItem, load_default_manifest
-from dev_ready.recorded import RecordedProject
+from dev_ready.recorded import RecordedProject, ResolvedRecordedItem
 from dev_ready.stamp import load_stamp
 
 __all__ = ["check_project"]
@@ -57,7 +55,7 @@ def check_project(project_dir: Path, json_output: bool = False) -> str:
 
     def verify_item_pins(
         name: str,
-        stamp_items: tuple[Any, ...],
+        stamp_items: tuple[ResolvedRecordedItem, ...],
         catalog_items: tuple[CatalogItem, ...],
     ) -> None:
         catalog_map = {item.id: item for item in catalog_items}
@@ -80,9 +78,21 @@ def check_project(project_dir: Path, json_output: bool = False) -> str:
                     f"differs from current {expected_pin!r}"
                 )
 
-    verify_item_pins("skills", stamp.skills_items, manifest.components.get("skills", ()))
-    verify_item_pins("mcp", stamp.mcp_items, manifest.components.get("mcp", ()))
-    verify_item_pins("docs", stamp.docs_items, manifest.components.get("docs", ()))
+    verify_item_pins(
+        "skills",
+        recorded_project.recorded_skills_items,
+        manifest.components.get("skills", ()),
+    )
+    verify_item_pins(
+        "mcp",
+        recorded_project.recorded_mcp_items,
+        manifest.components.get("mcp", ()),
+    )
+    verify_item_pins(
+        "docs",
+        recorded_project.recorded_docs_items,
+        manifest.components.get("docs", ()),
+    )
 
     report_data = {
         "project_dir": str(resolved_dir),

@@ -19,7 +19,7 @@ _DOCUMENTATION_GUIDANCE = """## Architecture documentation
 Read `docs/architecture.md` before structural changes; it records the system overview, module boundaries, and dependency rules."""
 
 def _spec_loop_guidance(answers: Answers) -> str:
-    if "spec-loop" not in answers.items("skills"):
+    if "mattpocock" not in answers.items("skills"):
         return ""
     return """## Spec Loop
 

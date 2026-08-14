@@ -576,9 +576,9 @@ def test_upgrade_maps_each_retired_loop_item_to_the_development_loop(
     upgrade_project(project)
 
     migrated = json.loads(stamp_path.read_text(encoding="utf-8"))
-    assert migrated["development_loop"] == "spec-loop"
+    assert migrated["development_loop"] == "mattpocock"
     assert [item["id"] for item in migrated["components"]["skills"]["items"]] == [
-        "spec-loop"
+        "mattpocock"
     ]
     assert migrated["categories"] == ["dev"]
 
@@ -597,7 +597,7 @@ def test_upgrade_migrates_a_v5_record_naming_retired_setup_all(
     upgrade_project(project)
 
     migrated = load_stamp(project)
-    assert {item.id for item in migrated.skills_items} == {"caveman", "spec-loop"}
+    assert {item.id for item in migrated.skills_items} == {"caveman", "mattpocock"}
     assert (
         project
         / ".agents"
@@ -618,8 +618,8 @@ def test_v4_project_that_declined_the_loop_gains_the_complete_loop_tree(
 
     _assert_complete_loop_tree(project)
     migrated = load_stamp(project)
-    assert migrated.development_loop == "spec-loop"
-    assert "spec-loop" in {item.id for item in migrated.skills_items}
+    assert migrated.development_loop == "mattpocock"
+    assert "mattpocock" in {item.id for item in migrated.skills_items}
 
 
 def test_v4_project_that_selected_the_loop_keeps_the_complete_loop_tree(
@@ -635,8 +635,8 @@ def test_v4_project_that_selected_the_loop_keeps_the_complete_loop_tree(
     _assert_complete_loop_tree(project)
     assert implement.read_bytes() == before_implement
     migrated = load_stamp(project)
-    assert migrated.development_loop == "spec-loop"
-    assert "spec-loop" in {item.id for item in migrated.skills_items}
+    assert migrated.development_loop == "mattpocock"
+    assert "mattpocock" in {item.id for item in migrated.skills_items}
 
 
 def test_upgrade_preserves_recorded_base_provenance(tmp_path: Path) -> None:
@@ -663,7 +663,7 @@ def test_upgrade_advances_overlay_currency_without_adding_new_enhancements(
 
     upgraded = load_stamp(project)
     assert upgraded.dev_ready_version == "0.7.0"
-    assert {item.id for item in upgraded.skills_items} == {"caveman", "spec-loop"}
+    assert {item.id for item in upgraded.skills_items} == {"caveman", "mattpocock"}
 
 
 def _drop_from_inventory(project: Path, path: str) -> None:
@@ -1062,7 +1062,7 @@ def test_pre_target_stamp_migrates_to_canonical_claude_layout(tmp_path: Path) ->
     migrated = load_stamp(project)
     assert migrated.stamp_version == 5
     assert migrated.categories == ("dev", "token-optimize")
-    assert migrated.development_loop == "spec-loop"
+    assert migrated.development_loop == "mattpocock"
     assert migrated.agent_targets == ("claude",)
     assert migrated.upstream == old_provenance
     assert main(["check", str(project)]) == 0

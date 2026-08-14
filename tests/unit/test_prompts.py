@@ -11,6 +11,7 @@ from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 
 import dev_ready.prompts.collect as collect_module
+import dev_ready.prompts._questionary_asker as questionary_asker_module
 from dev_ready.errors import AbortedError, InvalidArgumentsError
 from dev_ready.manifest import (
     AgentTarget,
@@ -27,6 +28,7 @@ from dev_ready.prompts import (
     confirm_generation,
 )
 from dev_ready.prompts._questionary_asker import QuestionaryAsker
+from dev_ready.overlay import render_stamp
 
 PIN = UpstreamPin(
     repo="fastapi/full-stack-fastapi-template",
@@ -50,16 +52,31 @@ ALL_AGENT_LABELS = [
     _agent_target_label(target) for target in CATALOG.agent_targets.values()
 ]
 CLAUDE_AGENT_LABELS = [_agent_target_label(CATALOG.agent_targets["claude"])]
-ALL_CATEGORY_LABELS = [
-    f"{category.id}: {category.description}"
-    for category in CATALOG.categories.values()
-]
 ALL_ITEM_LABELS = [
-    f"{item.category}: {item.id} — {item.description}"
+    f"{item.id} — {item.description}"
     for items in CATALOG.values()
     for item in items
     if item.id not in CATALOG.development_loop_ids
 ]
+SELECTABLE_FLOW_LABEL = next(
+    f"{item.display_name} — {item.description}" for item in CATALOG.loops()
+)
+ANNOUNCED_FLOW_LABELS = [
+    f"{item.display_name} — Not yet available"
+    for item in CATALOG.announced_loops
+]
+CATEGORY_PROMPTS = [
+    "Select Security items:",
+    "Select Quality items:",
+    "Select Design items:",
+    "Select Token Optimize items:",
+]
+AGENT_TARGET_PROMPT = (
+    "Select Agent Targets (standard-compliant agents read .agents/skills/ directly "
+    "— no selection needed: amp, antigravity, antigravity-cli, cline, codex, cursor, "
+    "deepagents, dexto, firebender, gemini-cli, github-copilot, kimi-code-cli, loaf, "
+    "opencode, promptscript, replit, universal, warp, zed):"
+)
 
 
 def _catalog_with_second_loop() -> ComponentCatalog:
@@ -93,14 +110,7 @@ def _item_labels(*item_ids: str) -> list[str]:
     return [
         label
         for label in ALL_ITEM_LABELS
-        if label.split(": ", 1)[1].split(" — ", 1)[0] in requested
-    ]
-
-
-def _category_labels(*category_ids: str) -> list[str]:
-    requested = set(category_ids)
-    return [
-        label for label in ALL_CATEGORY_LABELS if label.split(":", 1)[0] in requested
+        if label.split(" — ", 1)[0] in requested
     ]
 
 
@@ -122,18 +132,29 @@ class FakeAsker:
         self.text_calls: list[str] = []
         self.select_calls: list[str] = []
         self.select_choices: list[list[str]] = []
+        self.select_disabled_choices: list[list[str]] = []
         self.checkbox_calls: list[str] = []
         self.checkbox_choices: list[list[str]] = []
         self.checkbox_initially_selected: list[list[str]] = []
         self.confirm_calls: list[str] = []
+        self.events: list[str] = []
 
     def text(self, message: str) -> str | None:
+        self.events.append(message)
         self.text_calls.append(message)
         return self._texts.pop(0)
 
-    def select(self, message: str, choices: Sequence[str]) -> str | None:
+    def select(
+        self,
+        message: str,
+        choices: Sequence[str],
+        *,
+        disabled_choices: Sequence[str],
+    ) -> str | None:
+        self.events.append(message)
         self.select_calls.append(message)
         self.select_choices.append(list(choices))
+        self.select_disabled_choices.append(list(disabled_choices))
         return self._selects.pop(0)
 
     def checkbox(
@@ -143,12 +164,14 @@ class FakeAsker:
         *,
         initially_selected: Sequence[str],
     ) -> list[str] | None:
+        self.events.append(message)
         self.checkbox_calls.append(message)
         self.checkbox_choices.append(list(choices))
         self.checkbox_initially_selected.append(list(initially_selected))
         return self._checkboxes.pop(0)
 
     def confirm(self, message: str, *, default: bool = True) -> bool | None:
+        self.events.append(message)
         self.confirm_calls.append(message)
         return self._confirms.pop(0)
 
@@ -159,7 +182,13 @@ class _RaisingAsker:
     def text(self, message: str) -> str | None:
         raise KeyboardInterrupt
 
-    def select(self, message: str, choices: Sequence[str]) -> str | None:
+    def select(
+        self,
+        message: str,
+        choices: Sequence[str],
+        *,
+        disabled_choices: Sequence[str],
+    ) -> str | None:
         raise KeyboardInterrupt
 
     def checkbox(
@@ -244,52 +273,92 @@ def test_name_prompt_result_lands_in_answers() -> None:
 # --- Category prompt ---
 
 
-def test_interactive_defaults_produce_default_set_without_enhancement_selection() -> None:
-    asker = FakeAsker(confirms=[True], checkboxes=[[], CLAUDE_AGENT_LABELS])
-
-    answers = collect_answers(
-        _partial(selection_explicit=False), catalog=CATALOG, asker=asker
-    )
-
-    assert answers.selection.categories == frozenset({"dev"})
-    assert answers.skills_items == frozenset({"spec-loop"})
-    assert answers.mcp_items == frozenset()
-    assert answers.include_docs is False
-    assert answers.items("docs") == frozenset()
-    assert asker.confirm_calls == [
-        "Use the Default Set (development loop: spec-loop)?",
-    ]
-    assert asker.checkbox_calls[0] == "Select Categories to include:"
-    # No item prompt: `dev` holds only the development loop, so there is nothing
-    # left to choose between and an empty list is never put in front of the user.
-    assert "Select items within the chosen Categories:" not in asker.checkbox_calls
-    assert asker.checkbox_calls[1].startswith(
-        "Select Agent Targets (standard-compliant agents read .agents/skills/ directly"
-    )
-    assert "cursor" in asker.checkbox_calls[1]
-    assert answers.agent_targets == frozenset({"claude"})
-    assert answers.selection == ProjectSelection.default_set(CATALOG)
-    assert asker.checkbox_initially_selected == [[], CLAUDE_AGENT_LABELS]
-
-
-def test_interactive_custom_branch_preselects_the_same_agent_as_default_set() -> None:
-    asker = FakeAsker(confirms=[False], checkboxes=[[], CLAUDE_AGENT_LABELS])
-
-    answers = collect_answers(
-        _partial(selection_explicit=False), catalog=CATALOG, asker=asker
-    )
-
-    assert answers.agent_targets == ProjectSelection.default_set(CATALOG).agent_targets
-    assert asker.checkbox_initially_selected[-1] == CLAUDE_AGENT_LABELS
-
-
-def test_interactive_default_set_can_add_one_enhancement() -> None:
+def test_interactive_sequence_discloses_flow_then_walks_every_category() -> None:
     asker = FakeAsker(
+        texts=["my-app"],
+        selects=[SELECTABLE_FLOW_LABEL],
+        checkboxes=[[], [], [], [], CLAUDE_AGENT_LABELS],
         confirms=[True],
+    )
+
+    answers = collect_answers(
+        _partial(project_name=None, selection_explicit=False),
+        catalog=CATALOG,
+        asker=asker,
+    )
+    assert confirm_generation(answers, PIN, asker=asker) is True
+
+    assert asker.events == [
+        "Project name:",
+        "Select an Engineering Flow:",
+        *CATEGORY_PROMPTS,
+        AGENT_TARGET_PROMPT,
+        "Proceed?",
+    ]
+    assert answers.selection == ProjectSelection.default_set(CATALOG)
+    assert asker.checkbox_initially_selected[:4] == [[], [], [], []]
+
+
+def test_flow_prompt_lists_announced_flows_as_disabled_choices() -> None:
+    asker = FakeAsker(
+        selects=[SELECTABLE_FLOW_LABEL],
+        checkboxes=[[], [], [], [], CLAUDE_AGENT_LABELS],
+    )
+
+    answers = collect_answers(
+        _partial(selection_explicit=False), catalog=CATALOG, asker=asker
+    )
+
+    assert asker.select_choices == [
+        [SELECTABLE_FLOW_LABEL, *ANNOUNCED_FLOW_LABELS]
+    ]
+    assert asker.select_disabled_choices == [ANNOUNCED_FLOW_LABELS]
+    reasons = [label.rsplit(" — ", 1)[1] for label in ANNOUNCED_FLOW_LABELS]
+    assert reasons == ["Not yet available"] * len(ANNOUNCED_FLOW_LABELS)
+    assert all(not any(character.isdigit() for character in reason) for reason in reasons)
+    assert answers.selection.development_loop == "mattpocock"
+    assert answers.selection.development_loop not in {
+        item.id for item in CATALOG.announced_loops
+    }
+
+
+def test_all_enter_interview_and_accept_defaults_render_identical_stamps(
+    tmp_path: Path,
+) -> None:
+    target_dir = tmp_path / "my-app"
+    prompted = collect_answers(
+        _partial(
+            target_dir=target_dir,
+            selection_explicit=False,
+        ),
+        catalog=CATALOG,
+        asker=FakeAsker(
+            selects=[SELECTABLE_FLOW_LABEL],
+            checkboxes=[[], [], [], [], CLAUDE_AGENT_LABELS],
+        ),
+    )
+    defaults = Answers(
+        project_name="my-app",
+        target_dir=target_dir,
+        selection=ProjectSelection.default_set(CATALOG),
+        assume_yes=True,
+    )
+
+    assert prompted.selection == defaults.selection
+    assert render_stamp(prompted, PIN, CATALOG) == render_stamp(
+        defaults, PIN, CATALOG
+    )
+
+
+def test_interactive_walk_can_add_one_enhancement() -> None:
+    asker = FakeAsker(
+        selects=[SELECTABLE_FLOW_LABEL],
         checkboxes=[
-            _category_labels("security"),
             _item_labels("security-audit"),
-            ALL_AGENT_LABELS,
+            [],
+            [],
+            [],
+            CLAUDE_AGENT_LABELS,
         ],
     )
 
@@ -297,20 +366,22 @@ def test_interactive_default_set_can_add_one_enhancement() -> None:
         _partial(selection_explicit=False), catalog=CATALOG, asker=asker
     )
 
-    assert answers.selection.development_loop == "spec-loop"
-    assert answers.skills_items == frozenset({"security-audit", "spec-loop"})
+    assert answers.selection.development_loop == "mattpocock"
+    assert answers.skills_items == frozenset({"security-audit", "mattpocock"})
     assert answers.include_docs is False
-    assert asker.confirm_calls == [
-        "Use the Default Set (development loop: spec-loop)?",
-    ]
+    assert answers.selection.categories == frozenset({"dev", "security"})
 
 
 def test_interactive_customization_can_choose_an_alternate_loop() -> None:
     catalog = _catalog_with_second_loop()
+    alternate_label = next(
+        f"{item.display_name} — {item.description}"
+        for item in catalog.loops()
+        if item.id == "alternate-loop"
+    )
     asker = FakeAsker(
-        confirms=[False],
-        selects=["alternate-loop: Alternate development method."],
-        checkboxes=[[], [], ALL_AGENT_LABELS],
+        selects=[alternate_label],
+        checkboxes=[[], [], [], [], ALL_AGENT_LABELS],
     )
 
     answers = collect_answers(
@@ -319,11 +390,11 @@ def test_interactive_customization_can_choose_an_alternate_loop() -> None:
 
     assert answers.selection.development_loop == "alternate-loop"
     assert answers.skills_items == frozenset({"alternate-loop"})
-    assert asker.select_calls == ["Select one development loop:"]
+    assert asker.select_calls == ["Select an Engineering Flow:"]
 
 
 def test_category_prompt_skipped_when_flags_resolved_selection() -> None:
-    asker = FakeAsker(checkboxes=[ALL_CATEGORY_LABELS])
+    asker = FakeAsker(checkboxes=[["should-not-be-used"]])
     answers = collect_answers(
         _partial(
             selection=ProjectSelection.from_items(
@@ -334,18 +405,20 @@ def test_category_prompt_skipped_when_flags_resolved_selection() -> None:
         asker=asker,
     )
 
-    assert answers.selection.development_loop == "spec-loop"
+    assert answers.selection.development_loop == "mattpocock"
     assert answers.include_skills is True
     assert asker.checkbox_calls == []
 
 
 def test_category_and_item_choices_resolve_across_components() -> None:
     asker = FakeAsker(
-        confirms=[False],
+        selects=[SELECTABLE_FLOW_LABEL],
         checkboxes=[
-            _category_labels("token-optimize"),
+            [],
+            [],
+            [],
             _item_labels("caveman", "code-memory"),
-            ALL_AGENT_LABELS,
+            CLAUDE_AGENT_LABELS,
         ]
     )
 
@@ -354,35 +427,46 @@ def test_category_and_item_choices_resolve_across_components() -> None:
     )
 
     assert answers.skills_items == frozenset(
-        {"caveman", "spec-loop"}
+        {"caveman", "mattpocock"}
     )
     assert answers.mcp_items == frozenset({"code-memory"})
     assert answers.include_docs is False
 
 
-def test_empty_category_selection_produces_no_catalog_content() -> None:
-    asker = FakeAsker(confirms=[False], checkboxes=[[], ALL_AGENT_LABELS])
+def test_declining_every_category_produces_no_optional_catalog_content() -> None:
+    asker = FakeAsker(
+        selects=[SELECTABLE_FLOW_LABEL],
+        checkboxes=[[], [], [], [], CLAUDE_AGENT_LABELS],
+    )
 
     answers = collect_answers(
         _partial(selection_explicit=False), catalog=CATALOG, asker=asker
     )
 
     assert answers.skills_items == frozenset(
-        {"spec-loop"}
+        {"mattpocock"}
     )
     assert answers.mcp_items == frozenset()
     assert answers.include_docs is False
-    assert answers.selection.development_loop == "spec-loop"
+    assert answers.selection.development_loop == "mattpocock"
     assert answers.selection.categories == frozenset({"dev"})
-    assert asker.checkbox_initially_selected == [[], CLAUDE_AGENT_LABELS]
+    assert asker.checkbox_initially_selected == [
+        [],
+        [],
+        [],
+        [],
+        CLAUDE_AGENT_LABELS,
+    ]
 
 
 def test_interactive_agent_targets_remain_last_and_are_resolved() -> None:
     asker = FakeAsker(
-        confirms=[False],
+        selects=[SELECTABLE_FLOW_LABEL],
         checkboxes=[
-            _category_labels("design"),
+            [],
+            [],
             _item_labels("frontend-design"),
+            [],
             ["windsurf: skills .windsurf/skills"],
         ]
     )
@@ -396,6 +480,25 @@ def test_interactive_agent_targets_remain_last_and_are_resolved() -> None:
         "Select Agent Targets (standard-compliant agents read .agents/skills/ directly"
     )
     assert asker.checkbox_choices[-1] == ALL_AGENT_LABELS
+
+
+def test_agent_target_answer_skips_only_its_question() -> None:
+    asker = FakeAsker(
+        selects=[SELECTABLE_FLOW_LABEL],
+        checkboxes=[[], [], [], []],
+    )
+    partial = PartialAnswers(
+        project_name="my-app",
+        target_dir=None,
+        selection=None,
+        agent_targets=frozenset({"windsurf"}),
+    )
+
+    answers = collect_answers(partial, catalog=CATALOG, asker=asker)
+
+    assert answers.agent_targets == frozenset({"windsurf"})
+    assert asker.select_calls == ["Select an Engineering Flow:"]
+    assert asker.checkbox_calls == CATEGORY_PROMPTS
 
 
 # --- QuestionaryAsker against the real questionary, driven headlessly ---
@@ -455,22 +558,18 @@ def test_questionary_checkbox_narrows_choices_by_typing() -> None:
     assert selected == ["gamma"]
 
 
-def test_default_set_flow_survives_pressing_enter_through_every_prompt() -> None:
-    """The reported v0.10.0 session: `dev-ready init my-app`, accept the Default
-    Set, then take the default at each remaining prompt.
-
-    Accepting no extra Categories leaves only `dev`, whose sole item is the
-    development loop itself — so the item prompt has nothing to offer and must
-    not be asked. This drives collect_answers through the real questionary, the
-    only arrangement that reproduces what users actually hit.
-    """
-    # Default Set offer, Category selection, Agent Target selection. Naming them
-    # means adding a prompt forces this list to be updated: a short count would
-    # otherwise read EOF from the pipe rather than fail on the missing answer.
-    default_flow_prompts = ("default-set", "categories", "agent-targets")
+def test_default_set_survives_pressing_enter_through_every_prompt() -> None:
+    prompt_names = (
+        "engineering-flow",
+        "security",
+        "quality",
+        "design",
+        "token-optimize",
+        "agent-targets",
+    )
 
     answers = _drive_asker(
-        ENTER * len(default_flow_prompts),
+        ENTER * len(prompt_names),
         lambda asker: collect_answers(
             _partial(selection_explicit=False), catalog=CATALOG, asker=asker
         ),
@@ -486,8 +585,63 @@ def test_questionary_text_returns_what_was_typed() -> None:
 
 def test_questionary_select_returns_the_highlighted_choice() -> None:
     assert (
-        _drive_asker(ENTER, lambda asker: asker.select("Select one:", ["alpha", "beta"])) == "alpha"
+        _drive_asker(
+            ENTER,
+            lambda asker: asker.select(
+                "Select one:", ["alpha", "beta"], disabled_choices=[]
+            ),
+        )
+        == "alpha"
     )
+
+
+def test_questionary_select_skips_disabled_choices() -> None:
+    assert (
+        _drive_asker(
+            ENTER,
+            lambda asker: asker.select(
+                "Select one:", ["announced", "available"], disabled_choices=["announced"]
+            ),
+        )
+        == "available"
+    )
+
+
+def test_questionary_asker_applies_one_style_to_every_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    class _Question:
+        def ask(self) -> object:
+            return None
+
+    def _capture(kind: str) -> Callable[..., _Question]:
+        def capture(*args: object, **kwargs: object) -> _Question:
+            calls.append((kind, kwargs))
+            return _Question()
+
+        return capture
+
+    for kind in ("text", "select", "checkbox", "confirm"):
+        monkeypatch.setattr(
+            questionary_asker_module.questionary,
+            kind,
+            _capture(kind),
+        )
+
+    asker = QuestionaryAsker()
+    asker.text("Name:")
+    asker.select("Flow:", ["available"], disabled_choices=[])
+    asker.checkbox("Items:", ["one"], initially_selected=[])
+    asker.confirm("Proceed?")
+
+    assert [kwargs["style"] for _, kwargs in calls] == [
+        questionary_asker_module._PROMPT_STYLE
+    ] * 4
+    assert all(kwargs["qmark"] == questionary_asker_module._QUESTION_MARK for _, kwargs in calls)
+    checkbox_kwargs = next(kwargs for kind, kwargs in calls if kind == "checkbox")
+    assert "type to filter" in str(checkbox_kwargs["instruction"])
 
 
 def test_questionary_confirm_returns_the_default_on_enter() -> None:
@@ -497,11 +651,13 @@ def test_questionary_confirm_returns_the_default_on_enter() -> None:
 
 def test_category_item_selection_can_be_narrowed_to_one_item() -> None:
     asker = FakeAsker(
-        confirms=[False],
+        selects=[SELECTABLE_FLOW_LABEL],
         checkboxes=[
-            _category_labels("quality"),
+            [],
             _item_labels("react-doctor"),
-            ALL_AGENT_LABELS,
+            [],
+            [],
+            CLAUDE_AGENT_LABELS,
         ]
     )
 
@@ -510,28 +666,27 @@ def test_category_item_selection_can_be_narrowed_to_one_item() -> None:
     )
 
     assert answers.skills_items == frozenset(
-        {"react-doctor", "spec-loop"}
+        {"react-doctor", "mattpocock"}
     )
     assert answers.mcp_items == frozenset()
 
 
-def test_category_prompt_cancel_raises_aborted() -> None:
-    with pytest.raises(AbortedError, match="Category selection prompt cancelled"):
+def test_first_category_prompt_cancel_raises_aborted() -> None:
+    with pytest.raises(AbortedError, match="Security item selection prompt cancelled"):
         collect_answers(
             _partial(selection_explicit=False),
             catalog=CATALOG,
-            asker=FakeAsker(confirms=[False], checkboxes=[None]),
+            asker=FakeAsker(selects=[SELECTABLE_FLOW_LABEL], checkboxes=[None]),
         )
 
 
-def test_category_item_prompt_cancel_raises_aborted() -> None:
-    # `quality` rather than `dev`: the item prompt only appears for a Category
-    # that has items left to offer once the development loop is excluded.
+def test_later_category_prompt_cancel_raises_aborted() -> None:
     asker = FakeAsker(
-        confirms=[False], checkboxes=[_category_labels("quality"), None]
+        selects=[SELECTABLE_FLOW_LABEL],
+        checkboxes=[[], None],
     )
 
-    with pytest.raises(AbortedError, match="Category item selection cancelled"):
+    with pytest.raises(AbortedError, match="Quality item selection prompt cancelled"):
         collect_answers(
             _partial(selection_explicit=False), catalog=CATALOG, asker=asker
         )
@@ -549,7 +704,7 @@ def test_flags_explicit_path_no_prompts() -> None:
     answers = collect_answers(partial, catalog=CATALOG, asker=asker)
 
     assert answers.skills_items == frozenset(
-        {"caveman", "spec-loop"}
+        {"caveman", "mattpocock"}
     )
     assert answers.mcp_items == frozenset()
     assert len(asker.checkbox_calls) == 0
@@ -594,7 +749,9 @@ def test_non_tty_missing_category_selection_raises_invalid_arguments(
     monkeypatch.setattr(collect_module, "_is_interactive", lambda: False)
     with pytest.raises(InvalidArgumentsError) as excinfo:
         collect_answers(_partial(selection_explicit=False))
-    assert "Category selection requires an interactive terminal" in str(excinfo.value)
+    assert "Engineering Flow and Category selection require an interactive terminal" in str(
+        excinfo.value
+    )
     assert "--categories" in str(excinfo.value)
 
 
@@ -610,22 +767,23 @@ def test_interactive_and_flag_paths_produce_identical_answers(tmp_path: Path) ->
     flag_answers = Answers(
         project_name="my-app",
         target_dir=target_dir,
-            selection=ProjectSelection.from_items(
-                CATALOG,
-                mcp=frozenset({"code-memory"}),
-                categories=frozenset({"token-optimize"}),
-                agent_targets=frozenset({"claude"}),
-            ),
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            mcp=frozenset({"code-memory"}),
+            agent_targets=frozenset({"claude"}),
+        ),
         assume_yes=False,
     )
 
     asker = FakeAsker(
         texts=["my-app"],
-        confirms=[False],
+        selects=[SELECTABLE_FLOW_LABEL],
         checkboxes=[
-                _category_labels("token-optimize"),
-                _item_labels("code-memory"),
-                CLAUDE_AGENT_LABELS,
+            [],
+            [],
+            [],
+            _item_labels("code-memory"),
+            CLAUDE_AGENT_LABELS,
         ],
     )
     prompt_answers = collect_answers(
@@ -663,10 +821,12 @@ def test_design_skill_only_is_identical_through_flags_and_prompts(tmp_path: Path
         ),
         catalog=CATALOG,
         asker=FakeAsker(
-            confirms=[False],
+            selects=[SELECTABLE_FLOW_LABEL],
             checkboxes=[
-                _category_labels("design"),
+                [],
+                [],
                 _item_labels("frontend-design"),
+                [],
                 CLAUDE_AGENT_LABELS,
             ]
         ),
@@ -766,6 +926,7 @@ def test_render_confirmation_summary_names_categories_and_items() -> None:
     summary = _render_confirmation_summary(_answers(), PIN)
 
     assert "categories:" in summary
+    assert "engineering flow: mattpocock" in summary
     assert "token-optimize" in summary
     assert "selected items:" in summary
     assert "caveman" in summary

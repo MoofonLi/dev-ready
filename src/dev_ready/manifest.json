@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "default_set": {
-    "development_loop": "spec-loop",
+    "development_loop": "mattpocock",
     "enhancements": []
   },
   "categories": {
@@ -402,7 +402,8 @@
           ]
         },
         {
-          "id": "spec-loop",
+          "id": "mattpocock",
+          "title": "Matt Pocock's skills",
           "kind": "development-loop",
           "category": "dev",
           "description": "Complete Spec Loop for grilling, durable specs, tracer-bullet tickets, TDD, review, diagnosis, and architecture improvement.",
@@ -473,10 +474,26 @@
               "dest": ".agents/skills/setup-matt-pocock-skills"
             },
             {
-              "src": "claude/spec-loop",
+              "src": "claude/mattpocock",
               "dest": "docs/agents"
             }
           ]
+        },
+        {
+          "id": "superpowers",
+          "kind": "development-loop",
+          "category": "dev",
+          "title": "Superpowers",
+          "status": "coming-soon",
+          "description": "Obra's Superpowers Engineering Flow, announced but not yet available."
+        },
+        {
+          "id": "addyosmani",
+          "kind": "development-loop",
+          "category": "dev",
+          "title": "Addy Osmani's Agent Skills",
+          "status": "coming-soon",
+          "description": "Addy Osmani's Engineering Flow, announced but not yet available."
         },
         {
           "id": "webapp-testing",

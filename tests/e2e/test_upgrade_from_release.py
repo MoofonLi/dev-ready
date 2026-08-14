@@ -18,7 +18,7 @@ from dev_ready.manifest import load_default_manifest
 
 pytestmark = pytest.mark.network
 
-_RELEASED_VERSION = "0.9.0"
+_RELEASED_VERSION = "0.10.1"
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PROBE_PREFIX = "__DEV_READY_PROBE__="
 _PROBE_AND_RUN = f"""
@@ -327,10 +327,6 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
             "--yes",
             "--dir",
             str(target),
-            "--categories",
-            "dev",
-            "--dev",
-            "setup-all",
         ],
         cwd=tmp_path,
     )
@@ -350,14 +346,17 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
         "released project omitted the Claude rules pointer"
     )
     old_stamp = _load_stamp(target, "old generation")
-    assert "setup-all" in _component_item_ids(old_stamp, "skills", "old generation")
+    assert "spec-loop" in _component_item_ids(old_stamp, "skills", "old generation")
+    assert "setup-all" not in _component_item_ids(
+        old_stamp, "skills", "old generation"
+    )
     assert not _component_item_ids(old_stamp, "docs", "old generation")
     old_docs = old_stamp["components"]["docs"]
     assert old_docs.get("included") is False, (
         "released project unexpectedly selected documentation"
     )
-    assert not (target / "docs" / "architecture.md").exists()
-    assert not (target / "docs" / "requirements.md").exists()
+    assert (target / "docs" / "architecture.md").is_file()
+    assert (target / "docs" / "requirements.md").is_file()
     _assert_skill_projection(target, old_stamp, "implement", "released project")
 
     edited_setup_relative = Path(
@@ -415,7 +414,6 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
             "dev-ready version",
             "skills pin drift",
             "mcp pin drift",
-            "removed catalog item",
             "missing required path",
             "missing overlay file",
             "missing item path",
@@ -460,7 +458,7 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert "Skipped (user-modified)" in real_upgrade.stdout
     assert edited_setup_relative.as_posix() in real_upgrade.stdout
     assert "setup-all" not in _component_item_ids(new_stamp, "skills", "real upgrade")
-    assert "spec-loop" in _component_item_ids(new_stamp, "skills", "real upgrade")
+    assert "mattpocock" in _component_item_ids(new_stamp, "skills", "real upgrade")
     assert not _component_item_ids(new_stamp, "docs", "real upgrade")
     assert new_stamp["components"]["docs"].get("included") is False
     assert (target / "docs" / "architecture.md").is_file()
@@ -471,8 +469,8 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert new_stamp.get("categories") == old_stamp.get("categories"), (
         "upgrade changed the released project's Categories"
     )
-    assert new_stamp.get("development_loop") == old_stamp.get("development_loop"), (
-        "upgrade changed the released project's development loop"
+    assert new_stamp.get("development_loop") == "mattpocock", (
+        "upgrade did not resolve the released Engineering Flow identifier"
     )
     components = new_stamp.get("components")
     assert isinstance(components, dict) and "handoff" not in components, (
@@ -555,15 +553,8 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert action_counts and not any(action_counts.values()), (
         "second upgrade reported a nonzero action plan: " + repr(action_counts)
     )
-    # Two, not one: the edited setup skill, plus the root ignore file. FR-38 made
-    # `.gitignore` a managed path, and an N-1 project already carries upstream's
-    # own copy there — a file dev-ready never wrote, so ADR-014 forbids replacing
-    # it. The first upgrade reports it as a conflict and leaves it alone; every
-    # upgrade after that reports it as user-modified, which is the honest steady
-    # state and the only one that does not overwrite a file the user may own.
-    assert "Skipped (user-modified) (2):" in idempotence_result.stdout
+    assert "Skipped (user-modified) (1):" in idempotence_result.stdout
     assert edited_setup_relative.as_posix() in idempotence_result.stdout
-    assert ".gitignore" in idempotence_result.stdout
 
     _checkout_stage(
         "idempotence real upgrade",

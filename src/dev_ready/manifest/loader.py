@@ -28,6 +28,7 @@ from dev_ready.manifest.models import (
 
 SUPPORTED_MANIFEST_VERSION = 1
 ALLOWED_MODES = ("builtin", "vendor", "pinned-dependency")
+ANNOUNCED_FLOW_STATUS = "coming-soon"
 DEFAULT_SET_SIZE_LIMIT = 3
 _ITEM_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _PIN_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+.][0-9A-Za-z.-]+)?$")
@@ -86,7 +87,12 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
         data, agent_targets, source
     )
     vendored = _parse_vendored(data, source)
-    components = _parse_components(data, source, vendored, categories)
+    components, announced_loops = _parse_components(
+        data,
+        source,
+        vendored,
+        categories,
+    )
     _validate_non_empty_categories(components, categories, source)
     _validate_catalog_requirements(components, source)
     development_loop_ids = _validate_development_loops(components, source)
@@ -107,6 +113,7 @@ def parse_manifest(raw: str, source: str = "<string>") -> Manifest:
         categories,
         default_set,
         standard_compliant_agents,
+        announced_loops,
     )
     return Manifest(
         manifest_version=version,
@@ -129,9 +136,7 @@ def _validate_development_loops(
     items = tuple(item for component in components.values() for item in component)
     loops = tuple(item for item in items if item.kind == "development-loop")
     for item in items:
-        if item.id in RETIRED_LOOP_ITEM_IDS and not (
-            item.id == "spec-loop" and item.kind == "development-loop"
-        ):
+        if item.id in RETIRED_LOOP_ITEM_IDS:
             raise ManifestError(
                 f"{source}: retired catalog id {item.id!r} cannot be declared selectable"
             )
@@ -546,7 +551,7 @@ def _parse_components(
     source: str,
     vendored: tuple[VendoredPin, ...],
     categories: dict[str, Category],
-) -> dict[str, tuple[CatalogItem, ...]]:
+) -> tuple[dict[str, tuple[CatalogItem, ...]], tuple[CatalogItem, ...]]:
     raw = data.get("components")
     if not isinstance(raw, dict):
         raise ManifestError(f"{source}: 'components' must be an object")
@@ -560,6 +565,7 @@ def _parse_components(
             raise ManifestError(f"{source}: missing required component in 'components': {req!r}")
 
     result: dict[str, tuple[CatalogItem, ...]] = {}
+    announced_loops: list[CatalogItem] = []
     for comp_name, comp_dict in raw.items():
         if not isinstance(comp_dict, dict):
             raise ManifestError(f"{source}: component '{comp_name}' must be an object")
@@ -596,6 +602,73 @@ def _parse_components(
                     f"{source}: component '{comp_name}' item '{item_id}' references "
                     f"unknown category {category!r}"
                 )
+
+            title = item_entry.get("title")
+            if title is not None and (
+                not isinstance(title, str) or not title
+            ):
+                raise ManifestError(
+                    f"{source}: component '{comp_name}' item '{item_id}' field "
+                    "'title' must be a non-empty string or null"
+                )
+
+            status = item_entry.get("status")
+            if "status" in item_entry:
+                if status != ANNOUNCED_FLOW_STATUS:
+                    raise ManifestError(
+                        f"{source}: component '{comp_name}' item '{item_id}' field "
+                        f"'status' must be {ANNOUNCED_FLOW_STATUS!r}"
+                    )
+                if comp_name != "skills" or category != "dev":
+                    raise ManifestError(
+                        f"{source}: announced flow {item_id!r} must be in the skills "
+                        "Component and Dev Category"
+                    )
+                kind = item_entry.get("kind", "development-loop")
+                if kind != "development-loop":
+                    raise ManifestError(
+                        f"{source}: announced flow {item_id!r} must have kind "
+                        "'development-loop'"
+                    )
+                materialization_fields = sorted(
+                    set(item_entry)
+                    & {
+                        "inject",
+                        "license",
+                        "mode",
+                        "mount",
+                        "paths",
+                        "pin",
+                        "requires",
+                        "steps",
+                        "vendored_repo",
+                    }
+                )
+                if materialization_fields:
+                    raise ManifestError(
+                        f"{source}: announced flow {item_id!r} must not define "
+                        "materialized content fields "
+                        f"{materialization_fields!r}"
+                    )
+                desc = item_entry.get("description")
+                if not isinstance(desc, str) or not desc:
+                    raise ManifestError(
+                        f"{source}: announced flow {item_id!r} field 'description' "
+                        "must be a non-empty string"
+                    )
+                announced_loops.append(
+                    CatalogItem(
+                        id=item_id,
+                        category=category,
+                        kind=kind,
+                        title=title,
+                        status=status,
+                        description=desc,
+                        mode="builtin",
+                        license="",
+                    )
+                )
+                continue
 
             kind, steps = _parse_item_kind_and_steps(
                 item_entry,
@@ -701,6 +774,7 @@ def _parse_components(
             parsed_items.append(
                 CatalogItem(
                     id=item_id,
+                    title=title,
                     category=category,
                     mount=mount if isinstance(mount, str) else None,
                     kind=kind,
@@ -717,7 +791,7 @@ def _parse_components(
             )
 
         result[comp_name] = tuple(parsed_items)
-    return result
+    return result, tuple(announced_loops)
 
 
 def _parse_item_kind_and_steps(
