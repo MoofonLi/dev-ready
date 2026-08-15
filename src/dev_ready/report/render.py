@@ -45,11 +45,13 @@ def render_report(
         "",
         "next steps:",
         f"  1. cd {answers.target_dir}",
+        "  2. ask your coding agent to run `/setup-project` before the first start",
+        "     (the superuser is created on that first start)",
         # "docker compose watch" is the dev workflow for
         # fastapi/full-stack-fastapi-template as of the manifest-pinned commit.
         # Update when a manifest bump changes the upstream workflow.
-        "  2. docker compose watch   (see AGENTS.md for other commands)",
-        "  3. read AGENTS.md for the full picture",
+        "  3. docker compose watch   (see AGENTS.md for other commands)",
+        "  4. read AGENTS.md for the full picture",
         "",
         *_CREDENTIAL_DISCLOSURE,
         "",

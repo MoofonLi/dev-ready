@@ -55,6 +55,25 @@ def test_report_contains_runnable_next_steps() -> None:
     assert "AGENTS.md" in report
 
 
+@pytest.mark.parametrize(
+    "selection",
+    [ProjectSelection.default_set(CATALOG), ProjectSelection.all(CATALOG)],
+)
+def test_report_names_setup_project_before_first_start(
+    selection: ProjectSelection,
+) -> None:
+    answers = Answers(
+        project_name="my-app",
+        target_dir=Path("/does/not/exist/my-app"),
+        selection=selection,
+    )
+
+    report = render_report(answers, PIN, [], CATALOG)
+
+    assert report.index("setup-project") < report.index("docker compose watch")
+    assert "before the first start" in report
+
+
 def test_location_next_steps_and_login_precede_overlay_summary() -> None:
     answers = Answers(project_name="my-app", target_dir=Path("/does/not/exist/my-app"))
 
@@ -165,6 +184,7 @@ def test_report_states_when_no_agent_targets_were_selected() -> None:
 
     assert "agent targets: (none)" in report
     assert "AGENTS.md" in report
+    assert "setup-project" in report
 
 
 def test_report_distinguishes_required_loop_from_selected_enhancements() -> None:
