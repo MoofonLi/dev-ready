@@ -1,6 +1,6 @@
 # FR-43 — Flow Chain guidance, corrected
 
-Status: Draft (2026-08-15)
+Status: Accepted by Moofon (2026-08-15)
 
 Version: v0.11
 
