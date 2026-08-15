@@ -417,6 +417,7 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
             "missing required path",
             "missing overlay file",
             "missing item path",
+            "missing item asset",
             "missing agent target artifact",
         )
         unexpected_drifts = [
