@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check generated AGENTS.md claims against the generated upstream tree."""
+"""Check dev-ready's generated upstream claims against the generated tree."""
 
 from __future__ import annotations
 
@@ -20,6 +20,16 @@ class SourceFact(NamedTuple):
     path: str
     needles: tuple[str, ...]
     kind: Literal["file", "directory"] = "file"
+
+
+class GeneratedClaimFact(NamedTuple):
+    """One generated claim and the upstream evidence that keeps it true."""
+
+    label: str
+    generated_path: str
+    claim_needles: tuple[str, ...]
+    sources: tuple[SourceFact, ...]
+    forbidden_sources: tuple[SourceFact, ...] = ()
 
 
 def _file(path: str, *needles: str) -> SourceFact:
@@ -101,6 +111,164 @@ STACK_FACTS: dict[str, SourceFact] = {
     "biome check ./": _file("frontend/package.json", '"@biomejs/biome"'),
     "biome format --write ./": _file("frontend/package.json", '"@biomejs/biome"'),
 }
+
+
+_SETUP_PROJECT_SKILL = ".agents/skills/setup-project/SKILL.md"
+_SETUP_PROJECT_EMAIL = (
+    ".agents/skills/setup-project/email-and-error-reporting.md"
+)
+SETUP_PROJECT_FACTS = (
+    GeneratedClaimFact(
+        "setup-project superuser lifecycle",
+        _SETUP_PROJECT_SKILL,
+        (
+            "creates the superuser on first start",
+            "looks it up by email",
+            "startup initializer runs on every start",
+        ),
+        (
+            _file("backend/scripts/prestart.sh", "python app/initial_data.py"),
+            _file(
+                "backend/app/core/db.py",
+                "select(User).where(User.email == settings.FIRST_SUPERUSER)",
+                "if not user:",
+                "password=settings.FIRST_SUPERUSER_PASSWORD",
+                "is_superuser=True",
+            ),
+            _file(
+                "compose.yml",
+                "command: bash scripts/prestart.sh",
+                "condition: service_completed_successfully",
+            ),
+        ),
+    ),
+    GeneratedClaimFact(
+        "setup-project required superuser settings",
+        _SETUP_PROJECT_SKILL,
+        ("required settings and cannot simply be deleted",),
+        (
+            _file(
+                "backend/app/core/config.py",
+                "FIRST_SUPERUSER: EmailStr",
+                "FIRST_SUPERUSER_PASSWORD: str",
+            ),
+            _file(
+                "compose.yml",
+                "FIRST_SUPERUSER: ${FIRST_SUPERUSER?Variable not set}",
+                "FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD?Variable not set}",
+            ),
+        ),
+    ),
+    GeneratedClaimFact(
+        "setup-project SMTP defaults",
+        _SETUP_PROJECT_EMAIL,
+        ("SMTP_PORT=587", "SMTP_TLS=True", "SMTP_SSL=False"),
+        (
+            _file(".env", "SMTP_PORT=587", "SMTP_TLS=True", "SMTP_SSL=False"),
+            _file(
+                "backend/app/core/config.py",
+                "SMTP_PORT: int = 587",
+                "SMTP_TLS: bool = True",
+                "SMTP_SSL: bool = False",
+            ),
+        ),
+    ),
+    GeneratedClaimFact(
+        "setup-project email and error-reporting settings",
+        _SETUP_PROJECT_EMAIL,
+        (
+            "SMTP_HOST",
+            "SMTP_USER",
+            "SMTP_PASSWORD",
+            "EMAILS_FROM_EMAIL",
+            "SENTRY_DSN",
+            "changes take effect after an application restart",
+        ),
+        (
+            _file(
+                ".env",
+                "SMTP_HOST=",
+                "SMTP_USER=",
+                "SMTP_PASSWORD=",
+                "EMAILS_FROM_EMAIL=",
+                "SENTRY_DSN=",
+            ),
+            _file(
+                "compose.yml",
+                "SMTP_HOST: ${SMTP_HOST}",
+                "SMTP_USER: ${SMTP_USER}",
+                "SMTP_PASSWORD: ${SMTP_PASSWORD}",
+                "EMAILS_FROM_EMAIL: ${EMAILS_FROM_EMAIL}",
+                "SENTRY_DSN: ${SENTRY_DSN}",
+            ),
+            _file(
+                "backend/app/utils.py",
+                "settings.SMTP_HOST",
+                "settings.SMTP_PORT",
+                "settings.SMTP_TLS",
+                "settings.SMTP_SSL",
+                "settings.SMTP_USER",
+                "settings.SMTP_PASSWORD",
+                "settings.EMAILS_FROM_EMAIL",
+                "message.send",
+            ),
+            _file(
+                "backend/app/main.py",
+                "if settings.SENTRY_DSN and settings.ENVIRONMENT != \"local\"",
+                "sentry_sdk.init(dsn=str(settings.SENTRY_DSN)",
+            ),
+            _file("backend/app/core/config.py", "settings = Settings()"),
+        ),
+    ),
+    GeneratedClaimFact(
+        "setup-project deployment boundary",
+        _SETUP_PROJECT_SKILL,
+        (
+            "Do not ask for the deployment domain, frontend host, CORS origins, "
+            "environment name, or container image variables",
+            "The generated local values are already wired into the backend and "
+            "Compose configuration",
+            "Container image variables are not present in this template's `.env`",
+            "Point deployment work to `deployment.md` instead",
+        ),
+        (
+            _file(
+                ".env",
+                "DOMAIN=",
+                "FRONTEND_HOST=",
+                "ENVIRONMENT=",
+                "BACKEND_CORS_ORIGINS=",
+            ),
+            _file(
+                "compose.yml",
+                "FRONTEND_HOST: ${FRONTEND_HOST?Variable not set}",
+                "ENVIRONMENT: ${ENVIRONMENT}",
+                "BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS}",
+                "traefik.http.routers.backend-http.rule=Host(`${DOMAIN?Variable not set}`)",
+            ),
+            _file(
+                "backend/app/core/config.py",
+                "FRONTEND_HOST: str",
+                "ENVIRONMENT: Literal",
+                "BACKEND_CORS_ORIGINS: Annotated",
+                "self.BACKEND_CORS_ORIGINS",
+                "self.FRONTEND_HOST",
+            ),
+            _file(
+                "backend/app/main.py",
+                "settings.ENVIRONMENT",
+                "settings.all_cors_origins",
+            ),
+            _file(
+                "deployment.md",
+                "Set the `ENVIRONMENT`",
+                "Set the `DOMAIN`",
+                "`BACKEND_CORS_ORIGINS`",
+            ),
+        ),
+        (_file(".env", "DOCKER_IMAGE_BACKEND=", "DOCKER_IMAGE_FRONTEND="),),
+    ),
+)
 
 
 # FR-38's login disclosure. The generated `README.md` tells the user which email
@@ -228,6 +396,81 @@ def _claim_is_present(claim: str, text: str) -> bool:
     """Match a claim without accepting a longer tool or command token."""
     pattern = rf"(?<![A-Za-z0-9_-]){re.escape(claim.casefold())}(?![A-Za-z0-9_-])"
     return re.search(pattern, text.casefold()) is not None
+
+
+def _contains_all_needles(text: str, needles: Sequence[str]) -> bool:
+    """Match authored/source phrases without making line wrapping significant."""
+    normalized = " ".join(text.casefold().split())
+    return all(" ".join(needle.casefold().split()) in normalized for needle in needles)
+
+
+def _source_fact_problem(project_dir: Path, source: SourceFact) -> str | None:
+    """Describe why required source evidence fails, or return None."""
+    source_path = project_dir / Path(source.path)
+    if source.kind == "directory":
+        return None if source_path.is_dir() else f"upstream source missing: {source.path}"
+    if not source_path.is_file():
+        return f"upstream source missing: {source.path}"
+    if not source.needles:
+        return None
+    try:
+        source_text = source_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return f"upstream source unreadable: {source.path}"
+    if not _contains_all_needles(source_text, source.needles):
+        return f"upstream evidence missing from {source.path}"
+    return None
+
+
+def _source_fact_holds(project_dir: Path, source: SourceFact) -> bool:
+    return _source_fact_problem(project_dir, source) is None
+
+
+def _forbidden_source_problem(project_dir: Path, source: SourceFact) -> str | None:
+    """Describe why forbidden-evidence checking fails, or return None."""
+    source_path = project_dir / Path(source.path)
+    if not source_path.is_file():
+        return f"forbidden-evidence source missing: {source.path}"
+    try:
+        source_text = source_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return f"forbidden-evidence source unreadable: {source.path}"
+    normalized = " ".join(source_text.casefold().split())
+    if any(
+        " ".join(needle.casefold().split()) in normalized for needle in source.needles
+    ):
+        return f"forbidden upstream evidence present in {source.path}"
+    return None
+
+
+def _generated_claim_failures(project_dir: Path) -> list[str]:
+    failures: list[str] = []
+    for fact in SETUP_PROJECT_FACTS:
+        generated_path = project_dir / fact.generated_path
+        if not generated_path.is_file():
+            failures.append(
+                f"{fact.label}: generated claim file missing: {fact.generated_path}"
+            )
+            continue
+        try:
+            generated_text = generated_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            failures.append(
+                f"{fact.label}: generated claim file unreadable: {fact.generated_path}"
+            )
+            continue
+        if not _contains_all_needles(generated_text, fact.claim_needles):
+            failures.append(
+                f"{fact.label}: generated claim missing from {fact.generated_path}"
+            )
+            continue
+        for source in fact.sources:
+            if problem := _source_fact_problem(project_dir, source):
+                failures.append(f"{fact.label}: {problem}")
+        for source in fact.forbidden_sources:
+            if problem := _forbidden_source_problem(project_dir, source):
+                failures.append(f"{fact.label}: {problem}")
+    return failures
 
 
 def _is_mapped_term(term: str) -> bool:
@@ -367,7 +610,7 @@ def _superuser_disclosure_failures(project_dir: Path) -> list[str]:
     env_path = project_dir / ".env"
     try:
         env_text = env_path.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeError):
         return [
             "the generated .env is missing or unreadable, so the superuser email "
             "disclosed by README.md and the generation report cannot be checked"
@@ -383,7 +626,7 @@ def _superuser_disclosure_failures(project_dir: Path) -> list[str]:
 
     try:
         readme_text = (project_dir / "README.md").read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeError):
         return ["README.md is missing or unreadable"]
 
     disclosed = _EMAIL_IN_BACKTICKS.search(readme_text)
@@ -402,14 +645,14 @@ def _superuser_disclosure_failures(project_dir: Path) -> list[str]:
 
 
 def check_stack_facts(project_dir: Path) -> list[str]:
-    """Return generated AGENTS.md claims that do not hold in project_dir."""
+    """Return dev-ready-generated claims that do not hold in project_dir."""
     agents_path = project_dir / "AGENTS.md"
     if not agents_path.is_file():
         return ["AGENTS.md is missing"]
 
     try:
         agents_source = agents_path.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeError):
         return ["AGENTS.md is unreadable"]
 
     agents_text = agents_source.casefold()
@@ -420,31 +663,19 @@ def check_stack_facts(project_dir: Path) -> list[str]:
             failures.append(claim)
             continue
 
-        source_path = project_dir / Path(source.path)
-        if source.kind == "file" and not source_path.is_file():
-            failures.append(claim)
-            continue
-        if source.kind == "directory" and not source_path.is_dir():
-            failures.append(claim)
-            continue
-        if not source.needles:
-            continue
-        try:
-            source_text = source_path.read_text(encoding="utf-8").casefold()
-        except OSError:
-            failures.append(claim)
-            continue
-        if any(needle.casefold() not in source_text for needle in source.needles):
+        if not _source_fact_holds(project_dir, source):
             failures.append(claim)
 
     failures.extend(_superuser_disclosure_failures(project_dir))
+    if (project_dir / ".env").is_file():
+        failures.extend(_generated_claim_failures(project_dir))
     return failures
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the stack-facts check for one generated project directory."""
     parser = argparse.ArgumentParser(
-        description="Check generated AGENTS.md stack claims against its upstream tree."
+        description="Check generated upstream claims against the generated project tree."
     )
     parser.add_argument(
         "project_dir",
