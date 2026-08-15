@@ -1,0 +1,85 @@
+---
+name: setup-project
+description: Configure a generated project before first start, or return later to change one setup section.
+disable-model-invocation: true
+---
+
+# Setup project
+
+Configure this project without starting it or deleting data. This skill explains
+destructive routes but never runs them. It is safe to invoke again whenever one
+part of the configuration changes.
+
+## Start by reading current state
+
+1. Confirm that the repository root contains `.env`, `compose.yml`, and
+   `backend/` before continuing.
+2. Read `.env`. Report the current `FIRST_SUPERUSER` value and whether
+   `FIRST_SUPERUSER_PASSWORD` is set. Show the generated `SECRET_KEY` and
+   `POSTGRES_PASSWORD`; do not ask the user to replace either one.
+3. State that `.env` and `.env*` are ignored by git, but values typed in a chat
+   may still be retained in that conversation's transcript.
+4. Offer the available setup sections and ask which ones to run:
+   **Superuser**, **Email sending**, and **Error reporting**. Run only the
+   sections the user chooses. For either of the latter two, follow
+   [email-and-error-reporting.md](email-and-error-reporting.md).
+
+{{engineering_flow_setup}}
+
+## Superuser
+
+Explain before asking for values:
+
+- The backend creates the superuser on first start and looks it up by email.
+- Changing `FIRST_SUPERUSER_PASSWORD` after that first start does not change the
+  existing login.
+- Setup therefore belongs before the first `docker compose up`.
+
+Determine whether the project has been started before changing these fields:
+
+1. If Docker is available, resolve the current Compose project name, then use a
+   read-only Docker volume query filtered by Docker's
+   `com.docker.compose.project` label. A matching volume proves that the project
+   has started. Do not infer state from running containers: `docker compose
+   stop` leaves the database volume behind.
+2. If no matching volume is found, explain that a renamed directory or an
+   overridden Compose project name can hide it, and ask the user to confirm
+   whether the project has ever been started.
+3. If Docker is unavailable, ask that same question instead of guessing.
+
+### Project has not started
+
+Ask for the superuser email. Offer these password choices, with the first one as
+the default:
+
+1. Keep the generated random `FIRST_SUPERUSER_PASSWORD`.
+2. Replace it with a value the user provides.
+
+Write the chosen email and password to `.env`, preserving the rest of the file.
+Never print the password after writing it. Stop without starting the project.
+
+### Project has started
+
+Warn here, and only here, that changing the superuser can destroy data if the
+reset route is chosen. `FIRST_SUPERUSER` and `FIRST_SUPERUSER_PASSWORD` are
+required settings and cannot simply be deleted. The startup initializer runs on
+every start, so deleting the old database row alone makes it return.
+
+Offer both routes and wait for the user to choose and run one; execute neither:
+
+- **Reset:** `docker compose down -v` removes project volumes, including the
+  database, so the next start creates a fresh database and superuser from
+  `.env`. If the user chooses this route, wait for them to run the command and
+  confirm that it completed. Then ask for the desired superuser email and the
+  password choice above, write both values to `.env`, and stop before the next
+  start.
+- **Migrate:** keep existing data by following
+  [migrate-superuser.md](migrate-superuser.md).
+
+## Leave deployment settings alone
+
+Do not ask for the deployment domain, frontend host, CORS origins, environment
+name, or container image variables. The generated local values are already
+wired into the backend and Compose configuration. Container image variables are
+not present in this template's `.env`; do not invent them. Point deployment
+work to `deployment.md` instead.

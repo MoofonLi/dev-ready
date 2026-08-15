@@ -3,6 +3,7 @@
 from pathlib import Path
 import hashlib
 import re
+from dataclasses import replace
 
 import pytest
 
@@ -46,6 +47,24 @@ def _answers(
             docs_items=docs_items if include_docs else frozenset(),
             agent_targets=agent_targets,
         ),
+    )
+
+
+def _selection_case(
+    selection_name: str,
+    *,
+    mixed_skills: frozenset[str],
+) -> ProjectSelection:
+    if selection_name == "everything":
+        return ProjectSelection.all(CATALOG)
+    if selection_name == "nothing":
+        return ProjectSelection.empty()
+    assert selection_name == "mixed"
+    return ProjectSelection.from_items(
+        CATALOG,
+        skills=mixed_skills,
+        mcp=frozenset(),
+        agent_targets=frozenset({"claude"}),
     )
 
 
@@ -228,17 +247,10 @@ def test_setup_skill_arrives_through_the_mandatory_development_loop(
 def test_no_selection_writes_handoff_protocol_paths(
     tmp_path: Path, selection_name: str
 ) -> None:
-    if selection_name == "everything":
-        selection = ProjectSelection.all(CATALOG)
-    elif selection_name == "nothing":
-        selection = ProjectSelection.empty()
-    else:
-        selection = ProjectSelection.from_items(
-            CATALOG,
-            skills=frozenset({"mattpocock"}),
-            mcp=frozenset(),
-            agent_targets=frozenset({"claude"}),
-        )
+    selection = _selection_case(
+        selection_name,
+        mixed_skills=frozenset({"mattpocock"}),
+    )
 
     project_dir = tmp_path / selection_name
     (project_dir / "frontend").mkdir(parents=True)
@@ -259,17 +271,10 @@ def test_no_selection_writes_handoff_protocol_paths(
 def test_no_selection_writes_project_orientation_skill(
     tmp_path: Path, selection_name: str
 ) -> None:
-    if selection_name == "everything":
-        selection = ProjectSelection.all(CATALOG)
-    elif selection_name == "nothing":
-        selection = ProjectSelection.empty()
-    else:
-        selection = ProjectSelection.from_items(
-            CATALOG,
-            skills=frozenset({"caveman"}),
-            mcp=frozenset(),
-            agent_targets=frozenset({"claude"}),
-        )
+    selection = _selection_case(
+        selection_name,
+        mixed_skills=frozenset({"caveman"}),
+    )
 
     project_dir = tmp_path / selection_name
     (project_dir / "frontend").mkdir(parents=True)
@@ -286,6 +291,21 @@ def test_no_selection_writes_project_orientation_skill(
     assert all("project-orientation" not in path.parts for path in generated_paths)
 
 
+@pytest.mark.parametrize("selection_name", ["everything", "nothing", "mixed"])
+def test_every_selection_writes_setup_project_canonical_skill(
+    tmp_path: Path, selection_name: str
+) -> None:
+    selection = _selection_case(
+        selection_name,
+        mixed_skills=frozenset({"caveman"}),
+    )
+    content = build_overlay_content(
+        Answers("my-app", tmp_path / selection_name, selection), CATALOG
+    )
+
+    assert ".agents/skills/setup-project/SKILL.md" in content
+
+
 def test_apply_overlay_stamp_inventory_hashes_rendered_non_inject_files(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
@@ -296,8 +316,11 @@ def test_apply_overlay_stamp_inventory_hashes_rendered_non_inject_files(tmp_path
     for path in (
         "AGENTS.md",
         "CLAUDE.md",
+        ".agents/skills/setup-project/SKILL.md",
+        ".claude/skills/setup-project/SKILL.md",
         ".agents/skills/caveman/SKILL.md",
         ".claude/skills/caveman/SKILL.md",
+        "docs/agents/mattpocock.md",
     ):
         assert inventory[path] == hashlib.sha256((project_dir / path).read_bytes()).hexdigest()
 
@@ -317,6 +340,96 @@ def test_claude_pointer_stub_names_and_describes_canonical_skill(tmp_path: Path)
     assert stub.read_bytes() != canonical.read_bytes()
     assert not canonical.is_symlink()
     assert not stub.is_symlink()
+
+
+def test_setup_project_reaches_every_selected_agent_target(tmp_path: Path) -> None:
+    content = build_overlay_content(_answers(tmp_path), CATALOG)
+    canonical_path = ".agents/skills/setup-project/SKILL.md"
+
+    assert canonical_path in content
+    for stub_path in (
+        ".claude/skills/setup-project/SKILL.md",
+        ".windsurf/skills/setup-project/SKILL.md",
+    ):
+        stub = content[stub_path].decode("utf-8")
+        assert "name: setup-project" in stub
+        assert "description: Configure a generated project before first start" in stub
+        assert "disable-model-invocation: true" in stub
+        assert canonical_path in stub
+
+
+def test_setup_project_is_original_infrastructure_not_manifest_content(
+    tmp_path: Path,
+) -> None:
+    manifest = load_default_manifest()
+    content = build_overlay_content(
+        _answers(tmp_path, agent_targets=frozenset()), manifest.components
+    )
+    setup_skill = content[".agents/skills/setup-project/SKILL.md"].decode("utf-8")
+
+    assert "disable-model-invocation: true" in setup_skill
+    assert "{{" not in setup_skill
+    assert "}}" not in setup_skill
+    assert not any("setup-project" in flow.steps for flow in manifest.components.loops())
+    assert not any(
+        "setup-project" in path.src or "setup-project" in path.dest
+        for pin in manifest.vendored
+        for path in pin.paths
+    )
+    assert not any(
+        path.startswith(".claude/skills/setup-project/")
+        or path.startswith(".windsurf/skills/setup-project/")
+        for path in content
+    )
+
+
+def test_setup_project_offers_email_and_error_reporting_as_individual_sections(
+    tmp_path: Path,
+) -> None:
+    content = build_overlay_content(_answers(tmp_path), CATALOG)
+
+    router = content[".agents/skills/setup-project/SKILL.md"].decode("utf-8")
+    walk_path = ".agents/skills/setup-project/email-and-error-reporting.md"
+    walk = content[walk_path].decode("utf-8")
+    assert "**Email sending**" in router
+    assert "**Error reporting**" in router
+    assert "email-and-error-reporting.md" in router
+    assert "default is No" in walk
+    for index, key in enumerate(
+        ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "EMAILS_FROM_EMAIL"),
+        start=1,
+    ):
+        assert f"{index}. `{key}`" in walk
+    assert "1. `SENTRY_DSN`" in walk
+    assert "asks exactly\nfive values" in walk
+    assert "Email sending alone never walks through Error reporting" in walk
+    assert "Error reporting alone never asks for SMTP values" in walk
+    assert "stored transcript" in walk
+    assert "Leave this blank" in walk
+    assert "SMTP_PORT=587" in walk
+    assert "SMTP_TLS=True" in walk
+    assert "SMTP_SSL=False" in walk
+    assert "data loss" not in walk.lower()
+    assert "{{" not in walk
+    assert "}}" not in walk
+
+
+def test_setup_project_uses_the_selected_flow_configuration_handoff(
+    tmp_path: Path,
+) -> None:
+    manifest = load_default_manifest()
+    content = build_overlay_content(_answers(tmp_path), manifest.components)
+    setup_skill = content[".agents/skills/setup-project/SKILL.md"].decode("utf-8")
+    flow = next(item for item in manifest.components.loops() if item.id == "mattpocock")
+
+    assert "docs/agents/issue-tracker.md" in setup_skill
+    assert "docs/agents/triage-labels.md" in setup_skill
+    assert "docs/agents/domain.md" in setup_skill
+    assert "setup-matt-pocock-skills" in setup_skill
+    assert "user-modified" in setup_skill
+    assert "stops updating" in setup_skill
+    assert "setup-matt-pocock-skills" in flow.steps
+    assert "{{" not in setup_skill
 
 
 def test_windsurf_only_writes_windsurf_stubs_and_no_project_mcp(tmp_path: Path) -> None:
@@ -356,6 +469,7 @@ def test_no_agent_targets_still_writes_only_canonical_content(tmp_path: Path) ->
 
     assert (project_dir / "AGENTS.md").is_file()
     assert (project_dir / ".agents/skills/caveman/SKILL.md").is_file()
+    assert (project_dir / ".agents/skills/setup-project/SKILL.md").is_file()
     assert not (project_dir / ".claude").exists()
     assert not (project_dir / ".windsurf").exists()
     assert not (project_dir / "CLAUDE.md").exists()
@@ -430,7 +544,7 @@ def test_mandatory_loop_is_present_with_all_enhancements_disabled(tmp_path: Path
 
 
 @pytest.mark.parametrize("include_docs", [False, True])
-def test_mandatory_spec_loop_renders_independently_of_documentation_items(
+def test_mandatory_engineering_flow_renders_independently_of_documentation_items(
     tmp_path: Path,
     include_docs: bool,
 ) -> None:
@@ -454,7 +568,7 @@ def test_mandatory_spec_loop_renders_independently_of_documentation_items(
     assert (project_dir / "docs" / "architecture.md").is_file()
     assert (project_dir / "docs" / "requirements.md").is_file()
     assert "## Handoff Protocol" not in agents_md
-    assert "## Spec Loop" in agents_md
+    assert "## Engineering Flow" in agents_md
     assert "docs/architecture.md" in agents_md
     assert "## Process-v2 role mapping" not in agents_md
 
@@ -473,6 +587,93 @@ def test_mandatory_spec_loop_renders_independently_of_documentation_items(
     assert "`tech_lead`" not in architecture
 
     assert "{{" not in agents_md
+
+
+def test_selected_flow_without_authored_guidance_fails_at_overlay_seam(
+    tmp_path: Path,
+) -> None:
+    loop = next(item for item in CATALOG.loops() if item.id == "mattpocock")
+    unmapped_loop = replace(loop, id="unmapped-flow")
+    components = {
+        component: tuple(
+            unmapped_loop if item.id == loop.id else item
+            for item in CATALOG.get(component, ())
+        )
+        for component in CATALOG
+    }
+    catalog = ComponentCatalog(
+        components,
+        CATALOG.agent_targets,
+        CATALOG.categories,
+        CATALOG.default_set,
+        CATALOG.standard_compliant_agents,
+        CATALOG.announced_loops,
+    )
+    selection = ProjectSelection.from_items(
+        catalog,
+        skills=frozenset({"unmapped-flow"}),
+        agent_targets=frozenset(),
+    )
+
+    with pytest.raises(OverlayError, match="flow guidance is missing: unmapped-flow"):
+        build_overlay_content(Answers("my-app", tmp_path / "project", selection), catalog)
+
+
+def test_engineering_flow_guidance_states_the_exact_chain_and_skip_rule(
+    tmp_path: Path,
+) -> None:
+    content = build_overlay_content(_answers(tmp_path), CATALOG)
+    agents_md = content["AGENTS.md"].decode("utf-8")
+
+    guidance = agents_md.split("## Engineering Flow\n", 1)[1].split(
+        "\n\n## Architecture documentation", 1
+    )[0]
+    assert guidance == (
+        "\nThe default Flow Chain is `setup-project` → `grill-with-docs` → "
+        "`to-spec` → `to-tickets` → `implement` → "
+        "`improve-codebase-architecture`. Every step is user-invoked.\n\n"
+        "A step may reach for `tdd`, `code-review`, `diagnosing-bugs`, "
+        "`codebase-design`, or `domain-modeling` as a tool; those tools are not "
+        "additional chain entries.\n\nStart at `implement` when the change adds no "
+        "behaviour a user can observe — a rename, a formatting fix, a dependency "
+        "bump, or a test for behaviour that already works. Start at `setup-project` "
+        "or `grill-with-docs` for everything else.\n\nTracker and domain "
+        "conventions are in `docs/agents/issue-tracker.md`, "
+        "`docs/agents/triage-labels.md`, and `docs/agents/domain.md`. Follow those "
+        "files when a skill asks where to publish specs or tickets; domain "
+        "terminology is created lazily when a real term is resolved."
+    )
+    assert all(
+        "## Spec Loop" not in data.decode("utf-8")
+        for data in content.values()
+    )
+
+
+def test_selected_flow_writes_its_human_explainer_and_unselected_flow_does_not(
+    tmp_path: Path,
+) -> None:
+    selected = build_overlay_content(_answers(tmp_path), CATALOG)
+    unselected = build_overlay_content(
+        Answers("my-app", tmp_path / "empty", ProjectSelection.empty()), CATALOG
+    )
+    explainer_path = "docs/agents/mattpocock.md"
+
+    assert explainer_path in selected
+    assert explainer_path not in unselected
+    explainer = selected[explainer_path].decode("utf-8")
+    for step in (
+        "setup-project",
+        "grill-with-docs",
+        "to-spec",
+        "to-tickets",
+        "implement",
+        "improve-codebase-architecture",
+    ):
+        assert f"`{step}`" in explainer
+    assert "does not need to finish in one session" in explainer
+    assert "no behaviour a user can observe" in explainer
+    assert "For everything else" in explainer
+    assert "otherwise start at `grill-with-docs`" in explainer
 
 
 def test_readme_is_about_the_project_not_the_template(tmp_path: Path) -> None:
@@ -1312,7 +1513,7 @@ def test_generated_agents_md_describes_stack_commands_and_standards_source(
     assert "pre-commit run" not in agents_md
 
 
-def test_standalone_spec_loop_is_complete_and_role_neutral(tmp_path: Path) -> None:
+def test_standalone_engineering_flow_is_complete_and_role_neutral(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
     answers = _answers(
@@ -1344,8 +1545,8 @@ def test_standalone_spec_loop_is_complete_and_role_neutral(tmp_path: Path) -> No
     assert not (project_dir / "CONTEXT.md").exists()
 
     claude_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
-    assert "## Spec Loop" in claude_md
-    assert "`to-tickets` -> `implement` -> `tdd` -> `code-review`" in claude_md
+    assert "## Engineering Flow" in claude_md
+    assert "`to-tickets` → `implement` → `improve-codebase-architecture`" in claude_md
     assert "docs/agents/issue-tracker.md" in claude_md
     assert "Handoff Protocol" not in claude_md
     assert "tech_lead" not in claude_md
@@ -1367,11 +1568,11 @@ def test_declining_every_enhancement_keeps_bundle_configuration_and_guidance(
 
     assert (project_dir / "docs" / "agents" / "issue-tracker.md").is_file()
     claude_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
-    assert "Spec Loop" in claude_md
+    assert "Engineering Flow" in claude_md
     assert "Handoff Protocol" not in claude_md
 
 
-def test_spec_loop_stamp_records_the_resolved_selection_and_complete_inventory(
+def test_engineering_flow_stamp_records_the_resolved_selection_and_complete_inventory(
     tmp_path: Path,
 ) -> None:
     project_dir = tmp_path / "project"

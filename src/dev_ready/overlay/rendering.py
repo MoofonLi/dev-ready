@@ -1,5 +1,6 @@
 """Render overlay templates from a resolved project selection."""
 
+from dataclasses import dataclass
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
@@ -18,14 +19,50 @@ _DOCUMENTATION_GUIDANCE = """## Architecture documentation
 
 Read `docs/architecture.md` before structural changes; it records the system overview, module boundaries, and dependency rules."""
 
-def _spec_loop_guidance(answers: Answers) -> str:
-    if "mattpocock" not in answers.items("skills"):
-        return ""
-    return """## Spec Loop
+@dataclass(frozen=True)
+class _FlowGuidance:
+    rules: str
+    setup_project: str
 
-Use the installed loop as one end-to-end method: `grill-with-docs` -> `to-spec` -> `to-tickets` -> `implement` -> `tdd` -> `code-review` -> `improve-codebase-architecture`. Use `diagnosing-bugs` when failures need root-cause analysis.
 
-Tracker and domain conventions are in `docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md`, and `docs/agents/domain.md`. Follow those files when a skill asks where to publish specs or tickets; domain terminology is created lazily when a real term is resolved."""
+_EMPTY_FLOW_GUIDANCE = _FlowGuidance(rules="", setup_project="")
+_FLOW_GUIDANCE = {
+    "mattpocock": _FlowGuidance(
+        rules="""## Engineering Flow
+
+The default Flow Chain is `setup-project` → `grill-with-docs` → `to-spec` → `to-tickets` → `implement` → `improve-codebase-architecture`. Every step is user-invoked.
+
+A step may reach for `tdd`, `code-review`, `diagnosing-bugs`, `codebase-design`, or `domain-modeling` as a tool; those tools are not additional chain entries.
+
+Start at `implement` when the change adds no behaviour a user can observe — a rename, a formatting fix, a dependency bump, or a test for behaviour that already works. Start at `setup-project` or `grill-with-docs` for everything else.
+
+Tracker and domain conventions are in `docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md`, and `docs/agents/domain.md`. Follow those files when a skill asks where to publish specs or tickets; domain terminology is created lazily when a real term is resolved.""",
+        setup_project="""The selected Engineering Flow also contributes **Issue tracker and domain conventions** to the section menu.
+
+## Issue tracker and domain conventions
+
+Read `docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md`, and
+`docs/agents/domain.md`. Report where specs and tickets currently live, the
+triage-label vocabulary, and whether the domain document has been initialized.
+Do not change any of those files while reporting their current state.
+
+Ask whether the user wants this convention changed. Only if they answer yes,
+explain that editing these managed files makes them user-modified, so a future
+dev-ready upgrade preserves them and stops updating them. After the user accepts
+that cost, hand off to `/setup-matt-pocock-skills`. Do not invoke that skill when
+the user only asked to inspect current state.""",
+    ),
+}
+
+
+def _selected_flow_guidance(answers: Answers) -> _FlowGuidance:
+    flow_id = answers.selection.development_loop
+    if not flow_id:
+        return _EMPTY_FLOW_GUIDANCE
+    try:
+        return _FLOW_GUIDANCE[flow_id]
+    except KeyError as error:
+        raise OverlayError(f"flow guidance is missing: {flow_id}") from error
 
 
 def _issue_tracker_configuration() -> str:
@@ -43,9 +80,11 @@ When a skill says to publish to or fetch from the issue tracker, use these local
 
 def template_values(answers: Answers) -> dict[str, str]:
     """Return every supported template token for one resolved selection."""
+    flow_guidance = _selected_flow_guidance(answers)
     return {
         "project_name": answers.project_name,
-        "spec_loop_guidance": _spec_loop_guidance(answers),
+        "engineering_flow_guidance": flow_guidance.rules,
+        "engineering_flow_setup": flow_guidance.setup_project,
         "documentation_guidance": _DOCUMENTATION_GUIDANCE,
         "architecture_ownership": _ARCHITECTURE_OWNERSHIP,
         "issue_tracker_configuration": _issue_tracker_configuration(),

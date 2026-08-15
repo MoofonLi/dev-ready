@@ -15,7 +15,10 @@ from dev_ready.agent_targets import CANONICAL_SKILLS_ROOT, AgentTarget, project_
 from dev_ready.catalog_effects import CatalogEffectError
 from dev_ready.errors import OverlayError
 from dev_ready.manifest import CATALOG_COMPONENTS, ComponentCatalog, UpstreamPin, VendoredPin
-from dev_ready.overlay.infrastructure import documentation_scaffold_paths
+from dev_ready.overlay.infrastructure import (
+    documentation_scaffold_paths,
+    skill_infrastructure_paths,
+)
 from dev_ready.overlay.rendering import TEMPLATE_SUFFIX as _TEMPLATE_SUFFIX
 from dev_ready.overlay.rendering import inject_mounted_enhancements as _inject_mounts
 from dev_ready.overlay.rendering import render_asset as _render_asset
@@ -87,6 +90,9 @@ def build_overlay_content(
                     )
 
     _inject_mounts(content, answers, catalog)
+
+    for source, destination in skill_infrastructure_paths():
+        collect(templates_root.joinpath(source), destination)
 
     canonical_root = Path(*CANONICAL_SKILLS_ROOT)
     canonical_skill_files = {
