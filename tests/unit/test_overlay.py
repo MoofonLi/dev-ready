@@ -1397,6 +1397,113 @@ def test_apply_overlay_deselected_vendored_skills_are_absent(tmp_path: Path) -> 
         assert (project_dir / ".claude" / "skills" / skill / "SKILL.md").is_file()
 
 
+def test_lean_selection_carries_the_notice_in_every_engineering_flow_skill(
+    tmp_path: Path,
+) -> None:
+    manifest = load_default_manifest()
+    content = build_overlay_content(
+        _answers(
+            tmp_path,
+            skills_items=frozenset(),
+            include_mcp=False,
+            include_docs=False,
+            agent_targets=frozenset(),
+        ),
+        manifest.components,
+    )
+    flow_skills = (
+        "tdd",
+        "diagnosing-bugs",
+        "code-review",
+        "grill-with-docs",
+        "grilling",
+        "domain-modeling",
+        "to-spec",
+        "to-tickets",
+        "implement",
+        "improve-codebase-architecture",
+        "codebase-design",
+        "setup-matt-pocock-skills",
+    )
+
+    for skill in flow_skills:
+        notice = content[f".agents/skills/{skill}/LICENSE"]
+        assert hashlib.sha256(notice).hexdigest() == (
+            "4981c5f6a90eb3a969dacabb9350f5a75695ff3910b39b6534952908dfdc5ff7"
+        )
+
+
+@pytest.mark.parametrize(
+    ("skill", "expected_hash"),
+    [
+        (
+            "caveman",
+            "17a8a03e790cd0b662021daeefc008b0af05810c041215a95dfa19abc496d3b9",
+        ),
+        (
+            "security-audit",
+            "c007a58f958f8a5b2870aa35d8a17aa72a546447aecee6d2b72e19fea530890b",
+        ),
+    ],
+)
+def test_optional_mit_skill_notice_follows_its_selection(
+    tmp_path: Path,
+    skill: str,
+    expected_hash: str,
+) -> None:
+    manifest = load_default_manifest()
+    selected = build_overlay_content(
+        _answers(
+            tmp_path,
+            skills_items=frozenset({skill}),
+            include_mcp=False,
+            include_docs=False,
+            agent_targets=frozenset(),
+        ),
+        manifest.components,
+    )
+    deselected = build_overlay_content(
+        _answers(
+            tmp_path,
+            skills_items=frozenset(),
+            include_mcp=False,
+            include_docs=False,
+            agent_targets=frozenset(),
+        ),
+        manifest.components,
+    )
+    notice_path = f".agents/skills/{skill}/LICENSE"
+
+    assert hashlib.sha256(selected[notice_path]).hexdigest() == expected_hash
+    assert notice_path not in deselected
+
+
+def test_mit_skill_notices_are_recorded_in_the_stamp_inventory(tmp_path: Path) -> None:
+    manifest = load_default_manifest()
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    answers = _answers(
+        tmp_path,
+        skills_items=frozenset({"caveman", "security-audit"}),
+        include_mcp=False,
+        include_docs=False,
+        agent_targets=frozenset(),
+    )
+
+    apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
+
+    stamp = json.loads((project_dir / ".dev-ready.json").read_text(encoding="utf-8"))
+    inventory = {entry["path"]: entry["sha256"] for entry in stamp["inventory"]}
+    for notice_path in (
+        ".agents/skills/caveman/LICENSE",
+        ".agents/skills/security-audit/LICENSE",
+        ".agents/skills/implement/LICENSE",
+    ):
+        assert inventory[notice_path] == hashlib.sha256(
+            (project_dir / notice_path).read_bytes()
+        ).hexdigest()
+
+
 def test_apply_overlay_mixed_vendored_skills_selection(tmp_path: Path) -> None:
     manifest = load_default_manifest()
     project_dir = tmp_path / "project"

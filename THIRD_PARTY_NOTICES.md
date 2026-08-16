@@ -21,7 +21,7 @@ dev-ready does not ship a copy of this template inside the wheel. At generation 
 - License: MIT
 - Pinned Commit: 0d95a81d35a9f2d123a5e9430d1cfc43d55f1bb0
 - Source: https://github.com/JuliusBrussee/caveman
-- Subset: `skills/caveman` (token-discipline skill) vendored into `src/dev_ready/templates/claude/skills/caveman`.
+- Subset: `skills/caveman` (token-discipline skill) vendored into `src/dev_ready/templates/claude/skills/caveman`; the upstream `LICENSE` is vendored into that directory and travels with the generated copy.
 
 ## mattpocock/skills
 
@@ -29,6 +29,7 @@ dev-ready does not ship a copy of this template inside the wheel. At generation 
 - Pinned Commit: ed37663cc5fbef691ddfecd080dff42f7e7e350d
 - Source: https://github.com/mattpocock/skills
 - Subset: `skills/engineering/tdd`, `skills/engineering/diagnosing-bugs`, `skills/engineering/code-review`, `skills/engineering/grill-with-docs`, `skills/productivity/grilling`, `skills/engineering/domain-modeling`, `skills/engineering/to-spec`, `skills/engineering/to-tickets`, `skills/engineering/implement`, `skills/engineering/improve-codebase-architecture`, `skills/engineering/codebase-design`, and `skills/engineering/setup-matt-pocock-skills` vendored into `src/dev_ready/templates/claude/skills/`.
+- Notice paths: the upstream `LICENSE` is vendored into each of those twelve skill directories and travels with each generated copy.
 
 Copies of these skills written into generated projects may be modified by dev-ready and are distributed as derived works under the same MIT license. The vendored source snapshots in this repository remain byte-checked against the pinned commit.
 
@@ -37,7 +38,7 @@ Copies of these skills written into generated projects may be modified by dev-re
 - License: MIT
 - Pinned Commit: 8bac42001ddd90a4dcd8d5a5045199283a8eba75
 - Source: https://github.com/cloudflare/security-audit-skill
-- Subset: `skills/security-audit` vendored into `src/dev_ready/templates/claude/skills/security-audit`.
+- Subset: `skills/security-audit` vendored into `src/dev_ready/templates/claude/skills/security-audit`; the upstream `LICENSE` is vendored into that directory and travels with the generated copy.
 
 ## VoltAgent/awesome-design-md
 

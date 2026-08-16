@@ -196,15 +196,13 @@ def test_sync_all_rejects_invalid_manifest(tmp_path: Path) -> None:
 def test_spec_loop_snapshot_declares_every_support_path() -> None:
     manifest = load_default_manifest()
     pin = next(entry for entry in manifest.vendored if entry.repo == "mattpocock/skills")
-    spec_loop_paths = {
-        path.dest for path in pin.paths if path.dest not in {
-            "src/dev_ready/templates/claude/skills/tdd",
-            "src/dev_ready/templates/claude/skills/diagnosing-bugs",
-            "src/dev_ready/templates/claude/skills/code-review",
-        }
-    }
+    skill_directories = {path.dest for path in pin.paths if not path.dest.endswith("/LICENSE")}
+    notice_paths = {path.dest for path in pin.paths if path.dest.endswith("/LICENSE")}
 
-    assert spec_loop_paths == {
+    assert skill_directories == {
+        "src/dev_ready/templates/claude/skills/tdd",
+        "src/dev_ready/templates/claude/skills/diagnosing-bugs",
+        "src/dev_ready/templates/claude/skills/code-review",
         "src/dev_ready/templates/claude/skills/grill-with-docs",
         "src/dev_ready/templates/claude/skills/grilling",
         "src/dev_ready/templates/claude/skills/domain-modeling",
@@ -215,3 +213,4 @@ def test_spec_loop_snapshot_declares_every_support_path() -> None:
         "src/dev_ready/templates/claude/skills/codebase-design",
         "src/dev_ready/templates/claude/skills/setup-matt-pocock-skills",
     }
+    assert notice_paths == {f"{directory}/LICENSE" for directory in skill_directories}

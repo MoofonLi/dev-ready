@@ -246,6 +246,10 @@
         {
           "src": "skills/caveman",
           "dest": "src/dev_ready/templates/claude/skills/caveman"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/caveman/LICENSE"
         }
       ]
     },
@@ -301,6 +305,54 @@
         {
           "src": "skills/engineering/setup-matt-pocock-skills",
           "dest": "src/dev_ready/templates/claude/skills/setup-matt-pocock-skills"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/tdd/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/diagnosing-bugs/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/code-review/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/grill-with-docs/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/grilling/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/domain-modeling/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/to-spec/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/to-tickets/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/implement/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/improve-codebase-architecture/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/codebase-design/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/setup-matt-pocock-skills/LICENSE"
         }
       ]
     },
@@ -312,6 +364,10 @@
         {
           "src": "skills/security-audit",
           "dest": "src/dev_ready/templates/claude/skills/security-audit"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/security-audit/LICENSE"
         }
       ]
     },
