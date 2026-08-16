@@ -15,3 +15,36 @@
   - **A CI check comparing the two READMEs** — rejected: the Chinese README is deliberately not equivalent to the English one, so any mechanical comparison measures the wrong thing and manufactures false failures.
   - **No written boundary, decided per file** — rejected: this repository runs on agents that read `AGENTS.md` and these records rather than session history. An unwritten rule is not a rule.
 - Consequences: Traditional Chinese speakers are served at the point the evidence says they need it, and nowhere else. `README.zh-TW.md` becomes a maintained artifact, so `AGENTS.md` carries the rule that it tracks product facts rather than English wording — ordinary README edits therefore create no translation debt. Reopening CLI localization requires new evidence, specifically an external non-maintainer user asking for it, rather than a repetition of the original reasoning. One defect FR-25 would have fixed incidentally remains open: `check` builds one list of English sentences and serves it as both the human report and the `--json` payload. That is a machine-interface problem, it is now decoupled from any language question, and it can be raised on its own merits.
+
+## 2026-08-16 amendment — byte-identical vendored content keeps upstream language
+
+FR-40 vendors all 74 design documents from the pinned
+`VoltAgent/awesome-design-md` commit under ADR-009's byte-equality drift guard.
+One upstream file, `design-md/raycast/DESIGN.md`, contains the Chinese YAML key
+`属于:`. The pinned Git object and dev-ready's snapshot have identical SHA-256
+hashes, so the original boundary and the vendoring contract cannot both hold
+literally: translating the key breaks provenance, while omitting the document
+breaks the derived full-set contract.
+
+**Byte-identical vendored third-party content is therefore outside the authored
+language boundary.** When a pinned upstream snapshot contains non-English text,
+dev-ready preserves those bytes unmodified. Everything dev-ready authors,
+composes, renders, or adapts remains English, including manifest metadata,
+Generation Skill guidance, mounted guidance, CLI output, source, tests, and
+internal documentation. `README.zh-TW.md` remains the only Chinese file authored
+by this repository.
+
+- **Considered: translate or normalize the vendored file** — rejected. It would
+  make the committed snapshot differ from the pinned source and defeat the
+  ADR-009 drift guard.
+- **Considered: omit Raycast from the derived set** — rejected. FR-40's set is
+  derived rather than curated; silently dropping one source recreates the
+  curation problem the requirement removes.
+- **Considered: bump the pin to seek a corrected upstream file** — rejected.
+  FR-40 explicitly leaves the pin unchanged, and a future upstream correction
+  is not evidence available at this pinned commit.
+
+Consequences: language review distinguishes repository-authored text from
+verbatim vendored snapshots. This is not permission to introduce localized
+runtime or generated guidance, and it creates no second Chinese documentation
+surface.

@@ -114,6 +114,24 @@ def _make_mounted_project(tmp_path: Path) -> Path:
     return project
 
 
+def _make_design_reference_project(tmp_path: Path) -> Path:
+    project = tmp_path / "project"
+    project.mkdir()
+    answers = Answers(
+        project_name="upgrade-app",
+        target_dir=project,
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            skills=frozenset(),
+            mcp=frozenset(),
+            docs_items=frozenset({"design-vercel"}),
+            agent_targets=frozenset(),
+        ),
+    )
+    apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
+    return project
+
+
 def _set_inventory_hash(project: Path, path: str, content: bytes) -> None:
     stamp_path = project / ".dev-ready.json"
     data = json.loads(stamp_path.read_text(encoding="utf-8"))
@@ -339,6 +357,67 @@ def test_user_modified_file_is_left_unchanged(tmp_path: Path) -> None:
     report = upgrade_project(project)
     assert (project / "CLAUDE.md").read_bytes() == b"USEREDIT"
     assert "Skipped (user-modified) (1):" in report
+
+
+def test_derived_design_reference_stays_managed_and_preserves_user_edits(
+    tmp_path: Path,
+) -> None:
+    project = _make_design_reference_project(tmp_path)
+    design_reference = project / "docs" / "design-vercel.md"
+    original = design_reference.read_bytes()
+
+    clean_report = upgrade_project(project)
+    assert design_reference.read_bytes() == original
+    assert "docs/design-vercel.md" not in clean_report
+
+    design_reference.write_bytes(b"user-edited design reference")
+    modified_report = upgrade_project(project)
+    assert design_reference.read_bytes() == b"user-edited design reference"
+    assert "Skipped (user-modified) (1):" in modified_report
+    assert "docs/design-vercel.md" in modified_report
+
+
+def test_shipped_design_reference_pair_upgrades_to_collapsed_mount_without_conflict(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    answers = Answers(
+        project_name="upgrade-app",
+        target_dir=project,
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            skills=frozenset(),
+            mcp=frozenset(),
+            docs_items=frozenset({"design-stripe", "design-linear"}),
+            agent_targets=frozenset(),
+        ),
+    )
+    apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
+    mounted_path = ".agents/skills/implement/SKILL.md"
+    implement_path = project / mounted_path
+    old_mount = (
+        implement_path.read_text(encoding="utf-8").replace(
+            "- **Documentation references** — `design-linear`, `design-stripe`. "
+            "See `docs/`.",
+            "- **design-linear** — Linear-inspired DESIGN.md reference for a "
+            "polished dark product interface system; omit it if that visual "
+            "direction is not useful. See `docs/design-linear.md`.\n"
+            "- **design-stripe** — Stripe-inspired DESIGN.md reference for a "
+            "polished light interface system; omit it if that visual direction "
+            "is not useful. See `docs/design-stripe.md`.",
+        )
+    ).encode("utf-8")
+    implement_path.write_bytes(old_mount)
+    _set_inventory_hash(project, mounted_path, old_mount)
+
+    report = upgrade_project(project)
+
+    upgraded = implement_path.read_text(encoding="utf-8")
+    assert "- **Documentation references** — `design-linear`, `design-stripe`." in upgraded
+    assert "Skipped (user-modified) (0):" in report
+    assert (project / "docs/design-stripe.md").is_file()
+    assert (project / "docs/design-linear.md").is_file()
 
 
 def test_missing_unrecorded_file_is_added(tmp_path: Path) -> None:

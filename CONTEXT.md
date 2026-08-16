@@ -267,11 +267,14 @@ _Avoid_: project version, upstream currency
 ### Written language
 
 **Language Boundary**:
-The rule fixing what language each surface is written in (ADR-016). Everything
-dev-ready emits and everything it generates is English — generated content's
-consumer is a model, and English is what models parse most reliably. Chinese
-exists only in repository documentation addressed to external readers, today
-`README.zh-TW.md`. dev-ready has no localized runtime and records no language.
+The rule fixing what language each authored surface is written in (ADR-016).
+Everything dev-ready authors, emits, composes, or adapts is English — generated
+content's consumer is a model, and English is what models parse most reliably.
+Byte-identical vendored third-party snapshots retain their upstream language,
+because translating them would break provenance; they are not a localized
+surface. Chinese authored by this repository exists only in outward-facing
+documentation, today `README.zh-TW.md`. dev-ready has no localized runtime and
+records no language.
 _Avoid_: localization, i18n, localized surface, translation policy
 
 ### Internal process (ADR-021)

@@ -1,6 +1,7 @@
 """Unit tests for dev_ready.manifest."""
 
 import json
+import re
 
 import pytest
 
@@ -495,27 +496,23 @@ def test_default_manifest_declares_category_assignments() -> None:
     assert items["code-memory"].category == "token-optimize"
 
 
-def test_default_manifest_declares_the_six_expected_mounts() -> None:
-    items = {
-        item.id: item
-        for component_items in load_default_manifest().components.values()
-        for item in component_items
+def test_default_manifest_mounts_every_design_reference_and_keeps_skill_mounts() -> None:
+    catalog = load_default_manifest().components
+    skill_mounts = {
+        item.id: item.mount for item in catalog["skills"] if item.mount is not None
     }
+    docs_mounts = {item.id: item.mount for item in catalog["docs"]}
 
-    assert {
-        item_id: item.mount
-        for item_id, item in items.items()
-        if item.mount is not None
-    } == {
-        "design-linear": "implement",
-        "design-stripe": "implement",
+    assert skill_mounts == {
         "frontend-design": "implement",
         "react-doctor": "code-review",
         "security-audit": "code-review",
         "webapp-testing": "tdd",
     }
-    assert items["caveman"].mount is None
-    assert items["code-memory"].mount is None
+    assert len(docs_mounts) == 74
+    assert set(docs_mounts.values()) == {"implement"}
+    assert next(item for item in catalog["skills"] if item.id == "caveman").mount is None
+    assert next(item for item in catalog["mcp"] if item.id == "code-memory").mount is None
 
 
 @pytest.mark.parametrize("field", ["skills_dir", "rules_file", "mcp_file"])
@@ -1174,18 +1171,20 @@ def test_item_with_neither_paths_nor_inject_rejected() -> None:
         parse_manifest(json.dumps(data))
 
 
-def test_default_catalog_excludes_mcp_infrastructure() -> None:
+def test_default_catalog_excludes_mcp_infrastructure_and_loads_design_references() -> None:
     manifest = load_default_manifest()
     mcp_items = {item.id: item for item in manifest.components["mcp"]}
     assert "code-memory" in mcp_items
     assert mcp_items["code-memory"].pin == "0.9.0"
     assert "mcp-config" not in mcp_items
     docs_items = {item.id: item for item in manifest.components["docs"]}
-    assert set(docs_items) == {"design-stripe", "design-linear"}
+    assert len(docs_items) == 74
+    assert all(re.fullmatch(r"[a-z0-9][a-z0-9-]*", item_id) for item_id in docs_items)
     assert docs_items["design-stripe"].category == "design"
     assert docs_items["design-stripe"].paths[0].dest == "docs/design-stripe.md"
     assert docs_items["design-linear"].category == "design"
     assert docs_items["design-linear"].paths[0].dest == "docs/design-linear.md"
+    assert docs_items["design-xai"].title == "xAI"
     skills_items = {item.id: item for item in manifest.components["skills"]}
     assert "react-doctor" in skills_items
     assert skills_items["react-doctor"].pin == "0.8.1"

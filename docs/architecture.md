@@ -47,7 +47,7 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | [ADR-013](decisions/adr-013-internal-process-v2-spec-loop-adoption.md) | Internal process v2 — the Spec Loop layered into the Handoff Protocol (amends ADR-007/011) | Accepted (2026-07-24), partly superseded by ADR-021 |
 | [ADR-014](decisions/adr-014-truthful-overlay-lifecycle-state.md) | Separate immutable Base Provenance from Overlay Currency | Accepted (2026-07-25) |
 | [ADR-015](decisions/adr-015-agent-targets-canonical-content-pointer-stubs.md) | Agent Targets render as Pointer Stubs over one Canonical Content copy (v0.8) | Accepted (2026-07-26) |
-| [ADR-016](decisions/adr-016-language-boundary.md) | Language boundary — English everywhere dev-ready speaks or generates; Chinese only in outward-facing repository docs (v0.8) | Accepted (2026-07-26) |
+| [ADR-016](decisions/adr-016-language-boundary.md) | Language boundary — English on authored surfaces; byte-identical vendored snapshots retain upstream language (v0.8, amended v0.11) | Accepted (2026-07-26; amended 2026-08-16) |
 | [ADR-017](decisions/adr-017-category-first-selection.md) | Category replaces Component as the user-facing selection axis (v0.9) | Accepted (2026-07-27) |
 | [ADR-018](decisions/adr-018-spec-loop-spine-and-default-set.md) | Spec Loop always generated; catalog cap becomes a Default Set limit (v0.9) | Accepted (2026-07-27) |
 | [ADR-019](decisions/adr-019-agent-target-map-drift-guard.md) | Agent Target Map derived from the reference installer and drift-guarded (v0.10) | Accepted (2026-07-27) |

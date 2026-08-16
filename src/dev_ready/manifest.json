@@ -321,12 +321,304 @@
       "license": "MIT",
       "paths": [
         {
-          "src": "design-md/stripe/DESIGN.md",
-          "dest": "src/dev_ready/templates/docs/design-stripe.md"
+          "src": "design-md/airbnb/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-airbnb.md"
+        },
+        {
+          "src": "design-md/airtable/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-airtable.md"
+        },
+        {
+          "src": "design-md/apple/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-apple.md"
+        },
+        {
+          "src": "design-md/binance/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-binance.md"
+        },
+        {
+          "src": "design-md/bmw/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-bmw.md"
+        },
+        {
+          "src": "design-md/bmw-m/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-bmw-m.md"
+        },
+        {
+          "src": "design-md/bugatti/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-bugatti.md"
+        },
+        {
+          "src": "design-md/cal/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-cal.md"
+        },
+        {
+          "src": "design-md/claude/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-claude.md"
+        },
+        {
+          "src": "design-md/clay/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-clay.md"
+        },
+        {
+          "src": "design-md/clickhouse/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-clickhouse.md"
+        },
+        {
+          "src": "design-md/cohere/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-cohere.md"
+        },
+        {
+          "src": "design-md/coinbase/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-coinbase.md"
+        },
+        {
+          "src": "design-md/composio/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-composio.md"
+        },
+        {
+          "src": "design-md/cursor/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-cursor.md"
+        },
+        {
+          "src": "design-md/dell-1996/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-dell-1996.md"
+        },
+        {
+          "src": "design-md/elevenlabs/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-elevenlabs.md"
+        },
+        {
+          "src": "design-md/expo/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-expo.md"
+        },
+        {
+          "src": "design-md/ferrari/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-ferrari.md"
+        },
+        {
+          "src": "design-md/figma/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-figma.md"
+        },
+        {
+          "src": "design-md/framer/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-framer.md"
+        },
+        {
+          "src": "design-md/hashicorp/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-hashicorp.md"
+        },
+        {
+          "src": "design-md/hp/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-hp.md"
+        },
+        {
+          "src": "design-md/ibm/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-ibm.md"
+        },
+        {
+          "src": "design-md/intercom/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-intercom.md"
+        },
+        {
+          "src": "design-md/kraken/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-kraken.md"
+        },
+        {
+          "src": "design-md/lamborghini/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-lamborghini.md"
         },
         {
           "src": "design-md/linear.app/DESIGN.md",
           "dest": "src/dev_ready/templates/docs/design-linear.md"
+        },
+        {
+          "src": "design-md/lovable/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-lovable.md"
+        },
+        {
+          "src": "design-md/mastercard/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-mastercard.md"
+        },
+        {
+          "src": "design-md/meta/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-meta.md"
+        },
+        {
+          "src": "design-md/minimax/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-minimax.md"
+        },
+        {
+          "src": "design-md/mintlify/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-mintlify.md"
+        },
+        {
+          "src": "design-md/miro/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-miro.md"
+        },
+        {
+          "src": "design-md/mistral.ai/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-mistral.md"
+        },
+        {
+          "src": "design-md/mongodb/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-mongodb.md"
+        },
+        {
+          "src": "design-md/nike/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-nike.md"
+        },
+        {
+          "src": "design-md/nintendo-2001/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-nintendo-2001.md"
+        },
+        {
+          "src": "design-md/notion/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-notion.md"
+        },
+        {
+          "src": "design-md/nvidia/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-nvidia.md"
+        },
+        {
+          "src": "design-md/ollama/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-ollama.md"
+        },
+        {
+          "src": "design-md/opencode.ai/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-opencode.md"
+        },
+        {
+          "src": "design-md/pinterest/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-pinterest.md"
+        },
+        {
+          "src": "design-md/playstation/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-playstation.md"
+        },
+        {
+          "src": "design-md/posthog/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-posthog.md"
+        },
+        {
+          "src": "design-md/raycast/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-raycast.md"
+        },
+        {
+          "src": "design-md/renault/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-renault.md"
+        },
+        {
+          "src": "design-md/replicate/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-replicate.md"
+        },
+        {
+          "src": "design-md/resend/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-resend.md"
+        },
+        {
+          "src": "design-md/revolut/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-revolut.md"
+        },
+        {
+          "src": "design-md/runwayml/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-runwayml.md"
+        },
+        {
+          "src": "design-md/sanity/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-sanity.md"
+        },
+        {
+          "src": "design-md/sentry/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-sentry.md"
+        },
+        {
+          "src": "design-md/shopify/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-shopify.md"
+        },
+        {
+          "src": "design-md/slack/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-slack.md"
+        },
+        {
+          "src": "design-md/spacex/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-spacex.md"
+        },
+        {
+          "src": "design-md/spotify/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-spotify.md"
+        },
+        {
+          "src": "design-md/starbucks/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-starbucks.md"
+        },
+        {
+          "src": "design-md/stripe/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-stripe.md"
+        },
+        {
+          "src": "design-md/supabase/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-supabase.md"
+        },
+        {
+          "src": "design-md/superhuman/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-superhuman.md"
+        },
+        {
+          "src": "design-md/tesla/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-tesla.md"
+        },
+        {
+          "src": "design-md/theverge/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-theverge.md"
+        },
+        {
+          "src": "design-md/together.ai/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-together.md"
+        },
+        {
+          "src": "design-md/uber/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-uber.md"
+        },
+        {
+          "src": "design-md/vercel/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-vercel.md"
+        },
+        {
+          "src": "design-md/vodafone/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-vodafone.md"
+        },
+        {
+          "src": "design-md/voltagent/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-voltagent.md"
+        },
+        {
+          "src": "design-md/warp/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-warp.md"
+        },
+        {
+          "src": "design-md/webflow/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-webflow.md"
+        },
+        {
+          "src": "design-md/wired/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-wired.md"
+        },
+        {
+          "src": "design-md/wise/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-wise.md"
+        },
+        {
+          "src": "design-md/x.ai/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-xai.md"
+        },
+        {
+          "src": "design-md/zapier/DESIGN.md",
+          "dest": "src/dev_ready/templates/docs/design-zapier.md"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/docs/design-md-LICENSE.md"
         }
       ]
     },
@@ -549,10 +841,939 @@
     "docs": {
       "items": [
         {
-          "id": "design-stripe",
+          "id": "design-airbnb",
+          "title": "Airbnb",
           "category": "design",
           "mount": "implement",
-          "description": "Stripe-inspired DESIGN.md reference for a polished light interface system; omit it if that visual direction is not useful.",
+          "description": "Airbnb-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-airbnb.md",
+              "dest": "docs/design-airbnb.md"
+            }
+          ]
+        },
+        {
+          "id": "design-airtable",
+          "title": "Airtable",
+          "category": "design",
+          "mount": "implement",
+          "description": "Airtable-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-airtable.md",
+              "dest": "docs/design-airtable.md"
+            }
+          ]
+        },
+        {
+          "id": "design-apple",
+          "title": "Apple",
+          "category": "design",
+          "mount": "implement",
+          "description": "Apple-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-apple.md",
+              "dest": "docs/design-apple.md"
+            }
+          ]
+        },
+        {
+          "id": "design-binance",
+          "title": "Binance",
+          "category": "design",
+          "mount": "implement",
+          "description": "Binance-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-binance.md",
+              "dest": "docs/design-binance.md"
+            }
+          ]
+        },
+        {
+          "id": "design-bmw",
+          "title": "Bmw",
+          "category": "design",
+          "mount": "implement",
+          "description": "Bmw-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-bmw.md",
+              "dest": "docs/design-bmw.md"
+            }
+          ]
+        },
+        {
+          "id": "design-bmw-m",
+          "title": "BMW M",
+          "category": "design",
+          "mount": "implement",
+          "description": "BMW M-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-bmw-m.md",
+              "dest": "docs/design-bmw-m.md"
+            }
+          ]
+        },
+        {
+          "id": "design-bugatti",
+          "title": "Bugatti",
+          "category": "design",
+          "mount": "implement",
+          "description": "Bugatti-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-bugatti.md",
+              "dest": "docs/design-bugatti.md"
+            }
+          ]
+        },
+        {
+          "id": "design-cal",
+          "title": "Cal",
+          "category": "design",
+          "mount": "implement",
+          "description": "Cal-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-cal.md",
+              "dest": "docs/design-cal.md"
+            }
+          ]
+        },
+        {
+          "id": "design-claude",
+          "title": "Claude",
+          "category": "design",
+          "mount": "implement",
+          "description": "Claude-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-claude.md",
+              "dest": "docs/design-claude.md"
+            }
+          ]
+        },
+        {
+          "id": "design-clay",
+          "title": "Clay",
+          "category": "design",
+          "mount": "implement",
+          "description": "Clay-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-clay.md",
+              "dest": "docs/design-clay.md"
+            }
+          ]
+        },
+        {
+          "id": "design-clickhouse",
+          "title": "ClickHouse",
+          "category": "design",
+          "mount": "implement",
+          "description": "ClickHouse-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-clickhouse.md",
+              "dest": "docs/design-clickhouse.md"
+            }
+          ]
+        },
+        {
+          "id": "design-cohere",
+          "title": "Cohere",
+          "category": "design",
+          "mount": "implement",
+          "description": "Cohere-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-cohere.md",
+              "dest": "docs/design-cohere.md"
+            }
+          ]
+        },
+        {
+          "id": "design-coinbase",
+          "title": "Coinbase",
+          "category": "design",
+          "mount": "implement",
+          "description": "Coinbase-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-coinbase.md",
+              "dest": "docs/design-coinbase.md"
+            }
+          ]
+        },
+        {
+          "id": "design-composio",
+          "title": "Composio",
+          "category": "design",
+          "mount": "implement",
+          "description": "Composio-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-composio.md",
+              "dest": "docs/design-composio.md"
+            }
+          ]
+        },
+        {
+          "id": "design-cursor",
+          "title": "Cursor",
+          "category": "design",
+          "mount": "implement",
+          "description": "Cursor-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-cursor.md",
+              "dest": "docs/design-cursor.md"
+            }
+          ]
+        },
+        {
+          "id": "design-dell-1996",
+          "title": "Dell (1996)",
+          "category": "design",
+          "mount": "implement",
+          "description": "Dell (1996)-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-dell-1996.md",
+              "dest": "docs/design-dell-1996.md"
+            }
+          ]
+        },
+        {
+          "id": "design-elevenlabs",
+          "title": "Elevenlabs",
+          "category": "design",
+          "mount": "implement",
+          "description": "Elevenlabs-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-elevenlabs.md",
+              "dest": "docs/design-elevenlabs.md"
+            }
+          ]
+        },
+        {
+          "id": "design-expo",
+          "title": "Expo",
+          "category": "design",
+          "mount": "implement",
+          "description": "Expo-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-expo.md",
+              "dest": "docs/design-expo.md"
+            }
+          ]
+        },
+        {
+          "id": "design-ferrari",
+          "title": "Ferrari",
+          "category": "design",
+          "mount": "implement",
+          "description": "Ferrari-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-ferrari.md",
+              "dest": "docs/design-ferrari.md"
+            }
+          ]
+        },
+        {
+          "id": "design-figma",
+          "title": "Figma",
+          "category": "design",
+          "mount": "implement",
+          "description": "Figma-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-figma.md",
+              "dest": "docs/design-figma.md"
+            }
+          ]
+        },
+        {
+          "id": "design-framer",
+          "title": "Framer",
+          "category": "design",
+          "mount": "implement",
+          "description": "Framer-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-framer.md",
+              "dest": "docs/design-framer.md"
+            }
+          ]
+        },
+        {
+          "id": "design-hashicorp",
+          "title": "HashiCorp",
+          "category": "design",
+          "mount": "implement",
+          "description": "HashiCorp-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-hashicorp.md",
+              "dest": "docs/design-hashicorp.md"
+            }
+          ]
+        },
+        {
+          "id": "design-hp",
+          "title": "HP",
+          "category": "design",
+          "mount": "implement",
+          "description": "HP-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-hp.md",
+              "dest": "docs/design-hp.md"
+            }
+          ]
+        },
+        {
+          "id": "design-ibm",
+          "title": "IBM",
+          "category": "design",
+          "mount": "implement",
+          "description": "IBM-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-ibm.md",
+              "dest": "docs/design-ibm.md"
+            }
+          ]
+        },
+        {
+          "id": "design-intercom",
+          "title": "Intercom",
+          "category": "design",
+          "mount": "implement",
+          "description": "Intercom-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-intercom.md",
+              "dest": "docs/design-intercom.md"
+            }
+          ]
+        },
+        {
+          "id": "design-kraken",
+          "title": "Kraken",
+          "category": "design",
+          "mount": "implement",
+          "description": "Kraken-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-kraken.md",
+              "dest": "docs/design-kraken.md"
+            }
+          ]
+        },
+        {
+          "id": "design-lamborghini",
+          "title": "Lamborghini",
+          "category": "design",
+          "mount": "implement",
+          "description": "Lamborghini-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-lamborghini.md",
+              "dest": "docs/design-lamborghini.md"
+            }
+          ]
+        },
+        {
+          "id": "design-linear",
+          "title": "Linear",
+          "category": "design",
+          "mount": "implement",
+          "description": "Linear-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-linear.md",
+              "dest": "docs/design-linear.md"
+            }
+          ]
+        },
+        {
+          "id": "design-lovable",
+          "title": "Lovable",
+          "category": "design",
+          "mount": "implement",
+          "description": "Lovable-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-lovable.md",
+              "dest": "docs/design-lovable.md"
+            }
+          ]
+        },
+        {
+          "id": "design-mastercard",
+          "title": "Mastercard",
+          "category": "design",
+          "mount": "implement",
+          "description": "Mastercard-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-mastercard.md",
+              "dest": "docs/design-mastercard.md"
+            }
+          ]
+        },
+        {
+          "id": "design-meta",
+          "title": "Meta",
+          "category": "design",
+          "mount": "implement",
+          "description": "Meta-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-meta.md",
+              "dest": "docs/design-meta.md"
+            }
+          ]
+        },
+        {
+          "id": "design-minimax",
+          "title": "Minimax",
+          "category": "design",
+          "mount": "implement",
+          "description": "Minimax-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-minimax.md",
+              "dest": "docs/design-minimax.md"
+            }
+          ]
+        },
+        {
+          "id": "design-mintlify",
+          "title": "Mintlify",
+          "category": "design",
+          "mount": "implement",
+          "description": "Mintlify-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-mintlify.md",
+              "dest": "docs/design-mintlify.md"
+            }
+          ]
+        },
+        {
+          "id": "design-miro",
+          "title": "Miro",
+          "category": "design",
+          "mount": "implement",
+          "description": "Miro-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-miro.md",
+              "dest": "docs/design-miro.md"
+            }
+          ]
+        },
+        {
+          "id": "design-mistral",
+          "title": "Mistral AI",
+          "category": "design",
+          "mount": "implement",
+          "description": "Mistral AI-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-mistral.md",
+              "dest": "docs/design-mistral.md"
+            }
+          ]
+        },
+        {
+          "id": "design-mongodb",
+          "title": "Mongodb",
+          "category": "design",
+          "mount": "implement",
+          "description": "Mongodb-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-mongodb.md",
+              "dest": "docs/design-mongodb.md"
+            }
+          ]
+        },
+        {
+          "id": "design-nike",
+          "title": "Nike",
+          "category": "design",
+          "mount": "implement",
+          "description": "Nike-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-nike.md",
+              "dest": "docs/design-nike.md"
+            }
+          ]
+        },
+        {
+          "id": "design-nintendo-2001",
+          "title": "Nintendo.com (2001)",
+          "category": "design",
+          "mount": "implement",
+          "description": "Nintendo.com (2001)-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-nintendo-2001.md",
+              "dest": "docs/design-nintendo-2001.md"
+            }
+          ]
+        },
+        {
+          "id": "design-notion",
+          "title": "Notion",
+          "category": "design",
+          "mount": "implement",
+          "description": "Notion-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-notion.md",
+              "dest": "docs/design-notion.md"
+            }
+          ]
+        },
+        {
+          "id": "design-nvidia",
+          "title": "NVIDIA",
+          "category": "design",
+          "mount": "implement",
+          "description": "NVIDIA-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-nvidia.md",
+              "dest": "docs/design-nvidia.md"
+            }
+          ]
+        },
+        {
+          "id": "design-ollama",
+          "title": "Ollama",
+          "category": "design",
+          "mount": "implement",
+          "description": "Ollama-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-ollama.md",
+              "dest": "docs/design-ollama.md"
+            }
+          ]
+        },
+        {
+          "id": "design-opencode",
+          "title": "OpenCode AI",
+          "category": "design",
+          "mount": "implement",
+          "description": "OpenCode AI-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-opencode.md",
+              "dest": "docs/design-opencode.md"
+            }
+          ]
+        },
+        {
+          "id": "design-pinterest",
+          "title": "Pinterest",
+          "category": "design",
+          "mount": "implement",
+          "description": "Pinterest-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-pinterest.md",
+              "dest": "docs/design-pinterest.md"
+            }
+          ]
+        },
+        {
+          "id": "design-playstation",
+          "title": "Playstation",
+          "category": "design",
+          "mount": "implement",
+          "description": "Playstation-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-playstation.md",
+              "dest": "docs/design-playstation.md"
+            }
+          ]
+        },
+        {
+          "id": "design-posthog",
+          "title": "Posthog",
+          "category": "design",
+          "mount": "implement",
+          "description": "Posthog-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-posthog.md",
+              "dest": "docs/design-posthog.md"
+            }
+          ]
+        },
+        {
+          "id": "design-raycast",
+          "title": "Raycast",
+          "category": "design",
+          "mount": "implement",
+          "description": "Raycast-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-raycast.md",
+              "dest": "docs/design-raycast.md"
+            }
+          ]
+        },
+        {
+          "id": "design-renault",
+          "title": "Renault",
+          "category": "design",
+          "mount": "implement",
+          "description": "Renault-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-renault.md",
+              "dest": "docs/design-renault.md"
+            }
+          ]
+        },
+        {
+          "id": "design-replicate",
+          "title": "Replicate",
+          "category": "design",
+          "mount": "implement",
+          "description": "Replicate-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-replicate.md",
+              "dest": "docs/design-replicate.md"
+            }
+          ]
+        },
+        {
+          "id": "design-resend",
+          "title": "Resend",
+          "category": "design",
+          "mount": "implement",
+          "description": "Resend-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-resend.md",
+              "dest": "docs/design-resend.md"
+            }
+          ]
+        },
+        {
+          "id": "design-revolut",
+          "title": "Revolut",
+          "category": "design",
+          "mount": "implement",
+          "description": "Revolut-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-revolut.md",
+              "dest": "docs/design-revolut.md"
+            }
+          ]
+        },
+        {
+          "id": "design-runwayml",
+          "title": "RunwayML",
+          "category": "design",
+          "mount": "implement",
+          "description": "RunwayML-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-runwayml.md",
+              "dest": "docs/design-runwayml.md"
+            }
+          ]
+        },
+        {
+          "id": "design-sanity",
+          "title": "Sanity",
+          "category": "design",
+          "mount": "implement",
+          "description": "Sanity-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-sanity.md",
+              "dest": "docs/design-sanity.md"
+            }
+          ]
+        },
+        {
+          "id": "design-sentry",
+          "title": "Sentry",
+          "category": "design",
+          "mount": "implement",
+          "description": "Sentry-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-sentry.md",
+              "dest": "docs/design-sentry.md"
+            }
+          ]
+        },
+        {
+          "id": "design-shopify",
+          "title": "Shopify",
+          "category": "design",
+          "mount": "implement",
+          "description": "Shopify-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-shopify.md",
+              "dest": "docs/design-shopify.md"
+            }
+          ]
+        },
+        {
+          "id": "design-slack",
+          "title": "Slack",
+          "category": "design",
+          "mount": "implement",
+          "description": "Slack-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-slack.md",
+              "dest": "docs/design-slack.md"
+            }
+          ]
+        },
+        {
+          "id": "design-spacex",
+          "title": "Spacex",
+          "category": "design",
+          "mount": "implement",
+          "description": "Spacex-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-spacex.md",
+              "dest": "docs/design-spacex.md"
+            }
+          ]
+        },
+        {
+          "id": "design-spotify",
+          "title": "Spotify",
+          "category": "design",
+          "mount": "implement",
+          "description": "Spotify-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-spotify.md",
+              "dest": "docs/design-spotify.md"
+            }
+          ]
+        },
+        {
+          "id": "design-starbucks",
+          "title": "Starbucks",
+          "category": "design",
+          "mount": "implement",
+          "description": "Starbucks-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-starbucks.md",
+              "dest": "docs/design-starbucks.md"
+            }
+          ]
+        },
+        {
+          "id": "design-stripe",
+          "title": "Stripe",
+          "category": "design",
+          "mount": "implement",
+          "description": "Stripe-inspired DESIGN.md reference.",
           "mode": "vendor",
           "license": "MIT",
           "vendored_repo": "VoltAgent/awesome-design-md",
@@ -564,17 +1785,242 @@
           ]
         },
         {
-          "id": "design-linear",
+          "id": "design-supabase",
+          "title": "Supabase",
           "category": "design",
           "mount": "implement",
-          "description": "Linear-inspired DESIGN.md reference for a polished dark product interface system; omit it if that visual direction is not useful.",
+          "description": "Supabase-inspired DESIGN.md reference.",
           "mode": "vendor",
           "license": "MIT",
           "vendored_repo": "VoltAgent/awesome-design-md",
           "paths": [
             {
-              "src": "docs/design-linear.md",
-              "dest": "docs/design-linear.md"
+              "src": "docs/design-supabase.md",
+              "dest": "docs/design-supabase.md"
+            }
+          ]
+        },
+        {
+          "id": "design-superhuman",
+          "title": "Superhuman",
+          "category": "design",
+          "mount": "implement",
+          "description": "Superhuman-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-superhuman.md",
+              "dest": "docs/design-superhuman.md"
+            }
+          ]
+        },
+        {
+          "id": "design-tesla",
+          "title": "Tesla",
+          "category": "design",
+          "mount": "implement",
+          "description": "Tesla-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-tesla.md",
+              "dest": "docs/design-tesla.md"
+            }
+          ]
+        },
+        {
+          "id": "design-theverge",
+          "title": "The Verge",
+          "category": "design",
+          "mount": "implement",
+          "description": "The Verge-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-theverge.md",
+              "dest": "docs/design-theverge.md"
+            }
+          ]
+        },
+        {
+          "id": "design-together",
+          "title": "Together AI",
+          "category": "design",
+          "mount": "implement",
+          "description": "Together AI-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-together.md",
+              "dest": "docs/design-together.md"
+            }
+          ]
+        },
+        {
+          "id": "design-uber",
+          "title": "Uber",
+          "category": "design",
+          "mount": "implement",
+          "description": "Uber-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-uber.md",
+              "dest": "docs/design-uber.md"
+            }
+          ]
+        },
+        {
+          "id": "design-vercel",
+          "title": "Vercel",
+          "category": "design",
+          "mount": "implement",
+          "description": "Vercel-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-vercel.md",
+              "dest": "docs/design-vercel.md"
+            }
+          ]
+        },
+        {
+          "id": "design-vodafone",
+          "title": "Vodafone",
+          "category": "design",
+          "mount": "implement",
+          "description": "Vodafone-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-vodafone.md",
+              "dest": "docs/design-vodafone.md"
+            }
+          ]
+        },
+        {
+          "id": "design-voltagent",
+          "title": "VoltAgent",
+          "category": "design",
+          "mount": "implement",
+          "description": "VoltAgent-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-voltagent.md",
+              "dest": "docs/design-voltagent.md"
+            }
+          ]
+        },
+        {
+          "id": "design-warp",
+          "title": "Warp",
+          "category": "design",
+          "mount": "implement",
+          "description": "Warp-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-warp.md",
+              "dest": "docs/design-warp.md"
+            }
+          ]
+        },
+        {
+          "id": "design-webflow",
+          "title": "Webflow",
+          "category": "design",
+          "mount": "implement",
+          "description": "Webflow-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-webflow.md",
+              "dest": "docs/design-webflow.md"
+            }
+          ]
+        },
+        {
+          "id": "design-wired",
+          "title": "Wired",
+          "category": "design",
+          "mount": "implement",
+          "description": "Wired-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-wired.md",
+              "dest": "docs/design-wired.md"
+            }
+          ]
+        },
+        {
+          "id": "design-wise",
+          "title": "Wise",
+          "category": "design",
+          "mount": "implement",
+          "description": "Wise-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-wise.md",
+              "dest": "docs/design-wise.md"
+            }
+          ]
+        },
+        {
+          "id": "design-xai",
+          "title": "xAI",
+          "category": "design",
+          "mount": "implement",
+          "description": "xAI-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-xai.md",
+              "dest": "docs/design-xai.md"
+            }
+          ]
+        },
+        {
+          "id": "design-zapier",
+          "title": "Zapier",
+          "category": "design",
+          "mount": "implement",
+          "description": "Zapier-inspired DESIGN.md reference.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "VoltAgent/awesome-design-md",
+          "paths": [
+            {
+              "src": "docs/design-zapier.md",
+              "dest": "docs/design-zapier.md"
             }
           ]
         }

@@ -81,8 +81,80 @@ start of each line is the value to place in the corresponding selection flag.
 ### design items
 
 - `frontend-design`: You want a distinctive, polished frontend rather than a generic interface.
-- `design-stripe`: You are building a Stripe-style product or want Stripe's design language as a reference.
-- `design-linear`: You are building a Linear-style product or want Linear's design language as a reference.
+- `design-airbnb`: You want Airbnb's design language as a reference.
+- `design-airtable`: You want Airtable's design language as a reference.
+- `design-apple`: You want Apple's design language as a reference.
+- `design-binance`: You want Binance's design language as a reference.
+- `design-bmw`: You want Bmw's design language as a reference.
+- `design-bmw-m`: You want BMW M's design language as a reference.
+- `design-bugatti`: You want Bugatti's design language as a reference.
+- `design-cal`: You want Cal's design language as a reference.
+- `design-claude`: You want Claude's design language as a reference.
+- `design-clay`: You want Clay's design language as a reference.
+- `design-clickhouse`: You want ClickHouse's design language as a reference.
+- `design-cohere`: You want Cohere's design language as a reference.
+- `design-coinbase`: You want Coinbase's design language as a reference.
+- `design-composio`: You want Composio's design language as a reference.
+- `design-cursor`: You want Cursor's design language as a reference.
+- `design-dell-1996`: You want Dell (1996)'s design language as a reference.
+- `design-elevenlabs`: You want Elevenlabs's design language as a reference.
+- `design-expo`: You want Expo's design language as a reference.
+- `design-ferrari`: You want Ferrari's design language as a reference.
+- `design-figma`: You want Figma's design language as a reference.
+- `design-framer`: You want Framer's design language as a reference.
+- `design-hashicorp`: You want HashiCorp's design language as a reference.
+- `design-hp`: You want HP's design language as a reference.
+- `design-ibm`: You want IBM's design language as a reference.
+- `design-intercom`: You want Intercom's design language as a reference.
+- `design-kraken`: You want Kraken's design language as a reference.
+- `design-lamborghini`: You want Lamborghini's design language as a reference.
+- `design-linear`: You want Linear's design language as a reference.
+- `design-lovable`: You want Lovable's design language as a reference.
+- `design-mastercard`: You want Mastercard's design language as a reference.
+- `design-meta`: You want Meta's design language as a reference.
+- `design-minimax`: You want Minimax's design language as a reference.
+- `design-mintlify`: You want Mintlify's design language as a reference.
+- `design-miro`: You want Miro's design language as a reference.
+- `design-mistral`: You want Mistral AI's design language as a reference.
+- `design-mongodb`: You want Mongodb's design language as a reference.
+- `design-nike`: You want Nike's design language as a reference.
+- `design-nintendo-2001`: You want Nintendo.com (2001)'s design language as a reference.
+- `design-notion`: You want Notion's design language as a reference.
+- `design-nvidia`: You want NVIDIA's design language as a reference.
+- `design-ollama`: You want Ollama's design language as a reference.
+- `design-opencode`: You want OpenCode AI's design language as a reference.
+- `design-pinterest`: You want Pinterest's design language as a reference.
+- `design-playstation`: You want Playstation's design language as a reference.
+- `design-posthog`: You want Posthog's design language as a reference.
+- `design-raycast`: You want Raycast's design language as a reference.
+- `design-renault`: You want Renault's design language as a reference.
+- `design-replicate`: You want Replicate's design language as a reference.
+- `design-resend`: You want Resend's design language as a reference.
+- `design-revolut`: You want Revolut's design language as a reference.
+- `design-runwayml`: You want RunwayML's design language as a reference.
+- `design-sanity`: You want Sanity's design language as a reference.
+- `design-sentry`: You want Sentry's design language as a reference.
+- `design-shopify`: You want Shopify's design language as a reference.
+- `design-slack`: You want Slack's design language as a reference.
+- `design-spacex`: You want Spacex's design language as a reference.
+- `design-spotify`: You want Spotify's design language as a reference.
+- `design-starbucks`: You want Starbucks's design language as a reference.
+- `design-stripe`: You want Stripe's design language as a reference.
+- `design-supabase`: You want Supabase's design language as a reference.
+- `design-superhuman`: You want Superhuman's design language as a reference.
+- `design-tesla`: You want Tesla's design language as a reference.
+- `design-theverge`: You want The Verge's design language as a reference.
+- `design-together`: You want Together AI's design language as a reference.
+- `design-uber`: You want Uber's design language as a reference.
+- `design-vercel`: You want Vercel's design language as a reference.
+- `design-vodafone`: You want Vodafone's design language as a reference.
+- `design-voltagent`: You want VoltAgent's design language as a reference.
+- `design-warp`: You want Warp's design language as a reference.
+- `design-webflow`: You want Webflow's design language as a reference.
+- `design-wired`: You want Wired's design language as a reference.
+- `design-wise`: You want Wise's design language as a reference.
+- `design-xai`: You want xAI's design language as a reference.
+- `design-zapier`: You want Zapier's design language as a reference.
 
 ### token-optimize items
 

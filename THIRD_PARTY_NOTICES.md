@@ -44,7 +44,8 @@ Copies of these skills written into generated projects may be modified by dev-re
 - License: MIT
 - Pinned Commit: 664b3e78fd1a298ba11973822da988483256d4b4
 - Source: https://github.com/VoltAgent/awesome-design-md
-- Subset: Selected `DESIGN.md` templates (`design-md/stripe/DESIGN.md`, `design-md/linear.app/DESIGN.md`) vendored into `src/dev_ready/templates/docs/`.
+- Subset: All 74 `DESIGN.md` templates under `design-md/*/DESIGN.md` vendored into `src/dev_ready/templates/docs/`.
+- Notice path: the upstream `LICENSE` is vendored as `src/dev_ready/templates/docs/design-md-LICENSE.md` and is written beside selected Design References.
 
 ## anthropics/skills
 

@@ -19,7 +19,7 @@ Generate a new project.
 | `--dev IDS` | string | Default Set when unnamed; `all` when named | Dev Enhancements: none currently; accepts `all` or `none`; the Engineering Flow is mandatory |
 | `--security IDS` | string | Default Set when unnamed; `all` when named | Security items: `security-audit`, `all`, or `none` |
 | `--quality IDS` | string | Default Set when unnamed; `all` when named | Quality items: `react-doctor`, `webapp-testing`, `all`, or `none` |
-| `--design IDS` | string | Default Set when unnamed; `all` when named | Design items: `frontend-design`, `design-stripe`, `design-linear`, `all`, or `none` |
+| `--design IDS` | string | Default Set when unnamed; `all` when named | Design items: comma-separated ids, `all`, or `none` |
 | `--token-optimize IDS` | string | Default Set when unnamed; `all` when named | Token Optimize items: `caveman`, `code-memory`, `all`, or `none` |
 | `--agents IDS` | string | `claude` | Agent Target selection: comma-separated identifiers, `all`, or `none` |
 
