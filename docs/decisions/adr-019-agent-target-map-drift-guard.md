@@ -94,3 +94,67 @@ too, on both the Default Set and the custom branch: FR-31 made interactive-empty
 and `--yes` produce the same project, and that parity is worth more than
 symmetry with FR-36's pre-select-nothing rule, which exists to stop a plain
 Enter from dumping the whole catalog — not to forbid a sane default of one.
+
+## 2026-08-16 amendment — the derivation standard, applied to a second source
+
+Settled in the v0.11 Phase 3 grilling. `docs/requirements.md` and the v0.11
+plan both cite "the ADR-019 standard" when scheduling FR-40, so this ADR is
+already read as a general rule rather than as one about agent identifiers.
+Applying it to `VoltAgent/awesome-design-md` found three things the text does
+not cover. They are recorded here rather than in a new ADR, so the rule stays
+in one file.
+
+**The measured count is 74, not 103.** At the pinned commit
+`664b3e78fd1a298ba11973822da988483256d4b4` the tree holds 147 markdown files
+under `design-md/`: 74 `DESIGN.md` documents and 73 `README.md` stubs of about
+210 bytes each. `slack` is the one brand with no stub. The 103 in FR-40 and in
+the version plan was a planning-time figure and is corrected there. The
+vendored total is 2,150,035 bytes, which at a measured deflate ratio of 29.2%
+puts the wheel at roughly 803 KB, up from 204 KB.
+
+**A derivation script may own a section of a human-readable file.**
+`sync_agent_targets.py` writes `manifest.json` and nothing else, which leaves
+the 57 Agent Target lines in `skills/dev-ready/SKILL.md` hand-maintained and
+bound to the catalog by a contract test. Every monthly pin bump that changes
+the upstream agent list therefore turns `pytest` red until a person types the
+missing lines. That is a trap, not a precedent worth repeating at 74 entries,
+and the plan's own acceptance criterion — the script is re-runnable and its
+output is byte-identical to what is committed — is only half true while a
+derived list lives outside the script. The design-reference script owns both
+`manifest.json` and the `### design items` section of the Generation Skill,
+bounded by the same rule the contract test already uses to find that section:
+from the `### design items` heading to the next `###`. Its `--check` mode joins
+the existing `vendored-drift` CI job as a fourth step rather than becoming a
+sixth job, because the v0.11 plan's release acceptance names exactly five.
+
+**Where the loader requires a value upstream does not supply, the script
+composes it.** The amendment above dropped `description` for derived Agent
+Targets by making the field nullable. That route is closed here:
+`CatalogItem.description` is validated as a non-empty string, and re-typing it
+is not v0.11 work. No upstream field covers all 74 either — the `DESIGN.md`
+YAML frontmatter carries a usable `description` for only 64 of 74, and the
+values run to roughly 400 characters, which is unusable in a 74-row checkbox.
+So `description` is composed from one template,
+`"{Title}-inspired DESIGN.md reference."`, and `title` is derived from the
+upstream README heading, which parses cleanly for all 73 that have one and
+beats a naive titlecase of the slug in 15 cases (`ClickHouse`, `HashiCorp`,
+`IBM`, `NVIDIA`, `xAI`, `Dell (1996)`, and others). The template is kept short
+deliberately: `description` feeds both the checkbox label and the mounted block
+in `implement/SKILL.md`, and both multiply by the number selected.
+
+**Exception tables are declared, not discovered.** This ADR already carries one
+for `claude-code → claude`. The design-reference script carries two. Titles:
+`slack` has no README, and upstream writes `Bmw-m` and `Theverge`. Ids: the
+rule is to cut the slug at its first dot, which is self-validating because it
+reproduces both shipped identifiers exactly (`stripe → design-stripe`,
+`linear.app → design-linear`) and collides on none of the 74 — but it leaves
+`x.ai → design-x`, which is meaningless and is overridden to `design-xai`.
+Deleting the dot instead of cutting at it was rejected: it yields
+`design-linearapp` and breaks an identifier recorded in shipped v5 stamps,
+which would force a second alias in the version that already added one.
+
+Consequences: two derivation scripts now exist with different reach, and the
+older one is the weaker of the two. Bringing `sync_agent_targets.py` up to the
+same standard — owning its own section of the Generation Skill — is not v0.11
+work and is not scheduled here, but the asymmetry is deliberate rather than
+overlooked.

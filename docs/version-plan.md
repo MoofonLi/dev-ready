@@ -908,11 +908,16 @@ development on day one and looks like a broken template rather than a wrong
 answer. `SECRET_KEY` and `POSTGRES_PASSWORD` are shown and never asked for,
 because a user-invented value is worse than `token_urlsafe(32)`.
 
-**FR-40** takes the whole `awesome-design-md` set. Two of 103 is arbitrary
-curation of content whose only purpose is choosing between directions. The
+**FR-40** takes the whole `awesome-design-md` set. Two of 74 is arbitrary
+curation of content whose only purpose is choosing between directions.
+(*Corrected 2026-08-16 in the v0.11 Phase 3 grilling: this paragraph said 103,
+a planning-time figure. Measured at the pinned commit, `design-md/` holds 147
+markdown files — 74 `DESIGN.md` documents and 73 `README.md` stubs.*) The
 delivery question was settled by measurement rather than by instinct: markdown
-compresses to about 30%, so the whole set costs roughly 766 KB in the wheel, and
-that price buys every existing mechanism working unchanged. Generation-time
+compresses to a measured 29.2%, so the whole set costs roughly 600 KB in the
+wheel — taking it from 204 KB to about 803 KB, roughly 4% of the ~15 MB
+dependency tree `uvx` already installs — and that price buys every existing
+mechanism working unchanged. Generation-time
 fetching was recommended in session and then withdrawn — ADR-002 forbids
 resolving anything but the pinned commit, so it fetches identical bytes, and an
 overlay path absent from `build_overlay_content` is classified obsolete by the
@@ -1339,3 +1344,19 @@ membership is derived rather than curated, in which case what the skill must
 teach instead (the `all` selection, and where the full list is obtainable) has to
 be specified. Deciding it now, three phases early and without FR-40's measured
 document count, would be deciding it on an estimate.
+
+**Resolved 2026-08-16 in the Phase 3 `grill-with-docs`: the skill enumerates,
+and the derivation script writes the section.** Withholding the decision was the
+right call, because the estimate was wrong in both directions. The catalog goes
+to **74**, not ~104, so the burden is **72 lines rather than ~101**, taking
+`skills/dev-ready/SKILL.md` from 11,939 to roughly 17,000 bytes. And the
+exemption turned out to have nowhere to point: `init`, `check`, and `upgrade`
+are the entire CLI, so **no command enumerates the catalog**, while an unknown
+item id exits 2 — leaving an offline agent to guess ids like `design-theverge`,
+`design-bmw-m`, and `design-dell-1996` from a brand name. The context-bloat
+objection is answered instead by ownership: the derivation script writes that
+section as well as `manifest.json`, so no one hand-maintains 72 lines and a pin
+bump cannot leave the contract test red (ADR-019, 2026-08-16 amendment). This
+also names a standing weakness in the older `sync_agent_targets.py`, which
+writes only `manifest.json` and leaves 57 Agent Target lines hand-maintained
+behind the same test; repairing that is not v0.11 work.

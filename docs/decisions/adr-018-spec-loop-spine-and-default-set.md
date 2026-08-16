@@ -152,3 +152,55 @@ fails at manifest load, in front of the maintainer adding the loop, instead of
 silently producing an Enhancement with no guidance in front of a user. That
 strictness is the price of not needing the graceful degradation this ADR
 rejected optional loops to avoid.
+
+## 2026-08-16 amendment — a mounted block renders by Component
+
+Settled in the v0.11 Phase 3 grilling, measured against the shipped code. The
+2026-08-03 amendment settled *which* items mount and *where*. It never settled
+how the injected block renders, because at six mounts the question did not
+arise. FR-40 takes the design references from 2 to 74 and it does.
+
+**First, a correction to the amendment above.** Its opening paragraph lists
+`design-stripe` and `design-linear` among four Enhancements with "no honest
+moment", and its third paragraph mounts both on `implement`. The shipped
+manifest follows the third paragraph. The reconciling sentence is already
+there — a `docs` item mounts for discovery rather than for behaviour — but the
+first paragraph reads as a contradiction and should be taken as superseded.
+
+**The measurement.** `implement/SKILL.md` is **448 bytes**. Rendered per item
+with the FR-40 description template, a selection of every design reference
+appends **6,869 bytes** — the injected block becomes **93.9%** of the file the
+agent loads on every implementation run, at a cost of roughly 1,750 tokens.
+This is not a pathological invocation: `--categories all` is a worked example
+inside `skills/dev-ready/SKILL.md`, asserted by the Generation Skill's contract
+test, and an agent handed "I want everything" composes it by following that
+skill.
+
+**The block renders by Component, because the two mount kinds buy different
+things.** The amendment above already states the distinction:
+
+> A mount decides timing, not discoverability. […] The reverse holds for
+> Catalog Items under `docs`: nothing in the generated overlay references
+> `docs/design-stripe.md`, so for those a mount is the only discovery path
+> there is.
+
+A `skills` or `mcp` item mounts so the reminder sits where the agent acts, so
+it keeps its own bullet and its description. A `docs` item mounts so the file
+is discoverable at all, so its ids collapse onto one line pointing at `docs/`.
+That drops the same selection to **1,392 bytes**. Naming 74 visual directions
+individually also tells the agent nothing it can act on: a product has one
+visual direction, and the extra 1,400 tokens buy no instruction.
+
+- **Considered: dropping the mount from the design references** — rejected by
+  the sentence quoted above. Nothing else in the overlay names those files, so
+  the result is 74 documents no agent can find.
+- **Considered: a count threshold**, per-item below *N* and collapsed above —
+  rejected. *N* is a magic number with no derivation, and it invites the next
+  session to move it. Component is a distinction this ADR already draws.
+
+Consequences: `inject_mounted_enhancements` gains one branch on Component, and
+the block for a project holding both kinds carries per-item bullets followed by
+one docs line. `security-audit`, `react-doctor`, and `webapp-testing` render
+exactly as they do today. This is the second time an unbounded inline list has
+been repaired by a counted or collapsed form in this version; FR-44 did it to
+the generation report's `overlay:` line for the same reason.

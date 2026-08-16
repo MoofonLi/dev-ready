@@ -185,9 +185,15 @@ assets need.
 An [[Enhancement]] that is a whole design system written for an agent to build
 against — tokens, type scale, component rules — rather than guidance about how
 to work. Multi-select on purpose: a project legitimately wants one direction for
-its marketing surface and another for its dashboard, and the two shipped
-references are already recorded together in stamps, so single-select would break
-a contract to prevent a cost only a deliberate user incurs (FR-40). Which
+its marketing surface and another for its dashboard, and the two references
+shipped through v0.10 are already recorded together in stamps, so single-select
+would break a contract to prevent a cost only a deliberate user incurs (FR-40).
+The set is **derived, not curated**: FR-40 vendors all 74 `DESIGN.md` documents
+at the pinned `VoltAgent/awesome-design-md` commit, with identifiers, titles,
+and descriptions produced by a maintainer script rather than typed. Because a
+Design Reference is a document rather than behaviour, its Mount Point exists for
+discovery alone, and a selection of them renders as one collapsed line in the
+mounted skill rather than one bullet each (ADR-018, 2026-08-16). Which
 reference governs which surface is the user's to record in their own project
 documents; dev-ready declares no mapping and will not invent one.
 _Avoid_: theme, skin, style guide, brand pack, DESIGN.md (the file, not the concept)
