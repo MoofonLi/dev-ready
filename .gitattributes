@@ -1,0 +1,2 @@
+# Template assets must remain byte-identical across platforms.
+src/dev_ready/templates/** text eol=lf

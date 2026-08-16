@@ -1400,6 +1400,8 @@ def test_every_derived_design_reference_is_available_to_the_overlay(tmp_path: Pa
 def test_design_reference_notice_is_written_once_only_when_its_source_is_selected(
     tmp_path: Path,
 ) -> None:
+    from importlib import resources
+
     manifest = load_default_manifest()
     design_ids = manifest.components.item_ids("docs")
     selected_answers = _answers(
@@ -1423,8 +1425,10 @@ def test_design_reference_notice_is_written_once_only_when_its_source_is_selecte
     notice_path = "docs/design-md-LICENSE.md"
 
     assert list(selected).count(notice_path) == 1
-    assert hashlib.sha256(selected[notice_path]).hexdigest() == (
-        "0862a727415509d17206d78bfbfe2f6b142f2c2833283b457a6f0db972ee6ed3"
+    assert selected[notice_path] == (
+        resources.files("dev_ready")
+        .joinpath("templates", "docs", "design-md-LICENSE.md")
+        .read_bytes()
     )
     assert notice_path not in deselected
 
@@ -1486,6 +1490,8 @@ def test_apply_overlay_deselected_vendored_skills_are_absent(tmp_path: Path) -> 
 def test_lean_selection_carries_the_notice_in_every_engineering_flow_skill(
     tmp_path: Path,
 ) -> None:
+    from importlib import resources
+
     manifest = load_default_manifest()
     content = build_overlay_content(
         _answers(
@@ -1514,29 +1520,20 @@ def test_lean_selection_carries_the_notice_in_every_engineering_flow_skill(
 
     for skill in flow_skills:
         notice = content[f".agents/skills/{skill}/LICENSE"]
-        assert hashlib.sha256(notice).hexdigest() == (
-            "4981c5f6a90eb3a969dacabb9350f5a75695ff3910b39b6534952908dfdc5ff7"
+        assert notice == (
+            resources.files("dev_ready")
+            .joinpath("templates", "claude", "skills", skill, "LICENSE")
+            .read_bytes()
         )
 
 
-@pytest.mark.parametrize(
-    ("skill", "expected_hash"),
-    [
-        (
-            "caveman",
-            "17a8a03e790cd0b662021daeefc008b0af05810c041215a95dfa19abc496d3b9",
-        ),
-        (
-            "security-audit",
-            "c007a58f958f8a5b2870aa35d8a17aa72a546447aecee6d2b72e19fea530890b",
-        ),
-    ],
-)
+@pytest.mark.parametrize("skill", ["caveman", "security-audit"])
 def test_optional_mit_skill_notice_follows_its_selection(
     tmp_path: Path,
     skill: str,
-    expected_hash: str,
 ) -> None:
+    from importlib import resources
+
     manifest = load_default_manifest()
     selected = build_overlay_content(
         _answers(
@@ -1560,7 +1557,11 @@ def test_optional_mit_skill_notice_follows_its_selection(
     )
     notice_path = f".agents/skills/{skill}/LICENSE"
 
-    assert hashlib.sha256(selected[notice_path]).hexdigest() == expected_hash
+    assert selected[notice_path] == (
+        resources.files("dev_ready")
+        .joinpath("templates", "claude", "skills", skill, "LICENSE")
+        .read_bytes()
+    )
     assert notice_path not in deselected
 
 
