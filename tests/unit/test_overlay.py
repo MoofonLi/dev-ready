@@ -1374,6 +1374,92 @@ def test_either_design_reference_can_be_selected_alone(
     assert not (project_dir / "docs" / f"{absent}.md").exists()
 
 
+def test_every_derived_design_reference_is_available_to_the_overlay(tmp_path: Path) -> None:
+    manifest = load_default_manifest()
+    design_ids = manifest.components.item_ids("docs")
+    answers = _answers(
+        tmp_path,
+        skills_items=frozenset(),
+        include_mcp=False,
+        docs_items=design_ids,
+        agent_targets=frozenset(),
+    )
+
+    content = build_overlay_content(answers, manifest.components)
+
+    assert len(design_ids) == 74
+    assert "docs/design-vercel.md" in content
+    assert "docs/design-revolut.md" in content
+    implement = content[".agents/skills/implement/SKILL.md"].decode("utf-8")
+    documentation_line = next(
+        line for line in implement.splitlines() if line.startswith("- **Documentation references**")
+    )
+    assert len(documentation_line.encode("utf-8")) == 1354
+
+
+def test_design_reference_notice_is_written_once_only_when_its_source_is_selected(
+    tmp_path: Path,
+) -> None:
+    manifest = load_default_manifest()
+    design_ids = manifest.components.item_ids("docs")
+    selected_answers = _answers(
+        tmp_path,
+        skills_items=frozenset(),
+        include_mcp=False,
+        docs_items=design_ids,
+        agent_targets=frozenset(),
+    )
+    selected = build_overlay_content(selected_answers, manifest.components)
+    deselected = build_overlay_content(
+        _answers(
+            tmp_path,
+            skills_items=frozenset(),
+            include_mcp=False,
+            docs_items=frozenset(),
+            agent_targets=frozenset(),
+        ),
+        manifest.components,
+    )
+    notice_path = "docs/design-md-LICENSE.md"
+
+    assert list(selected).count(notice_path) == 1
+    assert hashlib.sha256(selected[notice_path]).hexdigest() == (
+        "0862a727415509d17206d78bfbfe2f6b142f2c2833283b457a6f0db972ee6ed3"
+    )
+    assert notice_path not in deselected
+
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    apply_overlay(
+        selected_answers,
+        project_dir,
+        manifest.components,
+        PIN,
+        manifest.vendored,
+    )
+    stamp = json.loads((project_dir / ".dev-ready.json").read_text(encoding="utf-8"))
+    inventory = {entry["path"]: entry["sha256"] for entry in stamp["inventory"]}
+    assert inventory[notice_path] == hashlib.sha256(
+        (project_dir / notice_path).read_bytes()
+    ).hexdigest()
+
+
+def test_one_design_reference_carries_its_source_notice(tmp_path: Path) -> None:
+    manifest = load_default_manifest()
+    content = build_overlay_content(
+        _answers(
+            tmp_path,
+            skills_items=frozenset(),
+            include_mcp=False,
+            docs_items=frozenset({"design-vercel"}),
+            agent_targets=frozenset(),
+        ),
+        manifest.components,
+    )
+
+    assert "docs/design-md-LICENSE.md" in content
+
+
 def test_apply_overlay_deselected_vendored_skills_are_absent(tmp_path: Path) -> None:
     manifest = load_default_manifest()
     project_dir = tmp_path / "project"

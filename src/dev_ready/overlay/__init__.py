@@ -27,6 +27,9 @@ from dev_ready.prompts import Answers
 
 __all__ = ["apply_overlay", "build_overlay_content", "content_inventory", "render_stamp"]
 
+_DESIGN_REFERENCE_REPO = "VoltAgent/awesome-design-md"
+_DESIGN_REFERENCE_NOTICE = Path("docs/design-md-LICENSE.md")
+
 
 def build_overlay_content(
     answers: Answers, catalog: ComponentCatalog
@@ -72,11 +75,14 @@ def build_overlay_content(
     for target_path in projection.base_mcp_config_paths(catalog, answers.items("mcp")):
         collect(templates_root.joinpath("mcp", "mcp.json"), target_path)
 
+    selected_vendored_repos: set[str] = set()
     for component in CATALOG_COMPONENTS:
         selected = answers.items(component)
         for item in catalog.get(component, ()):
             if item.id not in selected:
                 continue
+            if item.vendored_repo is not None:
+                selected_vendored_repos.add(item.vendored_repo)
             written_items = (
                 tuple(retargeted for _, retargeted in projection.retarget_mcp(item))
                 if component == "mcp"
@@ -88,6 +94,12 @@ def build_overlay_content(
                         templates_root.joinpath(*item_path.src.split("/")),
                         Path(item_path.dest),
                     )
+
+    if _DESIGN_REFERENCE_REPO in selected_vendored_repos:
+        add(
+            templates_root.joinpath(*_DESIGN_REFERENCE_NOTICE.parts),
+            _DESIGN_REFERENCE_NOTICE,
+        )
 
     _inject_mounts(content, answers, catalog)
 

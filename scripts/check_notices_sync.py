@@ -82,7 +82,7 @@ def check_notices_sync(
 
     diffs: list[str] = []
 
-    # Check direction 1: manifest -> NOTICES & Apache LICENSE presence
+    # Check direction 1: manifest -> NOTICES and source notice presence
     for entry in manifest.vendored:
         repo = entry.repo
         info = {"commit": entry.commit.lower(), "license": entry.license}
@@ -99,22 +99,35 @@ def check_notices_sync(
                     f"NOTICES mismatch: {repo} license mismatch (manifest: {info['license']}, NOTICES: {notice_info['license']})"
                 )
 
-        if entry.license == "Apache-2.0":
-            for path_map in entry.paths:
-                committed = repo_root / path_map.dest
-                has_license = False
-                if committed.is_dir():
-                    for file_path in committed.rglob("*"):
-                        if file_path.is_file() and file_path.name.lower().startswith("license"):
-                            has_license = True
-                            break
-                elif committed.is_file() and committed.name.lower().startswith("license"):
-                    has_license = True
-
-                if not has_license:
+        committed_paths = [
+            (path_map, repo_root / path_map.dest) for path_map in entry.paths
+        ]
+        directory_paths = [
+            (path_map, committed)
+            for path_map, committed in committed_paths
+            if committed.is_dir()
+        ]
+        if directory_paths:
+            for path_map, committed in directory_paths:
+                has_notice = any(
+                    file_path.is_file()
+                    and file_path.name.lower().startswith("license")
+                    for file_path in committed.rglob("*")
+                )
+                if not has_notice:
                     diffs.append(
-                        f"NOTICES mismatch: Apache-2.0 entry {repo} path '{path_map.dest}' has no LICENSE file in its snapshot"
+                        f"NOTICES mismatch: vendored entry {repo} path "
+                        f"'{path_map.dest}' has no notice file in its snapshot"
                     )
+        elif committed_paths and not any(
+            committed.is_file()
+            and Path(path_map.src).name.lower().startswith("license")
+            for path_map, committed in committed_paths
+        ):
+            diffs.append(
+                f"NOTICES mismatch: vendored entry {repo} has no notice file "
+                "in its loose-file snapshot"
+            )
 
     # Check direction 2: NOTICES -> manifest
     for repo, info in notices_map.items():

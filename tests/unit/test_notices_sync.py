@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 _SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "check_notices_sync.py"
@@ -34,6 +35,53 @@ _CURRENT_CATALOG_JSON = """"default_set": {
     "mcp": {"items": []},
     "docs": {"items": []}
   }"""
+
+
+def _write_vendored_fixture(
+    tmp_path: Path,
+    *,
+    repo: str,
+    license_name: str,
+    paths: list[dict[str, str]],
+) -> tuple[Path, Path]:
+    manifest_path = tmp_path / "src" / "dev_ready" / "manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    notices_path = tmp_path / "THIRD_PARTY_NOTICES.md"
+    commit = "a" * 40
+    manifest_path.write_text(
+        f"""{{
+  "manifest_version": 1,
+  "agent_targets": {{"claude": {{"description": "Claude Code.", "skills_dir": ".claude/skills", "rules_file": "CLAUDE.md", "mcp_file": ".mcp.json"}}}},
+  "upstream": {{
+    "base_template": {{
+      "repo": "fastapi/full-stack-fastapi-template",
+      "ref": "master",
+      "commit": "{commit}",
+      "license": "MIT"
+    }}
+  }},
+  "vendored": [
+    {{
+      "repo": "{repo}",
+      "commit": "{commit}",
+      "license": "{license_name}",
+      "paths": {json.dumps(paths)}
+    }}
+  ],
+  {_CURRENT_CATALOG_JSON},
+  "overlay_version": "0.1.0"
+}}""",
+        encoding="utf-8",
+    )
+    notices_path.write_text(
+        f"""# Notices
+## {repo}
+- License: {license_name}
+- Pinned Commit: {commit}
+""",
+        encoding="utf-8",
+    )
+    return manifest_path, notices_path
 
 
 def test_parse_notices_content_extracts_vendored_entries() -> None:
@@ -273,53 +321,14 @@ def test_check_notices_sync_detects_commit_or_license_mismatch(tmp_path: Path) -
 
 
 def test_check_notices_sync_apache_license_presence(tmp_path: Path) -> None:
-    manifest_path = tmp_path / "src" / "dev_ready" / "manifest.json"
-    manifest_path.parent.mkdir(parents=True)
-    notices_path = tmp_path / "THIRD_PARTY_NOTICES.md"
-
-    commit = "a" * 40
     dest_dir = "src/dev_ready/templates/claude/skills/apache-skill"
     (tmp_path / dest_dir).mkdir(parents=True)
     (tmp_path / dest_dir / "LICENSE.txt").write_text("Apache License 2.0", encoding="utf-8")
-
-    manifest_path.write_text(
-        f"""{{
-  "manifest_version": 1,
-  "agent_targets": {{"claude": {{"description": "Claude Code.", "skills_dir": ".claude/skills", "rules_file": "CLAUDE.md", "mcp_file": ".mcp.json"}}}},
-  "upstream": {{
-    "base_template": {{
-      "repo": "fastapi/full-stack-fastapi-template",
-      "ref": "master",
-      "commit": "{commit}",
-      "license": "MIT"
-    }}
-  }},
-  "vendored": [
-    {{
-      "repo": "owner/apache-repo",
-      "commit": "{commit}",
-      "license": "Apache-2.0",
-      "paths": [
-        {{
-          "src": "skills/apache-skill",
-          "dest": "{dest_dir}"
-        }}
-      ]
-    }}
-  ],
-  {_CURRENT_CATALOG_JSON},
-  "overlay_version": "0.1.0"
-}}""",
-        encoding="utf-8",
-    )
-
-    notices_path.write_text(
-        f"""# Notices
-## owner/apache-repo
-- License: Apache-2.0
-- Pinned Commit: {commit}
-""",
-        encoding="utf-8",
+    manifest_path, notices_path = _write_vendored_fixture(
+        tmp_path,
+        repo="owner/apache-repo",
+        license_name="Apache-2.0",
+        paths=[{"src": "skills/apache-skill", "dest": dest_dir}],
     )
 
     diffs = check_notices_sync_mod.check_notices_sync(manifest_path, notices_path, repo_root=tmp_path)
@@ -327,112 +336,66 @@ def test_check_notices_sync_apache_license_presence(tmp_path: Path) -> None:
 
 
 def test_check_notices_sync_apache_license_missing_fails(tmp_path: Path) -> None:
-    manifest_path = tmp_path / "src" / "dev_ready" / "manifest.json"
-    manifest_path.parent.mkdir(parents=True)
-    notices_path = tmp_path / "THIRD_PARTY_NOTICES.md"
-
-    commit = "a" * 40
     dest_dir = "src/dev_ready/templates/claude/skills/apache-skill"
     (tmp_path / dest_dir).mkdir(parents=True)
-    # Intentionally omit LICENSE.txt
-
-    manifest_path.write_text(
-        f"""{{
-  "manifest_version": 1,
-  "agent_targets": {{"claude": {{"description": "Claude Code.", "skills_dir": ".claude/skills", "rules_file": "CLAUDE.md", "mcp_file": ".mcp.json"}}}},
-  "upstream": {{
-    "base_template": {{
-      "repo": "fastapi/full-stack-fastapi-template",
-      "ref": "master",
-      "commit": "{commit}",
-      "license": "MIT"
-    }}
-  }},
-  "vendored": [
-    {{
-      "repo": "owner/apache-repo",
-      "commit": "{commit}",
-      "license": "Apache-2.0",
-      "paths": [
-        {{
-          "src": "skills/apache-skill",
-          "dest": "{dest_dir}"
-        }}
-      ]
-    }}
-  ],
-  {_CURRENT_CATALOG_JSON},
-  "overlay_version": "0.1.0"
-}}""",
-        encoding="utf-8",
-    )
-
-    notices_path.write_text(
-        f"""# Notices
-## owner/apache-repo
-- License: Apache-2.0
-- Pinned Commit: {commit}
-""",
-        encoding="utf-8",
+    manifest_path, notices_path = _write_vendored_fixture(
+        tmp_path,
+        repo="owner/apache-repo",
+        license_name="Apache-2.0",
+        paths=[{"src": "skills/apache-skill", "dest": dest_dir}],
     )
 
     diffs = check_notices_sync_mod.check_notices_sync(manifest_path, notices_path, repo_root=tmp_path)
     assert len(diffs) == 1
-    assert "has no LICENSE file in its snapshot" in diffs[0]
+    assert "has no notice file in its snapshot" in diffs[0]
 
 
-def test_check_notices_sync_mit_without_license_does_not_fail(tmp_path: Path) -> None:
-    manifest_path = tmp_path / "src" / "dev_ready" / "manifest.json"
-    manifest_path.parent.mkdir(parents=True)
-    notices_path = tmp_path / "THIRD_PARTY_NOTICES.md"
-
-    commit = "a" * 40
+def test_check_notices_sync_mit_without_notice_fails(tmp_path: Path) -> None:
     dest_dir = "src/dev_ready/templates/claude/skills/mit-skill"
     (tmp_path / dest_dir).mkdir(parents=True)
-    # No LICENSE file in MIT dest dir
-
-    manifest_path.write_text(
-        f"""{{
-  "manifest_version": 1,
-  "agent_targets": {{"claude": {{"description": "Claude Code.", "skills_dir": ".claude/skills", "rules_file": "CLAUDE.md", "mcp_file": ".mcp.json"}}}},
-  "upstream": {{
-    "base_template": {{
-      "repo": "fastapi/full-stack-fastapi-template",
-      "ref": "master",
-      "commit": "{commit}",
-      "license": "MIT"
-    }}
-  }},
-  "vendored": [
-    {{
-      "repo": "owner/mit-repo",
-      "commit": "{commit}",
-      "license": "MIT",
-      "paths": [
-        {{
-          "src": "skills/mit-skill",
-          "dest": "{dest_dir}"
-        }}
-      ]
-    }}
-  ],
-  {_CURRENT_CATALOG_JSON},
-  "overlay_version": "0.1.0"
-}}""",
-        encoding="utf-8",
+    manifest_path, notices_path = _write_vendored_fixture(
+        tmp_path,
+        repo="owner/mit-repo",
+        license_name="MIT",
+        paths=[{"src": "skills/mit-skill", "dest": dest_dir}],
     )
 
-    notices_path.write_text(
-        f"""# Notices
-## owner/mit-repo
-- License: MIT
-- Pinned Commit: {commit}
-""",
-        encoding="utf-8",
+    diffs = check_notices_sync_mod.check_notices_sync(
+        manifest_path, notices_path, repo_root=tmp_path
+    )
+    assert len(diffs) == 1
+    assert "owner/mit-repo" in diffs[0]
+    assert "has no notice file" in diffs[0]
+
+
+def test_loose_file_source_is_checked_once_per_repository(tmp_path: Path) -> None:
+    docs_dir = tmp_path / "src" / "dev_ready" / "templates" / "docs"
+    docs_dir.mkdir(parents=True)
+    for name in ("design-a.md", "design-b.md", "design-source-LICENSE.md"):
+        (docs_dir / name).write_text(name, encoding="utf-8")
+    manifest_path, notices_path = _write_vendored_fixture(
+        tmp_path,
+        repo="owner/design-source",
+        license_name="MIT",
+        paths=[
+            {
+                "src": "design/a.md",
+                "dest": "src/dev_ready/templates/docs/design-a.md",
+            },
+            {
+                "src": "design/b.md",
+                "dest": "src/dev_ready/templates/docs/design-b.md",
+            },
+            {
+                "src": "LICENSE",
+                "dest": "src/dev_ready/templates/docs/design-source-LICENSE.md",
+            },
+        ],
     )
 
-    diffs = check_notices_sync_mod.check_notices_sync(manifest_path, notices_path, repo_root=tmp_path)
-    assert diffs == []
+    assert check_notices_sync_mod.check_notices_sync(
+        manifest_path, notices_path, repo_root=tmp_path
+    ) == []
 
 
 def test_attribution_only_entry_is_recognized(tmp_path: Path) -> None:
