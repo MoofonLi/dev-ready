@@ -10,6 +10,7 @@ from dev_ready.manifest import CATALOG_COMPONENTS, CatalogItem, ComponentCatalog
 from dev_ready.prompts import Answers
 
 TEMPLATE_SUFFIX = ".tmpl"
+_DOCUMENTATION_ROOT = "docs"
 
 _ARCHITECTURE_OWNERSHIP = (
     "Keep this architecture document current as module boundaries and "
@@ -127,10 +128,22 @@ def inject_mounted_enhancements(
             raise OverlayError(
                 f"mounted development-loop skill is missing: {mounted_path}"
             )
-        entries = "\n".join(
+        documentation_ids = catalog.item_ids("docs")
+        per_item_entries = [
             f"- **{item.id}** — {item.description} See `{item.paths[0].dest}`."
             for item in items
+            if item.id not in documentation_ids
+        ]
+        documentation_items = tuple(
+            item for item in items if item.id in documentation_ids
         )
+        if documentation_items:
+            identifiers = ", ".join(f"`{item.id}`" for item in documentation_items)
+            per_item_entries.append(
+                f"- **Documentation references** — {identifiers}. "
+                f"See `{_DOCUMENTATION_ROOT}/`."
+            )
+        entries = "\n".join(per_item_entries)
         block = (
             "<!-- dev-ready:mounted-enhancements:start -->\n"
             "## Mounted enhancements\n\n"

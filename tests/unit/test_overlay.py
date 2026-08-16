@@ -1047,24 +1047,62 @@ def test_review_mount_lists_both_selected_enhancements_in_identifier_order(
     assert code_review.index(react_entry) < code_review.index(security_entry)
 
 
-def test_document_mount_points_to_its_generated_destination(tmp_path: Path) -> None:
+def test_document_mount_collapses_selected_references_to_one_directory_line(
+    tmp_path: Path,
+) -> None:
     content = build_overlay_content(
         _answers(
             tmp_path,
             skills_items=frozenset(),
             include_mcp=False,
-            docs_items=frozenset({"design-linear"}),
+            docs_items=frozenset({"design-stripe", "design-linear"}),
             agent_targets=frozenset(),
         ),
         CATALOG,
     )
 
     implement = content[".agents/skills/implement/SKILL.md"].decode("utf-8")
-    assert (
-        "- **design-linear** — Linear-inspired DESIGN.md reference for a "
-        "polished dark product interface system; omit it if that visual "
-        "direction is not useful. See `docs/design-linear.md`."
-    ) in implement
+    documentation_entry = (
+        "- **Documentation references** — `design-linear`, `design-stripe`. "
+        "See `docs/`."
+    )
+    assert documentation_entry in implement
+    assert implement.count("\n- **Documentation references**") == 1
+    assert "See `docs/design-linear.md`." not in implement
+    assert "See `docs/design-stripe.md`." not in implement
+
+
+def test_mixed_mount_keeps_skill_guidance_before_collapsed_documentation(
+    tmp_path: Path,
+) -> None:
+    content = build_overlay_content(
+        _answers(
+            tmp_path,
+            skills_items=frozenset({"frontend-design"}),
+            include_mcp=False,
+            docs_items=frozenset({"design-stripe", "design-linear"}),
+            agent_targets=frozenset(),
+        ),
+        CATALOG,
+    )
+
+    implement = content[".agents/skills/implement/SKILL.md"].decode("utf-8")
+    skill_entry = (
+        "- **frontend-design** — Methodology skill for how to build high-quality "
+        "frontend UI — layout, spacing, visual hierarchy, and interaction polish. "
+        "Distinct from the awesome-design-md DESIGN.md reference templates in the "
+        "docs component (which show what good design systems like Stripe and Linear "
+        "look like): this is the how-to process, those are the what-good-looks-like "
+        "references. Vendored from anthropics/skills (Apache-2.0). "
+        "See `.agents/skills/frontend-design`."
+    )
+    documentation_entry = (
+        "- **Documentation references** — `design-linear`, `design-stripe`. "
+        "See `docs/`."
+    )
+    assert skill_entry in implement
+    assert documentation_entry in implement
+    assert implement.index(skill_entry) < implement.index(documentation_entry)
 
 
 def test_browser_testing_mounts_on_the_test_writing_step(tmp_path: Path) -> None:
@@ -1080,8 +1118,16 @@ def test_browser_testing_mounts_on_the_test_writing_step(tmp_path: Path) -> None
     )
 
     tdd = content[".agents/skills/tdd/SKILL.md"].decode("utf-8")
-    assert "- **webapp-testing**" in tdd
-    assert "See `.agents/skills/webapp-testing`." in tdd
+    assert tdd.endswith(
+        "\n\n<!-- dev-ready:mounted-enhancements:start -->\n"
+        "## Mounted enhancements\n\n"
+        "When running this skill, also apply the enhancements selected for this project.\n\n"
+        "- **webapp-testing** — Browser-automation skill for testing web apps "
+        "end-to-end — drives a headless browser to exercise UI flows, capture "
+        "console logs, and discover elements. Vendored from anthropics/skills "
+        "(Apache-2.0). See `.agents/skills/webapp-testing`.\n"
+        "<!-- dev-ready:mounted-enhancements:end -->\n"
+    )
 
 
 def test_unmounted_enhancements_do_not_change_loop_skills(tmp_path: Path) -> None:
