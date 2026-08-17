@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "dev-ready",
+  "description": "Scaffold AI-development-ready FastAPI projects with canonical agent guidance, Agent Targets, MCP config, and design docs",
+  "owner": {
+    "name": "Moofon Li",
+    "url": "https://github.com/MoofonLi"
+  },
+  "plugins": [
+    {
+      "name": "dev-ready",
+      "source": "./",
+      "description": "Scaffold AI-development-ready FastAPI projects with canonical agent guidance, Agent Targets, MCP config, and design docs",
+      "author": {
+        "name": "Moofon Li",
+        "url": "https://github.com/MoofonLi"
+      },
+      "homepage": "https://github.com/MoofonLi/dev-ready",
+      "repository": "https://github.com/MoofonLi/dev-ready",
+      "license": "MIT",
+      "keywords": [
+        "fastapi",
+        "scaffold",
+        "agent-skills",
+        "ai-development"
+      ],
+      "skills": [
+        "./skills/dev-ready"
+      ]
+    }
+  ]
+}
