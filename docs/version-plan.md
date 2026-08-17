@@ -1112,6 +1112,11 @@ pinned `vercel-labs/skills` source, which knows only `.claude-plugin/`, and that
 proves what one installer consumes, not what an ecosystem offers. Codex's plugin
 system postdates that reasoning.
 
+> **Corrected 2026-08-17 (ADR-027).** The paragraph above calls a manifest a
+> storefront. It is not one, and that conflation is what made v0.11's Phase 4
+> plan ship files nobody could install from. See the 2026-08-17 amendment at the
+> end of this document.
+
 ### Flow recommendation is blocked on there being flows to recommend
 
 A comparison of the three frameworks was offered as material for a skill that
@@ -1360,3 +1365,115 @@ bump cannot leave the contract test red (ADR-019, 2026-08-16 amendment). This
 also names a standing weakness in the older `sync_agent_targets.py`, which
 writes only `manifest.json` and leaves 57 Agent Target lines hand-maintained
 behind the same test; repairing that is not v0.11 work.
+
+---
+
+## 2026-08-17 amendment — v0.11 Phase 4 grilling: FR-45 is distribution, not two files (CEO-confirmed, Moofon)
+
+Produced by the `grill-with-docs` session on v0.11 Phase 4, run against the two
+published plugin specifications and against a shipped third-party repository
+rather than against the phase plan. **v0.12, v0.13, and v1.0 are unchanged**, as
+are FR-39 through FR-44. Decision record: the new **ADR-027**; three `CONTEXT.md`
+terms — [[Plugin Manifest]], [[Marketplace Catalog]], [[Plugin Directory]].
+
+Like the 2026-08-04, 2026-08-12, 2026-08-13, and 2026-08-16 sessions before it,
+this one found a defect the plan would have shipped, and found it the same way —
+by reading the specification instead of the document about it.
+
+### A manifest describes; a catalog publishes; a directory sells
+
+FR-45 and the phase plan both use "manifest" and "storefront" as if they named
+one thing. They name three, and only the third is discovery.
+
+A **plugin manifest** describes one plugin to one ecosystem and reaches nobody.
+A **marketplace catalog** is what an install command actually fetches:
+`/plugin marketplace add owner/repo` reads `.claude-plugin/marketplace.json` at
+the repository root, and `codex plugin marketplace add owner/repo` reads
+`$REPO_ROOT/.agents/plugins/marketplace.json`. Neither command has any other way
+into a repository. A **plugin directory** is the browsable storefront FR-45 is
+justified by, and it is entered only by submission and review.
+
+So the two-file plan produced **no install path in either ecosystem**, and
+Phase 5's by-hand install verification could not have passed. FR-45 ships four
+files instead, both catalogs declaring the repository root as the plugin
+(`"source": "./"`), which is what keeps one skill directory serving every
+channel with no second copy. The Codex path semantics were checked against
+`appwrite/codex-plugin` rather than inferred: its catalog sits at
+`.agents/plugins/marketplace.json` and writes `"path": "./plugins/appwrite"`, so
+a source path resolves against the repository root.
+
+### A skills-only plugin qualifies for both public directories
+
+An in-session claim that Codex's directory structurally excludes dev-ready was
+**wrong** and is corrected here before it reached disk. Codex's submission page
+states that "A plugin can contain skills, an MCP server, or both", and its
+production-server URL, domain verification, and tool-annotation requirements are
+each conditional on the plugin containing MCP. What does apply to a skills-only
+submission is the submitter's individual identity verification in the OpenAI
+Platform, an org role with `Apps Management` write access, and at least five
+positive and three negative test cases.
+
+Anthropic's path is cheaper — a Console form that serves individual authors, plus
+the automated screening that `claude plugin validate` reproduces locally — but it
+pins an approved plugin to a commit SHA and syncs its public catalog nightly.
+
+Both submissions therefore run **after** the release tag, and **the acceptance
+criterion is that they were made, not that either was listed.** Neither
+organization states a review turnaround. Every other v0.11 criterion is something
+the repository can prove; a queue in someone else's building is not, and a
+version that waits on one has handed its release date away.
+
+### The repository root becomes a shipping surface
+
+This is the cost of the choice that avoids forking the skill. With the root
+declared as the plugin, Claude and Codex read component directories from it, so a
+future top-level `agents/`, `commands/`, `hooks/`, `bin/`, `monitors/`,
+`.mcp.json`, `.lsp.json`, or `settings.json` would ship to every installed user
+with no announcement — and `hooks/` and `bin/` ship executable behaviour, not
+text. An offline guard test asserts the root holds none of them and that
+`skills/` holds exactly `dev-ready`.
+
+The subdirectory alternative was rejected for the reason FR-45 itself gives: the
+only directory holding the skill is `skills/dev-ready/`, so its manifest would
+ride into every user's skills directory through the cross-agent installer, which
+copies the whole folder. Measured, the accepted cost is 4.8 MB across 366 tracked
+files copied into `~/.claude/plugins/cache` once per installed version, against
+the roughly 15 MB of runtime dependencies `uvx dev-ready` already installs.
+
+### Two of the three exposures were never unguardable
+
+The plan recorded FR-45's exposure as one thing — moving external specifications,
+no FR-16-style guard, re-verify by hand at every bump. That is exactly right for
+**schema drift** and wrong for the other two.
+
+**Version drift** is guarded. Claude pins an installed plugin to the `version`
+string and delivers an update only when it changes, and Codex requires the field,
+so a stale manifest strands every installed user with no visible symptom. A test
+asserts each manifest's `version` equals `dev_ready.__version__`, and the
+`release` skill bumps four files rather than two.
+
+**Repository-root content** is guarded, as above.
+
+The general shape is worth keeping: "this comes from a moving external spec" is a
+statement about *one* of the things a transcribed file can get wrong. Which
+fields exist is theirs. Which values we wrote is ours.
+
+### Recorded, not decided
+
+- CI's `paths-ignore` narrows from `.agents/**` to `.agents/skills/**` in both
+  event blocks, because Codex fixes its catalog path inside a tree this
+  repository already ignored, and the new version guard would otherwise be blind
+  to the one file it guards. `.claude-plugin/` needed no change — glob matching
+  is by whole path segment, so it never matched `.claude/**`.
+- The distributed skill teaches `--flow` and drops every mention of
+  `--development-loop`, which stays a permanently accepted alias documented for
+  humans in `docs/cli-spec.md`. Measured: the old spelling appears in no
+  generated project content. This overrides the phase's own stale acceptance
+  bullet, written before ADR-024's 2026-08-13 amendment.
+- The public names are both `dev-ready`, and the resulting `/dev-ready:dev-ready`
+  invocation is accepted rather than fixed by renaming `skills/dev-ready/` —
+  that directory name is the documented `--skill` argument, asserted against both
+  READMEs by the Generation Skill's contract test.
+- No CI job runs `claude plugin validate .`; it needs the `claude` CLI as a global
+  tool, which the standing constraints forbid tests to depend on. It joins the
+  by-hand Phase 5 checks, which now number four.

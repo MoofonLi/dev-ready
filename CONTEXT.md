@@ -121,9 +121,9 @@ interview by FR-34). It is defined by three things it is not: never a
 [[Catalog Item]], never part of a generated project's overlay, and not one of
 this repository's own process skills. Singular by construction — the repository
 distributes exactly one, from one source path, however many channels carry it:
-the cross-agent installer reaches every agent, and the Claude and Codex plugin
-manifests are additional storefronts over the same directory, never second
-copies. From v0.12 the interview also recommends an [[Engineering Flow]], which
+the cross-agent installer reaches every agent, and the Claude and Codex
+[[Plugin Manifest]] files describe that same directory to two more ecosystems,
+never as second copies. From v0.12 the interview also recommends an [[Engineering Flow]], which
 is why no second interviewing skill may exist — two would question the user
 twice.
 _Avoid_: setup skill, init skill, the dev-ready skill, bootstrap skill, generate skill
@@ -263,6 +263,32 @@ How current a generated project's dev-ready-managed overlay is: the dev-ready
 version, selected catalog items and their pins, and managed-file inventory.
 It can advance without changing Base Provenance.
 _Avoid_: project version, upstream currency
+
+### Distribution (ADR-027)
+
+**Plugin Manifest**:
+The file that describes dev-ready as one plugin to one agent ecosystem —
+`.claude-plugin/plugin.json` for Claude Code, `.codex-plugin/plugin.json` for
+Codex. It describes; it publishes nothing and reaches nobody on its own. Naming
+it a storefront is the confusion ADR-027 exists to end.
+_Avoid_: storefront, plugin config, plugin definition, listing
+
+**Marketplace Catalog**:
+The file that publishes plugins so a user can install one by name, fetched by
+`/plugin marketplace add` and `codex plugin marketplace add`. dev-ready declares
+the repository root as its own plugin's source, so one skill directory serves
+every channel and no second copy exists. A catalog makes dev-ready installable
+to someone who already knows its name; it does not make anyone find it.
+_Avoid_: marketplace, registry, index, store
+
+**Plugin Directory**:
+The public, browsable storefront a plugin reaches only through submission and
+review — Anthropic's `claude-community`, and the universal directory ChatGPT and
+Codex share. This is the discovery surface FR-45 is justified by, and the only
+one that reaches a user who has never heard of dev-ready. Entry is another
+organization's decision on another organization's schedule, so a dev-ready
+version records that it submitted, never that it was listed.
+_Avoid_: marketplace, app store, catalog, storefront listing
 
 ### Written language
 
