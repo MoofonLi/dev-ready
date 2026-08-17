@@ -5,7 +5,7 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
-      - '.agents/**'
+      - '.agents/skills/**'
       - '.bob/**'
       - '.claude/**'
       - '.vscode/**'
@@ -16,7 +16,7 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
-      - '.agents/**'
+      - '.agents/skills/**'
       - '.bob/**'
       - '.claude/**'
       - '.vscode/**'
