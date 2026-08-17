@@ -18,7 +18,7 @@ preferences when the project description cannot determine Token Optimize.
 
 If the developer already described the project and agent choices, do not ask
 them to repeat that information. Present one proposed command with one-line
-reasons for every selected Category, item, development loop, and Agent Target.
+reasons for every selected Category, item, Engineering Flow, and Agent Target.
 Hold the proposal for approval and revise it in plain language if the developer
 disagrees with a selection.
 
@@ -61,9 +61,17 @@ start of each line is the value to place in the corresponding selection flag.
 - `design`: You care about polished interfaces and design systems.
 - `token-optimize`: You want to reduce context use or improve codebase recall.
 
-### Development loops
+### Engineering Flows
 
 - `mattpocock`: You want a staged workflow that starts with a written spec and ends with implementation and review.
+
+`superpowers` and `addyosmani` are announced Engineering Flows and cannot be
+selected yet. Do not put either in `--flow`. `--flow spec-loop` exits 2 with
+`Engineering Flow id 'spec-loop' was renamed to 'mattpocock'`. `--flow superpowers`
+and `--flow addyosmani` exit 2 with `Engineering Flow 'superpowers' is not yet available`
+(the requested id substituted). An unknown `--flow` id exits 2 with
+`unknown Engineering Flow id '<id>'; valid ids: ['mattpocock']`. Surface the
+failure and stop; do not guess a replacement.
 
 ### dev items
 
@@ -249,12 +257,14 @@ Canonical Content already lives, so they need no Agent Target:
 Always use `--yes` for agent-driven, non-interactive generation.
 
 With no selection flags, `--yes` accepts the lean Default Set: the mandatory
-Spec Loop with no optional Enhancements. Every project also receives
-architecture and requirements skeletons as generation infrastructure. Select
-user-facing Categories with `--categories IDS`. Narrow Enhancements within
-each selected Category with `--dev`, `--security`, `--quality`, `--design`, or
-`--token-optimize`. Choose the mandatory loop with `--development-loop ID` if
-the manifest offers more than one. Select native Agent Target configuration
+Engineering Flow with no optional Enhancements. Every project also receives
+architecture and requirements skeletons as generation infrastructure. Every
+generated project receives the chain `setup-project` → `grill-with-docs` →
+`to-spec` → `to-tickets` → `implement` → `improve-codebase-architecture`.
+Select user-facing Categories with `--categories IDS`. Narrow Enhancements
+within each selected Category with `--dev`, `--security`, `--quality`,
+`--design`, or `--token-optimize`. Choose the Engineering Flow with `--flow ID`
+if the manifest offers more than one. Select native Agent Target configuration
 independently with `--agents IDS`.
 
 Every selection flag accepts:
@@ -267,11 +277,12 @@ Every generated project resolves `mattpocock`; `--categories none` and
 `--dev none` decline Enhancements without removing it. The former selectable
 ids `spec-loop`, `tdd`, `diagnosing-bugs`, `code-review`, and `setup-all` now
 exit 2 when passed to `--dev`, because their content is part of the mandatory
-Dev development loop. Treat the resolved selection shown in the report and
+Engineering Flow. Treat the resolved selection shown in the report and
 stamp as authoritative.
 
-Unknown Category ids, unknown item ids, unknown Agent Target ids, and conflicting
-flags are exit 2 failures; surface the error instead of guessing a replacement.
+Unknown Category ids, unknown item ids, unknown Agent Target ids, unknown
+Engineering Flow ids, and conflicting flags are exit 2 failures; surface the
+error instead of guessing a replacement.
 For example, `--design design-stripe` conflicts with `--categories dev` because
 Design was not selected.
 
@@ -305,7 +316,7 @@ uvx dev-ready init minimal-app --yes --categories none --agents none --dir ./min
 A developer says, "I am building a polished design-focused app and want token-conscious agents with Claude."
 
 ```shell
-uvx dev-ready init focused-app --yes --development-loop mattpocock --categories dev,design,token-optimize --dev none --design frontend-design,design-stripe --token-optimize code-memory --agents claude --dir ./focused-app
+uvx dev-ready init focused-app --yes --flow mattpocock --categories dev,design,token-optimize --dev none --design frontend-design,design-stripe --token-optimize code-memory --agents claude --dir ./focused-app
 ```
 
 Run exactly one selected command. Do not invent flags for language, overwriting, or cleanup.
