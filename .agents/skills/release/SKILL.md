@@ -9,7 +9,7 @@ Ship a dev-ready version from finished code to a published PyPI release. Follow 
 
 This skill is the single source of truth for the release process. Release is the one place where state-changing git is unavoidable, and it carries no standing exemption (ADR-021): every `git commit`, `git push`, and `git tag` below needs Moofon's explicit permission for that specific action, asked for at the moment it is due.
 
-Repo layout facts this workflow depends on: version lives in BOTH `src/dev_ready/__init__.py` (`__version__`) and `pyproject.toml` (`version`); `release.yml` refuses to publish if the pushed tag does not match `pyproject.toml`; handoff working files live in `docs/handoff/<version>/phase-N/` (gitignored - never commit them, ADR-011); Conventional Commits are mandatory.
+Repo layout facts this workflow depends on: version lives in FOUR files — `src/dev_ready/__init__.py` (`__version__`), `pyproject.toml` (`version`), `.claude-plugin/plugin.json` (`version`), and `.codex-plugin/plugin.json` (`version`); `release.yml` refuses to publish if the pushed tag does not match `pyproject.toml`; handoff working files live in `docs/handoff/<version>/phase-N/` (gitignored - never commit them, ADR-011); Conventional Commits are mandatory.
 
 ## Step 0 - Determine the version
 
@@ -18,14 +18,16 @@ The version comes from the user ("release v0.3.0" means `0.3.0`). If the user di
 - It must be greater than the current `version` in `pyproject.toml`.
 - Cross-check against `docs/handoff/<version-minor>/` (e.g. releasing 0.3.x, expect `docs/handoff/v0.3/`) and `docs/handoff/v0.3/v0.3-plan.md` to confirm which phase(s) this release covers.
 
-## Step 1 - Bump the version in two files
+## Step 1 - Bump the version in four files
 
-Update to the release version, keeping the two in sync:
+Update to the release version, keeping all four in sync:
 
 1. `src/dev_ready/__init__.py`: `__version__ = "X.Y.Z"`
 2. `pyproject.toml`: `version = "X.Y.Z"`
+3. `.claude-plugin/plugin.json`: `"version": "X.Y.Z"`
+4. `.codex-plugin/plugin.json`: `"version": "X.Y.Z"`
 
-They must be identical: the CLI prints `__version__`, while the wheel and the release-workflow guard read `pyproject.toml`. A mismatch ships a CLI that reports the wrong version.
+The package's two version strings must be identical: the CLI prints `__version__`, while the wheel and the release-workflow guard read `pyproject.toml`. A mismatch ships a CLI that reports the wrong version. The two plugin manifests carry the same string; they are not additional sources of truth. Leaving a manifest behind pins every installed plugin user to the version they first installed, with no error and no symptom.
 
 ## Step 2 - Local verification
 
@@ -77,7 +79,7 @@ Group the working-tree changes into separate commits by Conventional Commit type
 
 1. `feat:` / `fix:` - implementation changes (one commit per coherent change, not per file)
 2. `docs:` - documentation-only changes
-3. `chore: bump version to X.Y.Z` - the two version files + `uv.lock`, always the last commit before tagging
+3. `chore: bump version to X.Y.Z` - the four version files + `uv.lock`, always the last commit before tagging
 
 Never `git add .` blindly: check `git status` first and confirm nothing from `docs/handoff/` or scratch files is staged. If the user prefers, hand him the exact `git add <files>` + `git commit -m` command sequence instead of running it.
 
