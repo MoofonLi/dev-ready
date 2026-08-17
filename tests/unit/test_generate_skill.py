@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from dev_ready import __version__
 from dev_ready.cli import build_answers, build_parser
 from dev_ready.errors import InvalidArgumentsError
 from dev_ready.manifest import load_default_manifest
@@ -17,6 +18,23 @@ from dev_ready.prompts import Answers, ProjectSelection
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_PATH = REPO_ROOT / "skills" / "dev-ready" / "SKILL.md"
+SUBMISSION_PATH = REPO_ROOT / "docs" / "plugin-directory-submission.md"
+CLAUDE_PLUGIN_MANIFEST = REPO_ROOT / ".claude-plugin" / "plugin.json"
+CLAUDE_MARKETPLACE = REPO_ROOT / ".claude-plugin" / "marketplace.json"
+CODEX_PLUGIN_MANIFEST = REPO_ROOT / ".codex-plugin" / "plugin.json"
+CODEX_MARKETPLACE = REPO_ROOT / ".agents" / "plugins" / "marketplace.json"
+PLUGIN_COMPONENT_NAMES = frozenset(
+    {
+        "agents",
+        "commands",
+        "hooks",
+        "bin",
+        "monitors",
+        ".mcp.json",
+        ".lsp.json",
+        "settings.json",
+    }
+)
 README_PATHS = (REPO_ROOT / "README.md", REPO_ROOT / "README-pypi.md")
 INSTALL_COMMAND = "npx skills add MoofonLi/dev-ready --skill dev-ready"
 ISSUES_URL = "https://github.com/MoofonLi/dev-ready/issues"
@@ -52,8 +70,8 @@ def _init_examples(text: str) -> list[str]:
 def _documented_ids(text: str, label: str) -> set[str]:
     if label == "Category":
         heading = "Categories"
-    elif label == "development loop":
-        heading = "Development loops"
+    elif label == "Engineering Flow":
+        heading = "Engineering Flows"
     elif label == "Agent Target":
         heading = "Agent Targets"
     elif label == "standard-compliant agent":
@@ -116,7 +134,7 @@ def test_skill_examples_cover_default_none_and_mixed_current_cli_contract() -> N
     assert any("--categories none" in command and "--agents none" in command for command in examples)
     assert any(
         "--categories dev,design,token-optimize" in command
-        and "--development-loop mattpocock" in command
+        and "--flow mattpocock" in command
         and "--dev none" in command
         and "--design frontend-design,design-stripe" in command
         and "--token-optimize code-memory" in command
@@ -166,7 +184,7 @@ def test_skill_category_and_item_ids_match_the_current_manifest() -> None:
             for item in component_items
             if item.category == category and item.kind != "development-loop"
         }
-    assert _documented_ids(text, "development loop") == set(
+    assert _documented_ids(text, "Engineering Flow") == set(
         CATALOG.development_loop_ids
     )
     assert _documented_ids(text, "Agent Target") == set(CATALOG.agent_target_ids)
@@ -200,12 +218,13 @@ def test_public_docs_explain_discovery_agent_use_and_support() -> None:
 
 
 def test_skill_documents_safe_failure_and_verification_behavior() -> None:
-    text = _skill_text().casefold()
+    original = _skill_text()
+    text = original.casefold()
     for required in (
         "--yes",
         "--dir",
         "--categories",
-        "--development-loop",
+        "--flow",
         "--design",
         "--token-optimize",
         "--agents",
@@ -220,8 +239,14 @@ def test_skill_documents_safe_failure_and_verification_behavior() -> None:
         ".dev-ready.json",
         "non-empty target",
         "do not delete",
+        "superpowers",
+        "addyosmani",
     ):
         assert required in text
+    assert "--development-loop" not in original
+    assert "Engineering Flow id 'spec-loop' was renamed to 'mattpocock'" in original
+    assert "Engineering Flow 'superpowers' is not yet available" in original
+    assert "unknown Engineering Flow id" in original
     for removed in ("--skills", "--mcp", "--no-docs", "--no-handoff", "--no-agents"):
         assert removed in text
 
@@ -242,7 +267,7 @@ def test_skill_leads_with_interview_before_selection_flags() -> None:
         "--design",
         "--token-optimize",
         "--agents",
-        "--development-loop",
+        "--flow",
     )
     assert not any(flag in pre_interview for flag in selection_flags)
 
@@ -274,3 +299,94 @@ def test_distribution_skill_is_not_a_catalog_or_generated_overlay_asset(tmp_path
         for component in ("skills", "mcp")
         for item in stamp["components"][component]["items"]
     }
+
+
+def _load_json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _declared_skill_paths(declared: str | list[str]) -> list[str]:
+    if isinstance(declared, str):
+        return [declared]
+    return list(declared)
+
+
+def _contains_distributed_skill(location: Path) -> bool:
+    return (location / "SKILL.md").is_file() or (
+        location / "dev-ready" / "SKILL.md"
+    ).is_file()
+
+
+def _catalog_source_path(source: str | dict) -> str:
+    if isinstance(source, str):
+        return source
+    return source["path"]
+
+
+def test_plugin_distribution_files_resolve_to_the_distributed_skill() -> None:
+    claude_plugin = _load_json(CLAUDE_PLUGIN_MANIFEST)
+    claude_marketplace = _load_json(CLAUDE_MARKETPLACE)
+    codex_plugin = _load_json(CODEX_PLUGIN_MANIFEST)
+    codex_marketplace = _load_json(CODEX_MARKETPLACE)
+
+    assert claude_plugin["name"] == "dev-ready"
+    assert claude_plugin["skills"] == ["./skills/dev-ready"]
+    assert claude_marketplace["name"] == "dev-ready"
+    assert claude_marketplace["owner"]["name"]
+    assert codex_plugin["name"] == "dev-ready"
+    assert codex_plugin["description"]
+    assert codex_marketplace["name"] == "dev-ready"
+    assert codex_marketplace["interface"]["displayName"]
+
+    assert len(claude_marketplace["plugins"]) == 1
+    claude_entry = claude_marketplace["plugins"][0]
+    assert claude_entry["name"] == "dev-ready"
+    assert claude_entry["skills"] == ["./skills/dev-ready"]
+    assert (REPO_ROOT / _catalog_source_path(claude_entry["source"])).resolve() == (
+        REPO_ROOT.resolve()
+    )
+
+    assert len(codex_marketplace["plugins"]) == 1
+    codex_entry = codex_marketplace["plugins"][0]
+    assert codex_entry["name"] == "dev-ready"
+    assert codex_entry["policy"]["installation"]
+    assert codex_entry["policy"]["authentication"]
+    assert codex_entry["category"]
+    assert (REPO_ROOT / _catalog_source_path(codex_entry["source"])).resolve() == (
+        REPO_ROOT.resolve()
+    )
+
+    for declared in (
+        claude_plugin["skills"],
+        claude_entry["skills"],
+        codex_plugin["skills"],
+    ):
+        for relative in _declared_skill_paths(declared):
+            assert _contains_distributed_skill(REPO_ROOT / relative)
+
+
+def test_plugin_manifest_versions_match_the_package() -> None:
+    for path in (CLAUDE_PLUGIN_MANIFEST, CODEX_PLUGIN_MANIFEST):
+        assert _load_json(path)["version"] == __version__
+
+
+def test_repository_root_ships_only_the_distributed_skill() -> None:
+    root_names = {path.name for path in REPO_ROOT.iterdir()}
+    assert root_names & PLUGIN_COMPONENT_NAMES == set()
+    skill_entries = sorted(
+        path.name
+        for path in (REPO_ROOT / "skills").iterdir()
+        if not path.name.startswith(".")
+    )
+    assert skill_entries == ["dev-ready"]
+    assert SKILL_PATH.is_file()
+
+
+def test_submission_positive_cases_parse_through_the_real_cli() -> None:
+    commands = _init_examples(SUBMISSION_PATH.read_text(encoding="utf-8"))
+    assert len(commands) == 5
+    for command in commands:
+        tokens = shlex.split(command)
+        assert tokens[:2] == ["uvx", "dev-ready"]
+        args = build_parser().parse_args(tokens[2:])
+        build_answers(args, CATALOG)
