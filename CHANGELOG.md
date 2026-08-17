@@ -2,6 +2,75 @@
 
 All notable changes to dev-ready are documented here.
 
+## [0.11.0] — 2026-08-18
+
+### Breaking changes
+
+- **`--flow spec-loop` and `--development-loop spec-loop` now exit 2.** The
+  development-loop identifier was renamed to `mattpocock`. The error names the
+  new value. `--flow` is the documented spelling; `--development-loop` remains
+  a permanently accepted alias. Existing project stamps that record `spec-loop`
+  still resolve through the alias and upgrade without editing.
+- **A flag answers only its own question.** On v0.10.1, `--security
+  security-audit` (and `--agents windsurf`, and `--development-loop
+  mattpocock`) selected every catalog item and asked nothing. Those invocations
+  now select the Default Set plus the named answer. `--yes` alone and
+  `--categories all` are unchanged. A non-TTY `init` given only `--agents` and
+  no `--yes` now exits 2.
+
+### Added
+
+- A project’s development method is now chosen and named. Interactive `init`
+  asks the Engineering Flow first — even while only one is selectable — and
+  lists two coming-soon entries the cursor cannot land on.
+- Every optional Category is now shown to every interactive user. Pressing
+  Enter through them still produces the lean Default Set, identical to `--yes`.
+- A generated project can be configured without reading `.env` by hand.
+  `setup-project` is written into every project and is the first next step the
+  generation report prints.
+- Seventy-four Design References are selectable, as ordinary Design Category
+  items. `--design design-stripe,design-linear` still behaves as it did.
+- The MIT copyright notice now travels with the copied skills, matching the
+  Apache skills that already carried theirs.
+- The Generation Skill installs as a Claude Code plugin and a Codex plugin
+  from this repository, in addition to the existing
+  `npx skills add MoofonLi/dev-ready --skill dev-ready` channel.
+
+### Changed
+
+- Interactive prompts share one style. Announced Flows render as dimmed,
+  unselectable rows.
+- The generation report is a counted summary rather than a comma-joined wall
+  of paths. It stays plain text with no colour.
+- A docs-only Design selection collapses to one line in `implement/SKILL.md`.
+  The two shipped Design Reference descriptions no longer distinguish
+  light-versus-dark. An existing project sees both on upgrade if that file was
+  not edited.
+- Generated loop guidance is named `## Engineering Flow`, starts at
+  `setup-project`, and no longer lists `tdd` and `code-review` as peer steps of
+  `implement`.
+
+### Upgrade from v0.10
+
+Run `dev-ready upgrade PATH` with v0.11; no new selection input is required,
+and the stamp stays at version 5. The old loop name `spec-loop` resolves to
+`mattpocock`.
+
+What arrives as new managed files: the `setup-project` skill (and a Pointer
+Stub at each selected Agent Target), the MIT notice files beside the copied
+skills, and — when any Design Reference is selected — `docs/design-md-LICENSE.md`.
+An untouched `AGENTS.md` is replaced with the Engineering Flow section.
+
+If the project selected the two shipped Design References and nobody edited
+`implement/SKILL.md`, that file is replaced too: the mounted block becomes one
+docs line, and the two descriptions lose their light-versus-dark wording.
+
+There is no v0.10-style hole. Every new path is a managed file, so `upgrade`
+adds it. Edited files stay edited under the ordinary rule. `--dry-run` reports
+every planned write and deletion without mutation; a failure restores writes
+and deletions together; a repeated successful upgrade plans no further
+changes. Base Provenance and upstream application content remain unchanged.
+
 ## [0.10.1] — 2026-08-11
 
 ### Fixed

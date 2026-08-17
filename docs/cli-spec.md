@@ -1,6 +1,6 @@
 # CLI Specification — dev-ready
 
-Status: v0.11 development contract (unreleased). This replaces the REST
+Status: v0.11 released contract (v0.11.0). This replaces the REST
 `api-spec.yaml` from the original bootstrap plan: dev-ready is a CLI tool with
 no HTTP API. (Generated projects expose their own OpenAPI docs via FastAPI.)
 

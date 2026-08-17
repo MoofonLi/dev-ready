@@ -7,23 +7,28 @@ This file is the single source of truth for agent rules; `CLAUDE.md` imports it 
 
 dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus Canonical Content for coding agents, optional Agent Target Pointer Stubs and MCP configuration, and design docs.
 
-Current phase: v0.10 is released (`v0.10.1`; `v0.10.0` shipped the scope below,
-and the `v0.10.1` patch repaired two crashes that made interactive `init`
-unusable — see the v0.10 overview). It shipped Mount Points (FR-32), the Agent Target Map (FR-33), the interview-driven generation skill (FR-34), the selection-reach and overlay-infrastructure corrections (FR-36), the generated project's own stack and standards source (FR-37), and secret hygiene and credential disclosure (FR-38) — governed by ADR-018 as amended, ADR-019 as amended, ADR-022, and ADR-023. v0.11 is next, and the 2026-08-12 amendment expanded it: `setup-project` (FR-39), the full awesome-design-md set as Design References (FR-40), MIT notice propagation into generated projects (FR-41), Engineering Flow selection and the interactive rework (FR-42), corrected Flow Chain guidance (FR-43), CLI presentation (FR-44), and Claude/Codex plugin manifests (FR-45) — governed by ADR-024. v0.12 (FR-46 Skill Delivery Mode under ADR-025, FR-47 `superpowers`) and v0.13 (FR-48 `addyosmani/agent-skills`, FR-49 Token Optimize additions) follow. v1.0 remains gated on the real-users evidence defined in `docs/version-plan.md`, which the 2026-08-09 amendment narrowed to Branch A alone. Per-version plans live in `docs/handoff/<version>/<version>-plan.md`; the domain glossary is `CONTEXT.md`.
+Current phase: v0.11 is released (`v0.11.0` — see the v0.11 overview). It
+shipped `setup-project` (FR-39), the full Design Reference set (FR-40), MIT
+notice propagation (FR-41), Engineering Flow selection and the interactive
+rework (FR-42), corrected Flow Chain guidance (FR-43), CLI presentation
+(FR-44), and Claude/Codex plugin distribution (FR-45) — governed by ADR-024,
+ADR-026, and ADR-027. The stamp stayed at version 5. v0.12 (FR-46 Skill
+Delivery Mode under ADR-025, FR-47 `superpowers`) and v0.13 (FR-48
+`addyosmani/agent-skills`, FR-49 Token Optimize additions) follow. v1.0 remains
+gated on the real-users evidence defined in `docs/version-plan.md`, which the
+2026-08-09 amendment narrowed to Branch A alone. Per-version plans live in
+`docs/handoff/<version>/<version>-plan.md`; the domain glossary is `CONTEXT.md`.
 
 **Process note:** v0.9 stopped *generating* the Handoff Protocol into user projects (ADR-020), and ADR-021 retires it here too — this repo now develops on the Spec Loop and nothing else. See "How this repo is developed" below.
 
-The v0.10 release surface is fixed: Mount Points inject an Enhancement's guidance
-into its declared loop skill at generation time only, inside the overlay's
-whole-file rendering and never as a catalog effect; the Agent Target Map is
-derived from the pinned reference list and held to it by a CI drift check, with
-`claude` as what an absent `--agents` and `--yes` resolve to; the generation
-skill is an interview that composes one non-interactive command; the generated
-`AGENTS.md` states the project's stack, verification commands, and standards
-source, drift-guarded against the pinned base template; and generated projects
-ignore `.env` and `.env*` and disclose the superuser login and where its password
-lives. The stamp stays at version 5 — nothing in v0.10 added, removed, or
-re-typed a recorded field.
+The v0.11 release surface is fixed: the development method is an Engineering
+Flow, asked first and named `mattpocock`; `setup-project` is unconditional
+infrastructure at the head of every chain; all 74 Design References are
+ordinary catalog items; MIT notices travel with the copied skills; the
+repository root is the Claude and Codex plugin; and a flag answers only its
+own question. The stamp stays at version 5 — nothing in v0.11 added, removed,
+or re-typed a recorded field. Pointer Stubs remain the delivery mechanism;
+ADR-025 targets v0.12.
 
 ## Read before writing code
 

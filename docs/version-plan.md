@@ -9,6 +9,7 @@ Close-out 2026-07-27: v0.8 is released. FR-26 is shipped in `v0.8.0`, which is t
 Amended 2026-07-27: v0.9 and v0.10 added between v0.8 and v1.0 — see "2026-07-27 amendment" at the end of this document (ADR-017, ADR-018, ADR-019). v1.0 is unchanged.
 Close-out 2026-08-01: v0.9 is released. FR-30, FR-31, and FR-35 are shipped in `v0.9.0`; the Category selection model, lean Default Set, and generated Handoff Protocol retirement are complete. ADR-020 changed generated projects only; ADR-021 separately retired this repository's internal Handoff Protocol.
 Close-out 2026-08-09: v0.10 is released. FR-32, FR-33, FR-34, FR-36, FR-37, and FR-38 are shipped in `v0.10.0`; Mount Points, the derived and drift-guarded Agent Target Map, the interview-driven generation skill, the selection-reach and overlay-infrastructure corrections, the generated project's own stack and standards source, and the secret-hygiene repairs are complete. The stamp stayed at version 5, so there was no migration phase. v0.11 (FR-39, FR-40, FR-41) is next.
+Close-out 2026-08-18: v0.11 is released. FR-39, FR-40, FR-41, FR-42, FR-43, FR-44, and FR-45 are shipped in `v0.11.0`; the Engineering Flow, `setup-project`, the full Design Reference set, MIT notice propagation, CLI presentation, and Claude/Codex plugin distribution are complete. The stamp stayed at version 5. v0.12 (FR-46, FR-47) is next.
 Numbering continues from requirements.md (FR-1..FR-10 shipped in v0.1/v0.2).
 
 ## End goal

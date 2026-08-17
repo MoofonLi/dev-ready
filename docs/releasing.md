@@ -1,5 +1,11 @@
 # Releasing dev-ready
 
+The release procedure lives in the `release` process skill
+(`.agents/skills/release/SKILL.md`). That skill is the source of truth for
+which files hold the version, which verification commands must pass, how
+commits are staged, and when to tag. Do not copy the steps here — a second
+copy will drift.
+
 ## One-time setup: PyPI Trusted Publisher
 
 `release.yml` publishes via [PyPI trusted publishing](https://docs.pypi.org/trusted-publishers/) — no API token or password is stored in this repo. Before the first release, a maintainer with access to the `dev-ready` project on PyPI must configure it once:
@@ -17,20 +23,3 @@ This is a one-time setup per PyPI project. It does not need to be repeated for f
 ### GitHub Environment (`pypi`)
 
 The publish job declares `environment: pypi`. GitHub auto-creates the environment on first use, so nothing is strictly required up front. For real protection, pre-create it under the repo's **Settings → Environments** before the first tagged release and add a deployment branch/tag rule limiting it to `v*` tags (and optionally required reviewers). This pairs with the PyPI-side `pypi` environment above so only the release workflow, on a version tag, can publish.
-
-## Cutting a release
-
-1. Bump the version in `pyproject.toml` (`[project].version`).
-2. Commit the bump (Conventional Commits, e.g. `chore: release v0.2.0`).
-3. Tag the commit `vX.Y.Z`, matching the `pyproject.toml` version exactly:
-   ```
-   git tag v0.2.0
-   git push origin v0.2.0
-   ```
-4. Pushing the tag triggers `release.yml`, which:
-   - verifies the tag version matches `pyproject.toml` (fails fast on mismatch)
-   - builds sdist + wheel with `uv build`
-   - installs the built wheel into a scratch venv and runs `dev-ready --version` as a smoke test
-   - publishes to PyPI via trusted publishing
-
-No manual `twine upload` or token management is required or supported.
