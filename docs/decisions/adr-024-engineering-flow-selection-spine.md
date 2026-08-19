@@ -111,3 +111,81 @@ documented. This costs nothing and breaks nothing, and it is cheapest now for
 this ADR's own stated reason: the v1.0 real-users gate is unmet. The stamp field
 stays `development_loop` — the stamp does not advance in v0.11 and the field is
 not user-facing.
+
+## 2026-08-18 amendment — a flow declares who invokes its steps, and the recommendation rests on that
+
+Decided in the `grill-with-docs` session of 2026-08-18 opening v0.12, run against
+the two upstream projects rather than against the decision. The decision itself
+is unchanged: the Engineering Flow is still the first selection question, still
+named after its source, still recorded in the stamp. What changes is that this
+ADR assumed one invocation model for every flow, and the second flow does not
+share it.
+
+### Every flow is not user-invoked, and the generated text says it is
+
+Measured on 2026-08-18 at each project's default branch. Of the twelve
+`mattpocock/skills` items dev-ready vendors, the six chain entries declare
+`disable-model-invocation: true` and the six tools do not — the split
+`CONTEXT.md`'s [[Flow Chain]] entry records, and the split
+`tests/unit/test_flow_frontmatter.py` guards. Of `obra/superpowers`' fourteen
+skills, **none** declares it, and several descriptions are written as mandates:
+`brainstorming` opens with "You MUST use this before any creative work", and its
+README states plainly that these are "Mandatory workflows, not suggestions".
+
+FR-16 holds every vendored file byte-identical to its pinned upstream, so
+dev-ready cannot add the flag to make superpowers fit. The generated `AGENTS.md`
+sentence FR-43 wrote — that chain entries are user-invoked — would therefore
+ship as a false statement about the flow the user selected. That is the defect
+class FR-43 spent a phase removing: generated documentation misdescribing
+generated content.
+
+- **A development-loop catalog entry declares `invocation`**, beside `steps`,
+  with values `user` and `model`. `mattpocock` declares `user`; `superpowers`
+  declares `model`. The field records what upstream already states rather than
+  asserting anything new.
+- **The generated `AGENTS.md` chain sentence and `docs/agents/<flow-id>.md`
+  render from that field**, so each flow is described by its own behaviour and
+  neither describes the other's.
+- **`tests/unit/test_flow_frontmatter.py` becomes data-driven.** It reads the
+  manifest and asserts, for every flow, that the declared `invocation` matches
+  the frontmatter of every step that flow ships. A flow declaring `user` while
+  shipping a model-invokable step fails the build. Without this the field is a
+  comment, and the recommendation below would rest on a comment.
+
+### The flow recommendation rests only on guarded axes, and both surfaces share one string
+
+FR-47 requires the recommendation to be written as selection criteria rather
+than as a comparison of the upstream projects, because a comparative claim about
+a project dev-ready does not ship has no drift guard. Applying that rule leaves
+exactly two axes, because only two are traceable to something dev-ready ships
+and tests:
+
+1. **Who invokes the method** — from `invocation`, guarded by the test above.
+2. **Whether work is split across subagents** — from the declared `steps`, which
+   `manifest/loader.py` already validates against the paths each item writes.
+
+Anything further describes upstream's features, which change without notice.
+
+The criteria live in **one string per flow**: the catalog entry's `description`.
+`prompts/collect.py` renders the interactive flow row as
+`"{display_name} — {description}"`, and the Generation Skill's Engineering Flow
+trigger line quotes the same text. A second, separately worded description on
+the other surface is two sources for one fact, which is how the two drift. This
+rewrites `mattpocock`'s shipped v0.11 description, which is a user-visible
+change and belongs in the CHANGELOG.
+
+### Curation is the standard for a flow, not an exception
+
+dev-ready vendors twelve of `mattpocock/skills`' thirty-five skills. It vendors
+twelve of `obra/superpowers`' fourteen on the same standard: a skill ships when
+it is about building the user's project. `using-superpowers` is excluded because
+it teaches an agent to install and locate superpowers across roughly fifteen
+other products, which is installation metadata a dev-ready project answers
+differently through its Agent Target selection. `writing-skills` is excluded
+because it is about authoring skills, not about building the project; it is also
+the heaviest single skill at 107,377 bytes, 29% of the upstream total.
+
+A skill ships whole or not at all. FR-16 compares directories byte for byte, so
+splitting one skill's files would make the drift guard finer-grained and the
+sync tooling more complex than the saving is worth — which is why
+`systematic-debugging` ships its own test fixtures and creation log with it.

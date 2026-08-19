@@ -58,15 +58,27 @@ _Avoid_: placeholder item, disabled item, stub flow, future flow
 
 **Flow Chain**:
 The ordered steps of an [[Engineering Flow]] as a generated project describes
-them, beginning with its [[Setup Step]]. A **default path, not a rule** — every
-chain entry is user-invoked (`disable-model-invocation: true`), and a change
-adding no observable behaviour may start at `implement`. Steps a chain entry
-calls internally are not chain entries: `tdd` and `code-review` belong to
+them, beginning with its [[Setup Step]]. A **default path, not a rule** — a
+change adding no observable behaviour may start partway along it. Steps a chain
+entry calls internally are not chain entries: `tdd` and `code-review` belong to
 `implement`, which invokes both, and listing them as peers turns tools into
-phases. Upstream draws the same line: measured 2026-08-14, exactly the chain
-entries declare `disable-model-invocation: true` and the tools they reach for do
-not.
+phases. Whether the user or the agent starts each entry is the chain's
+[[Flow Invocation]] and differs per flow, so a generated project describes its
+own chain and never the other's.
 _Avoid_: pipeline, stages, the seven steps, phase order
+
+**Flow Invocation**:
+Who starts a [[Flow Chain]]'s entries — the user, or the agent on its own.
+Declared per [[Engineering Flow]] in the manifest as `user` or `model`, and
+guarded by a test that reads every shipped step's frontmatter, so the
+declaration cannot drift from the files (ADR-024, as amended 2026-08-18).
+`mattpocock` is `user`: measured 2026-08-14, exactly its chain entries declare
+`disable-model-invocation: true` and the tools they reach for do not.
+`superpowers` is `model`: measured 2026-08-18, none of its skills declares the
+flag and upstream calls them mandatory. dev-ready cannot change either, because
+FR-16 holds vendored files byte-identical to upstream — so this is recorded, not
+chosen. It is also the first of the two axes a flow recommendation may rest on.
+_Avoid_: trigger mode, auto-invoke, activation, enforcement
 
 **Setup Step**:
 The first entry of a [[Flow Chain]] — the run-once configuration a generated
@@ -216,23 +228,25 @@ _Avoid_: master copy, source-of-truth copy, primary
 A small file at an Agent Target's native path that identifies an item and
 directs the agent to its [[Canonical Content]], preserving the canonical
 frontmatter so discovery still sees the skill's name and description.
-**Retired in v0.12** by [[Skill Delivery Mode]] (ADR-025) — not because it
-failed, but to follow the ecosystem convention of offering symlink or copy. The
+**Retired in v0.12** by the [[Skill Link]] (ADR-028) — not because it failed,
+but to follow the ecosystem convention of linking rather than restating. The
 term survives to name what generated projects carried from v0.8 to v0.11, which
 `upgrade` must still recognise and retire.
 _Avoid_: shim, alias, symlink, mirror, proxy
 
-**Skill Delivery Mode**:
-How an [[Agent Target]]'s skills directory receives content: `symlink` (a link
-to the [[Canonical Content]]) or `copy` (the full content). A recorded user
-selection, never a detected platform fallback — an explicit input keeps output
-deterministic (NFR-1) where a fallback would make one dev-ready version produce
-different projects on different machines. Asked only when a selected target
-declares a directory other than `.agents/skills/`; `copy` is the
-non-interactive default, because it is the mode that survives `git clone`
-everywhere. Canonical Content is written in both modes and is never the thing
-being chosen.
-_Avoid_: install mode, link mode, symlinking, deployment mode
+**Skill Link**:
+The link an [[Agent Target]]'s skills directory holds in place of content — one
+per skill, pointing at that skill's [[Canonical Content]] under
+`.agents/skills/`. A relative symbolic link on macOS and Linux, a junction on
+Windows, because a junction is the only directory link Windows offers without
+elevation. Nothing is chosen and nothing is recorded: a link is derived state,
+recomputed from the stamp, so `check` reports a missing one as drift and
+`upgrade` recreates it. Machine-local by design — a `.gitignore` beside the
+links keeps them out of version control and acts as the ownership anchor for
+safe retirement when the projection later shrinks or moves. A clone carries
+Canonical Content and nothing else until `upgrade` runs. A project selecting no
+Agent Target projects no Skill Links and requires no link-capable filesystem.
+_Avoid_: shortcut, alias, shim, pointer, mount, delivery mode, install mode
 
 **Agent Target Map**:
 The manifest's record of each Agent Target's project-level skills directory,

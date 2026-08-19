@@ -9,7 +9,7 @@ Close-out 2026-07-27: v0.8 is released. FR-26 is shipped in `v0.8.0`, which is t
 Amended 2026-07-27: v0.9 and v0.10 added between v0.8 and v1.0 — see "2026-07-27 amendment" at the end of this document (ADR-017, ADR-018, ADR-019). v1.0 is unchanged.
 Close-out 2026-08-01: v0.9 is released. FR-30, FR-31, and FR-35 are shipped in `v0.9.0`; the Category selection model, lean Default Set, and generated Handoff Protocol retirement are complete. ADR-020 changed generated projects only; ADR-021 separately retired this repository's internal Handoff Protocol.
 Close-out 2026-08-09: v0.10 is released. FR-32, FR-33, FR-34, FR-36, FR-37, and FR-38 are shipped in `v0.10.0`; Mount Points, the derived and drift-guarded Agent Target Map, the interview-driven generation skill, the selection-reach and overlay-infrastructure corrections, the generated project's own stack and standards source, and the secret-hygiene repairs are complete. The stamp stayed at version 5, so there was no migration phase. v0.11 (FR-39, FR-40, FR-41) is next.
-Close-out 2026-08-18: v0.11 is released. FR-39, FR-40, FR-41, FR-42, FR-43, FR-44, and FR-45 are shipped in `v0.11.0`; the Engineering Flow, `setup-project`, the full Design Reference set, MIT notice propagation, CLI presentation, and Claude/Codex plugin distribution are complete. The stamp stayed at version 5. v0.12 (FR-46, FR-47) is next.
+Close-out 2026-08-18: v0.11 is released. FR-39, FR-40, FR-41, FR-42, FR-43, FR-44, and FR-45 are shipped in `v0.11.0`; the Engineering Flow, `setup-project`, the full Design Reference set, MIT notice propagation, CLI presentation, and Claude/Codex plugin distribution are complete. The stamp stayed at version 5. v0.12 (FR-46, FR-47) is next, and both were reshaped by the 2026-08-18 entry grilling at the end of this document — ADR-025 is superseded by **ADR-028**, and the stamp stays at version 5 in v0.12 too.
 Numbering continues from requirements.md (FR-1..FR-10 shipped in v0.1/v0.2).
 
 ## End goal
@@ -1085,6 +1085,13 @@ has **no git representation at all**, and its target is absolute, so a
 `copy` is therefore the non-interactive default, and the report states the
 consequence when `symlink` is chosen.
 
+> **Corrected 2026-08-18 (ADR-028).** Two of this section's load-bearing facts
+> were measured and failed. A junction **is** visible to git, which walks through
+> it and stores duplicate blobs, and a junction cannot be created before its
+> target exists, so it cannot be written into `init`'s staging directory. The
+> two-mode design was reversed to one mechanism: links only, no `copy`. See the
+> 2026-08-18 amendment at the end of this document.
+
 ### npx was rejected as a channel; the complaint underneath it was not
 
 Proposed on two grounds — easier installation, and plainer-looking screens than
@@ -1478,3 +1485,138 @@ fields exist is theirs. Which values we wrote is ours.
 - No CI job runs `claude plugin validate .`; it needs the `claude` CLI as a global
   tool, which the standing constraints forbid tests to depend on. It joins the
   by-hand Phase 5 checks, which now number four.
+
+---
+
+## 2026-08-18 amendment — v0.12 entry grilling: ADR-025 is superseded, superpowers is curated and model-invoked (CEO-confirmed, Moofon)
+
+Decided in the `grill-with-docs` session opening v0.12, run against the two
+upstream projects and against Windows link behaviour rather than against the
+decisions. **v0.13 and v1.0 are unchanged**, as are FR-48 and FR-49. v0.12 keeps
+FR-46 and FR-47 and both change shape. Governed by the new **ADR-028** and by
+**ADR-024 as amended 2026-08-18**; three `CONTEXT.md` entries changed —
+[[Skill Delivery Mode]] retired before shipping, [[Skill Link]] and
+[[Flow Invocation]] added, [[Flow Chain]] corrected.
+
+### ADR-025 chose two delivery modes; three of its premises did not survive measurement
+
+The 2026-08-12 amendment recorded that the session recommended `copy` only and
+the CEO chose both modes, "because the convention being adopted offers both".
+That convention was read from a Node installer. Measured on Windows on
+2026-08-18, before any code was written:
+
+- **A junction is not invisible to git.** ADR-025's sentence "a junction has no
+  representation in git at all" is wrong in the direction that matters. Git walks
+  through the reparse point and stages the linked files as ordinary blobs with
+  the same content hash as the canonical file. So the elevation-free mechanism
+  the ADR reopened the question for is the one that duplicates content.
+- **A junction cannot be created before its target exists.**
+  `_winapi.CreateJunction` against a missing target raises
+  `FileNotFoundError [WinError 3]`, and a junction created inside `init`'s
+  staging directory breaks at the rename. A relative POSIX symlink survives it.
+- **Python has no public junction API.** `os.symlink` on a directory needs
+  Developer Mode or an administrator on Windows — the mechanic ADR-015 was right
+  about. Node's `fs.symlink(..., 'junction')`, which ADR-025 quotes, has no
+  standard-library counterpart.
+
+Two further facts were measured and are recorded because they close open risk
+rather than change a decision: `Path.is_symlink()` returns `False` for a
+junction, so `upgrade`'s traversal guard is blind to one; and **Claude Code
+discovers a skill through both a junction and a symbolic link**, verified by hand
+in a scratch project. That last one had no prior evidence — dev-ready has never
+shipped a link — and every decision below rests on it.
+
+### The CEO reversed to one mechanism, and that makes FR-46 smaller than planned
+
+`copy` is dropped, the mode selection with it, and Pointer Stubs are retired as
+ADR-025 already had them. The fallback to `copy` on link failure was proposed in
+session and withdrawn, so ADR-025's rule against a platform-conditional fallback
+survives its supersession intact. ADR-028 records the whole design.
+
+**This changes the sequencing rationale, and `planning` must not carry the old
+one forward.** The 2026-08-12 table gave FR-46 a version largely to itself "for
+FR-26's reason: write path, stamp inventory, `verify`, `upgrade`, and a migration
+off Pointer Stubs". Two of those five are now gone. Nothing is recorded, so the
+**stamp stays at version 5** and there is no migration for a new field; links are
+never inventoried, so the stamp inventory shape does not change either. What
+remains is real but smaller: a link write primitive, a probe in `verify`, link
+creation inside `finalize` after the rename, link repair in `upgrade`, and one
+genuinely hard ticket — retiring a stub means deleting the file, removing the
+emptied directory, and creating the link in its place, which is the first
+`upgrade` transaction step that removes a directory and the first rollback that
+must restore one.
+
+Two costs are permanent and were accepted rather than solved. A cloned project
+carries Canonical Content and no agent directory contents until
+`uvx dev-ready upgrade` runs, on every platform, with no mode that avoids it;
+`setup-project` cannot bootstrap this because it reaches Claude Code through the
+same link, so the generated `README.md` carries the instruction. And a filesystem
+without link support — exFAT, some network shares, some container mounts — can no
+longer receive a generated project at all, where v0.11 could, because Pointer
+Stubs were ordinary files. That failure is caught by a probe in the verify stage
+and exits 5 before anything is written, with a message naming the remedy.
+
+### superpowers is curated on the standard `mattpocock` already set
+
+Measured at each project's default branch on 2026-08-18: `obra/superpowers` holds
+14 skills in 51 files totalling 369,641 bytes; `mattpocock/skills` holds 35 skills
+and dev-ready vendors 12. **Curation is established practice, not a new
+precedent**, so dev-ready vendors 12 of superpowers' 14 on the same standard — a
+skill ships when it is about building the user's project.
+
+`using-superpowers` is excluded as installation metadata: its five reference
+files teach an agent the tool names of five other products, a question a
+dev-ready project answers through its Agent Target selection. `writing-skills` is
+excluded as skill authoring rather than project building, and is also the
+heaviest single skill at 107,377 bytes, 29% of the upstream total. The curated
+set is 38 files and 245,095 bytes, still about 2.4 times the weight of the twelve
+vendored `mattpocock` skills.
+
+A skill ships whole or not at all, because FR-16 compares directories byte for
+byte. `systematic-debugging` therefore ships its own test fixtures and creation
+log, which is a cost named here rather than discovered during implementation.
+
+### The two flows do not share an invocation model
+
+Of the twelve vendored `mattpocock` skills, the six chain entries declare
+`disable-model-invocation: true` and the six tools do not. Of superpowers'
+fourteen, **none** does, and upstream states plainly that these are "Mandatory
+workflows, not suggestions".
+
+FR-16 forbids adding the flag, so the generated `AGENTS.md` sentence FR-43 wrote
+would ship as a false statement about the selected flow — the exact defect class
+FR-43 spent a phase removing. ADR-024 is amended: a development-loop entry
+declares `invocation` (`user` or `model`), the generated chain sentence and
+`docs/agents/<flow-id>.md` render from it, and
+`tests/unit/test_flow_frontmatter.py` becomes data-driven so the declaration
+cannot drift from the files it describes.
+
+### The recommendation rests on two guarded axes and one shared string
+
+FR-47's rule — criteria, never a comparison of upstream projects — leaves exactly
+two axes traceable to something dev-ready ships and tests: who invokes the method
+(from `invocation`) and whether work is split across subagents (from the declared
+`steps`, which the loader already validates). Anything further describes
+upstream's features and has no drift guard.
+
+The criteria live in **one string per flow**, the catalog entry's `description`.
+`prompts/collect.py` already renders the interactive flow row as
+`"{display_name} — {description}"`, and the Generation Skill's trigger line
+quotes the same text. This rewrites `mattpocock`'s shipped v0.11 description,
+which is user-visible and belongs in the CHANGELOG. Upstream's declared chain has
+seven entries with a fork at step four, so `docs/agents/superpowers.md` is the
+first per-flow document that must explain a choice inside a chain.
+
+### Recorded, not decided
+
+- The v0.12 phase cut belongs to `planning`, not to this session. It must be cut
+  against the reduced FR-46 above, not against the 2026-08-12 rationale.
+- `docs/architecture.md`'s ADR index was missing **ADR-026 and ADR-027**, a v0.11
+  gap found and closed in this session. Its Module Boundary row for
+  `agent_targets` still names Pointer Stub paths, which is true of shipped code
+  and changes with the FR-46 tickets, not before them.
+- Invocation through a junction was not exercised end to end. Discovery through
+  one was, and the frontmatter was parsed through it, which is the same read
+  path. It is a ten-second confirmation, not an open risk.
+- The v0.10.1 Spec Loop escape-hatch leftover stays deferred. This session did
+  not reopen it.

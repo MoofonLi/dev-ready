@@ -12,8 +12,8 @@ shipped `setup-project` (FR-39), the full Design Reference set (FR-40), MIT
 notice propagation (FR-41), Engineering Flow selection and the interactive
 rework (FR-42), corrected Flow Chain guidance (FR-43), CLI presentation
 (FR-44), and Claude/Codex plugin distribution (FR-45) — governed by ADR-024,
-ADR-026, and ADR-027. The stamp stayed at version 5. v0.12 (FR-46 Skill
-Delivery Mode under ADR-025, FR-47 `superpowers`) and v0.13 (FR-48
+ADR-026, and ADR-027. The stamp stayed at version 5. v0.12 (FR-46 Skill Links
+under ADR-028, FR-47 `superpowers`) and v0.13 (FR-48
 `addyosmani/agent-skills`, FR-49 Token Optimize additions) follow. v1.0 remains
 gated on the real-users evidence defined in `docs/version-plan.md`, which the
 2026-08-09 amendment narrowed to Branch A alone. Per-version plans live in
@@ -27,8 +27,10 @@ infrastructure at the head of every chain; all 74 Design References are
 ordinary catalog items; MIT notices travel with the copied skills; the
 repository root is the Claude and Codex plugin; and a flag answers only its
 own question. The stamp stays at version 5 — nothing in v0.11 added, removed,
-or re-typed a recorded field. Pointer Stubs remain the delivery mechanism;
-ADR-025 targets v0.12.
+or re-typed a recorded field. Pointer Stubs remain the delivery mechanism in
+shipped code; ADR-028 retires them in v0.12 in favour of one Skill Link per
+skill, with no copy mode and no new stamp field. ADR-025, which chose between
+two delivery modes, is superseded in full and was never implemented.
 
 ## Read before writing code
 
