@@ -149,3 +149,19 @@ jobs:
         if: always() && steps.generate.outcome == 'success'
         working-directory: demo-app
         run: docker compose down -v
+
+  # ADR-028 / FR-46. Windows junctions, Git exclusion, and moved-project
+  # repair cannot be proven on Ubuntu. Existing Ubuntu jobs stay unchanged.
+  windows-lifecycle:
+    needs: test
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - name: Sync dependencies
+        run: uv sync --dev
+      - name: Run full offline suite
+        run: uv run pytest
+      - name: Run real generation and N-1 lifecycle
+        run: uv run pytest -m network tests/e2e/test_init_real.py tests/e2e/test_upgrade_from_release.py -s

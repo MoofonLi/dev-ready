@@ -6,7 +6,12 @@
 | `integration/` | Module combinations: fetch+manifest against recorded fixtures, overlay onto a fixture base | medium, run in PR CI |
 | `e2e/` | Full real-network generation and cross-release lifecycle scenarios | slow, run in dedicated PR CI jobs and weekly upstream-bump |
 
-Conventions: pytest, files named `test_*.py`, no network in unit tests (integration uses recorded fixtures where possible). Network tests are deselected by default and invoked explicitly with `pytest -m network`; `test_upgrade_from_release.py` permanently pins the reviewed N-1 release rather than resolving `latest`.
+Conventions: pytest, files named `test_*.py`, no network in unit tests (integration uses recorded fixtures where possible). Network tests are deselected by default and invoked explicitly with `pytest -m network`; `test_upgrade_from_release.py` permanently pins the reviewed N-1 release rather than resolving `latest`. CI has six jobs. The five Ubuntu jobs keep their existing purposes. The sixth,
+`windows-lifecycle`, runs the full offline suite plus `tests/e2e/test_init_real.py`
+and `tests/e2e/test_upgrade_from_release.py` on Windows so native junctions,
+a real `git add -A` exclusion check, v0.11 Pointer Stub conversion, and
+moved-project junction repair are exercised. The test suite never calls Git
+from inside `src/dev_ready`.
 
 ## Adapters to third-party libraries are tested against the real library
 
