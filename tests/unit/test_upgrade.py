@@ -2,7 +2,9 @@
 
 import hashlib
 import json
+import os
 import shutil
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -14,10 +16,18 @@ from dev_ready.cli import main
 from dev_ready.errors import StampInvalidError, UpgradeError, UpgradeNotSupportedError
 from dev_ready.inspection import REQUIRED_UPSTREAM_PATHS
 from dev_ready.manifest import ComponentCatalog, load_default_manifest
-from dev_ready.overlay import apply_overlay, build_overlay_content
+from dev_ready.overlay import (
+    apply_overlay,
+    build_overlay_content,
+    projected_skill_link_pairs,
+    render_ignore_anchor,
+)
 from dev_ready.prompts import Answers, ProjectSelection
 from dev_ready.stamp import load_stamp
+from dev_ready.skill_links import PathKind, classify_path, create_skill_link
 from dev_ready.upgrade import upgrade_project
+
+_WINDOWS = sys.platform == "win32"
 
 MANIFEST = load_default_manifest()
 PIN = MANIFEST.upstream["base_template"]
@@ -66,11 +76,47 @@ _LOOP_TARGET_SKILLS_DIRS = (Path(".claude/skills"), Path(".windsurf/skills"))
 
 
 def _snapshot(root: Path) -> dict[str, str]:
-    return {
-        path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in sorted(root.rglob("*"))
-        if path.is_file()
-    }
+    snapshot: dict[str, str] = {}
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        for path in current.iterdir():
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink() or path.is_junction():
+                snapshot[relative] = f"link:{os.readlink(path)}"
+                continue
+            if path.is_dir():
+                stack.append(path)
+                continue
+            if path.is_file():
+                snapshot[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return snapshot
+
+
+def _remove_windsurf_tree(project: Path) -> None:
+    skills = project / ".windsurf" / "skills"
+    if skills.is_dir() and not skills.is_symlink() and not skills.is_junction():
+        for child in list(skills.iterdir()):
+            if child.is_symlink() or child.is_junction():
+                child.unlink()
+    windsurf = project / ".windsurf"
+    if windsurf.exists():
+        shutil.rmtree(windsurf)
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["inventory"] = [
+        entry
+        for entry in data["inventory"]
+        if not str(entry["path"]).startswith(".windsurf/")
+    ]
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _apply_current_project(answers: Answers, project: Path) -> Path:
+    apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
+    for link_rel, canonical_rel in projected_skill_link_pairs(answers, CATALOG):
+        create_skill_link(project / link_rel, project / canonical_rel)
+    return project
 
 
 def _make_project(tmp_path: Path, *, code_memory: bool = False) -> Path:
@@ -88,8 +134,7 @@ def _make_project(tmp_path: Path, *, code_memory: bool = False) -> Path:
                 agent_targets=frozenset({"claude", "windsurf"}),
         ),
     )
-    apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
-    return project
+    return _apply_current_project(answers, project)
 
 
 def _make_mounted_project(tmp_path: Path) -> Path:
@@ -110,8 +155,7 @@ def _make_mounted_project(tmp_path: Path) -> Path:
             agent_targets=frozenset({"claude", "windsurf"}),
         ),
     )
-    apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
-    return project
+    return _apply_current_project(answers, project)
 
 
 def _make_design_reference_project(tmp_path: Path) -> Path:
@@ -128,8 +172,7 @@ def _make_design_reference_project(tmp_path: Path) -> Path:
             agent_targets=frozenset(),
         ),
     )
-    apply_overlay(answers, project, CATALOG, PIN, MANIFEST.vendored)
-    return project
+    return _apply_current_project(answers, project)
 
 
 def _set_inventory_hash(project: Path, path: str, content: bytes) -> None:
@@ -176,8 +219,14 @@ def _make_pre_agent_target_project(tmp_path: Path) -> Path:
     """Rewrite a current fixture into the v3 Claude-only layout."""
     project = _make_project(tmp_path)
     _materialize_required_upstream_paths(project)
+    for skills_dir in (project / ".claude" / "skills", project / ".windsurf" / "skills"):
+        if skills_dir.is_dir() and not skills_dir.is_symlink() and not skills_dir.is_junction():
+            for child in list(skills_dir.iterdir()):
+                if child.is_symlink() or child.is_junction():
+                    child.unlink()
     canonical_skill = project / ".agents/skills/caveman/SKILL.md"
     legacy_skill = project / ".claude/skills/caveman/SKILL.md"
+    legacy_skill.parent.mkdir(parents=True, exist_ok=True)
     legacy_skill.write_bytes(canonical_skill.read_bytes())
     legacy_rules = (project / "AGENTS.md").read_bytes()
     (project / "CLAUDE.md").write_bytes(legacy_rules)
@@ -422,15 +471,19 @@ def test_shipped_design_reference_pair_upgrades_to_collapsed_mount_without_confl
 
 def test_missing_unrecorded_file_is_added(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
-    skill = project / ".claude" / "skills" / "caveman" / "SKILL.md"
-    skill.unlink()
+    anchor = project / ".claude" / "skills" / ".gitignore"
+    anchor.unlink()
     stamp_path = project / ".dev-ready.json"
     data = json.loads(stamp_path.read_text(encoding="utf-8"))
-    data["inventory"] = [entry for entry in data["inventory"] if entry["path"] != skill.relative_to(project).as_posix()]
+    data["inventory"] = [
+        entry
+        for entry in data["inventory"]
+        if entry["path"] != ".claude/skills/.gitignore"
+    ]
     stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
     report = upgrade_project(project)
-    assert skill.exists()
+    assert anchor.exists()
     assert "Added (1):" in report
 
 
@@ -507,19 +560,7 @@ def test_parent_mkdir_failure_removes_partial_directories(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project = _make_project(tmp_path)
-    skill_dir = project / ".claude" / "skills" / "caveman"
-    for path in sorted(skill_dir.rglob("*"), reverse=True):
-        if path.is_file():
-            path.unlink()
-    skill_dir.rmdir()
-    stamp_path = project / ".dev-ready.json"
-    data = json.loads(stamp_path.read_text(encoding="utf-8"))
-    data["inventory"] = [
-        entry
-        for entry in data["inventory"]
-        if entry["path"] != ".claude/skills/caveman/SKILL.md"
-    ]
-    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    _remove_windsurf_tree(project)
     before = _snapshot(project)
     original_mkdir = Path.mkdir
     calls = 0
@@ -1129,14 +1170,13 @@ def test_pre_target_stamp_migrates_to_canonical_claude_layout(tmp_path: Path) ->
     report = upgrade_project(project)
 
     canonical = project / ".agents/skills/caveman/SKILL.md"
-    stub = project / ".claude/skills/caveman/SKILL.md"
+    link = project / ".claude/skills/caveman"
     assert (project / "AGENTS.md").is_file()
     assert (project / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n"
     assert canonical.is_file()
-    assert stub.is_file()
-    assert canonical.read_bytes() != stub.read_bytes()
+    assert link.is_symlink() or link.is_junction()
+    assert link.resolve() == canonical.parent.resolve()
     assert not canonical.is_symlink()
-    assert not stub.is_symlink()
     assert not (project / ".windsurf").exists()
     migrated = load_stamp(project)
     assert migrated.stamp_version == 5
@@ -1211,3 +1251,717 @@ def test_migration_failure_rolls_back_added_and_replaced_files(
         upgrade_project(project)
 
     assert _snapshot(project) == before
+
+
+def _tree_snapshot(root: Path) -> dict[str, tuple[str, bytes]]:
+    snapshot: dict[str, tuple[str, bytes]] = {}
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        for child in current.iterdir():
+            relative = child.relative_to(root).as_posix()
+            if child.is_symlink() or child.is_junction():
+                snapshot[relative] = ("link", os.readlink(child).encode("utf-8"))
+                continue
+            if child.is_dir():
+                snapshot[relative] = ("directory", b"")
+                stack.append(child)
+                continue
+            snapshot[relative] = ("file", child.read_bytes())
+    return snapshot
+
+
+def test_wrong_skill_link_is_repaired_without_following_its_target(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    decoy = project / "decoy"
+    decoy.mkdir()
+    (decoy / "SKILL.md").write_text("other\n", encoding="utf-8")
+    link = project / ".claude" / "skills" / "caveman"
+    if link.is_symlink() or link.is_junction():
+        link.unlink()
+    create_skill_link(link, decoy)
+
+    report = upgrade_project(project)
+
+    assert "Skill Links repaired" in report
+    assert (decoy / "SKILL.md").read_text(encoding="utf-8") == "other\n"
+    assert (link / "SKILL.md").read_text(encoding="utf-8") != "other\n"
+    assert link.resolve() == (project / ".agents" / "skills" / "caveman").resolve()
+
+
+def test_clone_without_links_is_bootstrapped_by_upgrade(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    for skills_dir in (project / ".claude" / "skills", project / ".windsurf" / "skills"):
+        if not skills_dir.is_dir():
+            continue
+        for child in list(skills_dir.iterdir()):
+            if child.is_symlink() or child.is_junction():
+                child.unlink()
+
+    report = upgrade_project(project)
+
+    assert "Skill Links created" in report
+    assert "No changes were needed." not in report
+    caveman = project / ".claude" / "skills" / "caveman"
+    assert caveman.is_symlink() or caveman.is_junction()
+    repeat = upgrade_project(project, dry_run=True)
+    assert "would create" not in repeat
+    assert "would repair" not in repeat
+
+
+def test_relocate_moves_a_native_link_without_touching_its_target(tmp_path: Path) -> None:
+    canonical = tmp_path / "canon"
+    canonical.mkdir()
+    marker = canonical / "SKILL.md"
+    marker.write_text("keep\n", encoding="utf-8")
+    link = tmp_path / "link"
+    parked = tmp_path / "parked"
+    create_skill_link(link, canonical)
+
+    upgrade_module._relocate_path(link, parked)
+
+    assert classify_path(link) == PathKind.ABSENT
+    assert classify_path(parked) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert marker.read_text(encoding="utf-8") == "keep\n"
+
+    upgrade_module._relocate_path(parked, link)
+
+    assert classify_path(link) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert classify_path(parked) == PathKind.ABSENT
+    assert marker.read_text(encoding="utf-8") == "keep\n"
+    assert (link / "SKILL.md").read_text(encoding="utf-8") == "keep\n"
+
+
+@pytest.mark.skipif(not _WINDOWS, reason="junction detection is the Windows hole")
+def test_has_symlink_component_sees_a_junction(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    junction = tmp_path / "skills"
+    create_skill_link(junction, real)
+
+    assert upgrade_module._has_symlink_component(tmp_path, junction / "to-spec" / "SKILL.md")
+    assert (real / "to-spec").exists() is False
+
+
+def test_backup_failure_restores_already_relocated_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _make_project(tmp_path)
+    old = b"OLD"
+    (project / "CLAUDE.md").write_bytes(old)
+    _set_inventory_hash(project, "CLAUDE.md", old)
+    _add_obsolete_managed_file(
+        project, "docs/handoffs/phase-N/01-plan.md", recorded_content=b"legacy"
+    )
+    before = _tree_snapshot(project)
+    original = upgrade_module._relocate_path
+    calls = 0
+
+    def fail_second(source: Path, destination: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("injected backup failure")
+        original(source, destination)
+
+    monkeypatch.setattr(upgrade_module, "_relocate_path", fail_second)
+    with pytest.raises(UpgradeError, match="rolled back"):
+        upgrade_project(project)
+    assert _tree_snapshot(project) == before
+
+
+def test_stamp_write_failure_restores_empty_directory_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _make_project(tmp_path)
+    _remove_windsurf_tree(project)
+    before = _tree_snapshot(project)
+    original = upgrade_module._write_target
+
+    def fail_stamp(path: Path, data: bytes) -> None:
+        if path.name == ".dev-ready.json":
+            raise OSError("injected stamp failure")
+        original(path, data)
+
+    monkeypatch.setattr(upgrade_module, "_write_target", fail_stamp)
+    with pytest.raises(UpgradeError, match="rolled back"):
+        upgrade_project(project)
+    assert _tree_snapshot(project) == before
+    assert not (project / ".windsurf").exists()
+
+
+def test_rollback_leaves_an_unrelated_native_link_untouched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _make_project(tmp_path)
+    old = b"OLD"
+    (project / "CLAUDE.md").write_bytes(old)
+    _set_inventory_hash(project, "CLAUDE.md", old)
+    canonical = project / "user-skill"
+    canonical.mkdir()
+    (canonical / "SKILL.md").write_text("user\n", encoding="utf-8")
+    user_link = project / "user-link"
+    create_skill_link(user_link, canonical)
+    before = _tree_snapshot(project)
+
+    def fail_first(path: Path, data: bytes) -> None:
+        raise OSError("injected write failure")
+
+    monkeypatch.setattr(upgrade_module, "_write_target", fail_first)
+    with pytest.raises(UpgradeError, match="rolled back"):
+        upgrade_project(project)
+    assert _tree_snapshot(project) == before
+    assert classify_path(user_link) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert (canonical / "SKILL.md").read_text(encoding="utf-8") == "user\n"
+
+
+def _anchor_entries(project: Path, skills_dir: str) -> list[str]:
+    text = (project / skills_dir / ".gitignore").read_text(encoding="utf-8")
+    return [line for line in text.splitlines() if line and not line.startswith("#")]
+
+
+def _remove_native_link(path: Path) -> None:
+    if path.is_symlink() or path.is_junction():
+        path.unlink()
+
+
+def _inventory_hash(project: Path, path: str) -> str:
+    stamp = load_stamp(project)
+    for entry in stamp.inventory:
+        if entry.path == path:
+            return entry.sha256
+    raise AssertionError(f"inventory has no {path}")
+
+
+def test_differing_nested_gitignore_blocks_every_link_change_in_that_target(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    edited = b"# mine\ncustom-rule\n"
+    (project / ".claude" / "skills" / ".gitignore").write_bytes(edited)
+    claude_link = project / ".claude" / "skills" / "caveman"
+    windsurf_link = project / ".windsurf" / "skills" / "caveman"
+    _remove_native_link(claude_link)
+    _remove_native_link(windsurf_link)
+    before_claude = _tree_snapshot(project / ".claude" / "skills")
+
+    report = upgrade_project(project)
+
+    assert (project / ".claude" / "skills" / ".gitignore").read_bytes() == edited
+    assert classify_path(claude_link) == PathKind.ABSENT
+    assert _tree_snapshot(project / ".claude" / "skills") == before_claude
+    assert classify_path(windsurf_link) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert "Skipped (user-modified)" in report
+    assert "  - .claude/skills/.gitignore" in report
+    assert "  - .claude/skills\n" in report or "  - .claude/skills\r\n" in report
+    assert "  - .windsurf/skills/caveman" in report
+
+
+def test_recorded_missing_nested_gitignore_is_restored_and_ordinary_missing_is_not(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    anchor = project / ".claude" / "skills" / ".gitignore"
+    names = _anchor_entries(project, ".claude/skills")
+    expected = render_ignore_anchor(names)
+    anchor.unlink()
+    agents = project / "AGENTS.md"
+    agents.unlink()
+
+    report = upgrade_project(project)
+
+    assert anchor.read_bytes() == expected
+    assert not agents.exists()
+    assert "would restore" not in report
+    assert "Restored" in report
+    assert ".claude/skills/.gitignore" in report
+    assert "Skipped (missing)" in report
+    assert "AGENTS.md" in report
+    assert _inventory_hash(project, ".claude/skills/.gitignore") == hashlib.sha256(
+        expected
+    ).hexdigest()
+
+
+def test_dry_run_reports_would_restore_missing_anchor_without_mutation(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    anchor = project / ".claude" / "skills" / ".gitignore"
+    anchor.unlink()
+    before = _tree_snapshot(project)
+
+    report = upgrade_project(project, dry_run=True)
+
+    assert _tree_snapshot(project) == before
+    assert "would restore .claude/skills/.gitignore" in report
+    assert not anchor.exists()
+
+
+def test_identical_unrecorded_nested_gitignore_is_adopted(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    expected = (project / ".claude" / "skills" / ".gitignore").read_bytes()
+    _drop_from_inventory(project, ".claude/skills/.gitignore")
+    link = project / ".claude" / "skills" / "caveman"
+    _remove_native_link(link)
+
+    report = upgrade_project(project)
+
+    assert (project / ".claude" / "skills" / ".gitignore").read_bytes() == expected
+    assert classify_path(link) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert "  - .claude/skills/.gitignore" not in report
+    assert _inventory_hash(project, ".claude/skills/.gitignore") == hashlib.sha256(
+        expected
+    ).hexdigest()
+
+
+def test_partial_conversion_inventories_only_post_transaction_links(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    _materialize_required_upstream_paths(project)
+    occupant = project / ".claude" / "skills" / "caveman"
+    _remove_native_link(occupant)
+    occupant.mkdir()
+    (occupant / "notes.md").write_text("mine\n", encoding="utf-8")
+    setup = project / ".claude" / "skills" / "setup-project"
+    _remove_native_link(setup)
+
+    report = upgrade_project(project)
+
+    assert (occupant / "notes.md").read_text(encoding="utf-8") == "mine\n"
+    assert classify_path(occupant) == PathKind.DIRECTORY
+    assert classify_path(setup) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    names = _anchor_entries(project, ".claude/skills")
+    assert "caveman" not in names
+    assert "setup-project" in names
+    assert _inventory_hash(project, ".claude/skills/.gitignore") == hashlib.sha256(
+        render_ignore_anchor(names)
+    ).hexdigest()
+    assert "Conflict" in report
+    assert ".claude/skills/caveman" in report
+    assert main(["check", str(project)]) == 7
+
+    shutil.rmtree(occupant)
+    second = upgrade_project(project)
+
+    assert classify_path(occupant) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert "caveman" in _anchor_entries(project, ".claude/skills")
+    assert "Skill Links created" in second
+    repeat = upgrade_project(project, dry_run=True)
+    assert "would create" not in repeat
+    assert "would repair" not in repeat
+    assert "No changes were needed." in repeat
+    assert main(["check", str(project)]) == 0
+
+
+def test_user_modified_canonical_content_is_ready_for_its_link(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    canonical = project / ".agents" / "skills" / "caveman" / "SKILL.md"
+    canonical.write_bytes(b"edited skill\n")
+    link = project / ".claude" / "skills" / "caveman"
+    _remove_native_link(link)
+
+    report = upgrade_project(project)
+
+    assert canonical.read_bytes() == b"edited skill\n"
+    assert classify_path(link) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert "Skill Links created" in report
+    assert ".claude/skills/caveman" in report
+
+
+def test_missing_recorded_canonical_file_blocks_only_that_skill_link(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    (project / ".agents" / "skills" / "caveman" / "SKILL.md").unlink()
+    caveman = project / ".claude" / "skills" / "caveman"
+    setup = project / ".claude" / "skills" / "setup-project"
+    _remove_native_link(caveman)
+    _remove_native_link(setup)
+
+    report = upgrade_project(project)
+
+    assert classify_path(caveman) == PathKind.ABSENT
+    assert classify_path(setup) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert "caveman" not in _anchor_entries(project, ".claude/skills")
+    assert "setup-project" in _anchor_entries(project, ".claude/skills")
+    assert "Skipped (missing)" in report
+    assert ".agents/skills/caveman/SKILL.md" in report
+
+
+def test_redirected_agent_target_container_blocks_the_whole_target(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    skills = project / ".claude" / "skills"
+    real = project / ".claude" / "skills-real"
+    skills.rename(real)
+    create_skill_link(skills, real)
+    before = _tree_snapshot(real)
+    windsurf = project / ".windsurf" / "skills" / "caveman"
+    _remove_native_link(windsurf)
+
+    report = upgrade_project(project)
+
+    assert classify_path(skills) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert _tree_snapshot(real) == before
+    assert "Conflict" in report
+    assert report.count(".claude/skills") >= 1
+    assert classify_path(windsurf) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+
+
+def test_restored_anchor_rolls_back_when_a_later_write_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _make_project(tmp_path)
+    (project / ".claude" / "skills" / ".gitignore").unlink()
+    before = _tree_snapshot(project)
+    original = upgrade_module._write_target
+
+    def fail_stamp(path: Path, data: bytes) -> None:
+        if path.name == ".dev-ready.json":
+            raise OSError("injected stamp failure")
+        original(path, data)
+
+    monkeypatch.setattr(upgrade_module, "_write_target", fail_stamp)
+    with pytest.raises(UpgradeError, match="rolled back"):
+        upgrade_project(project)
+
+    assert _tree_snapshot(project) == before
+    assert not (project / ".claude" / "skills" / ".gitignore").exists()
+
+
+def _replace_link_with_recorded_stub(
+    project: Path,
+    skills_dir: str,
+    skill_name: str,
+    content: bytes = b"pointer stub\n",
+) -> Path:
+    link = project / skills_dir / skill_name
+    _remove_native_link(link)
+    stub = link / "SKILL.md"
+    stub.parent.mkdir(parents=True, exist_ok=True)
+    stub.write_bytes(content)
+    _add_obsolete_managed_file(
+        project,
+        f"{skills_dir}/{skill_name}/SKILL.md",
+        recorded_content=content,
+    )
+    return stub
+
+
+def test_untouched_pointer_stub_directory_is_retired_and_replaced_by_a_link(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    _replace_link_with_recorded_stub(project, ".claude/skills", "caveman")
+
+    report = upgrade_project(project)
+
+    link = project / ".claude" / "skills" / "caveman"
+    assert classify_path(link) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert link.resolve() == (project / ".agents" / "skills" / "caveman").resolve()
+    assert "Deleted (obsolete)" in report
+    assert ".claude/skills/caveman/SKILL.md" in report
+    stamp = load_stamp(project)
+    assert stamp.stamp_version == 5
+    assert not any(
+        entry.path.endswith("/SKILL.md") and entry.path.startswith(".claude/")
+        for entry in stamp.inventory
+    )
+    repeat = upgrade_project(project, dry_run=True)
+    assert "would delete" not in repeat
+    assert "would create" not in repeat
+    assert "No changes were needed." in repeat
+
+
+def test_missing_recorded_stub_in_empty_scaffold_still_converts(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    stub = _replace_link_with_recorded_stub(project, ".claude/skills", "caveman")
+    stub.unlink()
+    assert stub.parent.is_dir()
+
+    upgrade_project(project)
+
+    link = project / ".claude" / "skills" / "caveman"
+    assert classify_path(link) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert classify_path(stub.parent) != PathKind.DIRECTORY or link == stub.parent
+
+
+def test_untouched_stub_with_siblings_loses_only_the_managed_file(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    stub = _replace_link_with_recorded_stub(project, ".claude/skills", "caveman")
+    sibling = stub.parent / "notes.md"
+    sibling.write_text("mine\n", encoding="utf-8")
+
+    report = upgrade_project(project)
+
+    assert not stub.exists()
+    assert sibling.read_text(encoding="utf-8") == "mine\n"
+    assert classify_path(stub.parent) == PathKind.DIRECTORY
+    assert "caveman" not in _anchor_entries(project, ".claude/skills")
+    assert ".claude/skills/caveman" in report
+
+
+def test_modified_pointer_stub_is_preserved_and_blocks_its_link(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    stub = _replace_link_with_recorded_stub(project, ".claude/skills", "caveman")
+    stub.write_bytes(b"user-edited stub\n")
+
+    report = upgrade_project(project)
+
+    assert stub.read_bytes() == b"user-edited stub\n"
+    assert classify_path(stub.parent) == PathKind.DIRECTORY
+    assert "Preserved (obsolete, user-modified)" in report
+    assert "Divergence" in report
+    assert ".claude/skills/caveman/SKILL.md" in report
+    assert classify_path(project / ".claude" / "skills" / "caveman") == PathKind.DIRECTORY
+
+
+def test_correct_link_at_obsolete_stub_path_is_completed_conversion(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    canonical = (project / ".agents" / "skills" / "caveman" / "SKILL.md").read_bytes()
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["inventory"].append(
+        {
+            "path": ".claude/skills/caveman/SKILL.md",
+            "sha256": hashlib.sha256(b"pointer stub\n").hexdigest(),
+        }
+    )
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    report = upgrade_project(project)
+
+    link = project / ".claude" / "skills" / "caveman"
+    assert classify_path(link) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert (project / ".agents" / "skills" / "caveman" / "SKILL.md").read_bytes() == canonical
+    assert "  - .claude/skills/caveman/SKILL.md" not in report
+
+
+def test_v3_full_copy_directory_retires_as_one_clean_cohort(
+    tmp_path: Path,
+) -> None:
+    project = _make_pre_agent_target_project(tmp_path)
+    _materialize_required_upstream_paths(project)
+    skill_dir = project / ".claude" / "skills" / "caveman"
+    script = skill_dir / "scripts" / "run.py"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_bytes(b"print('hi')\n")
+    _add_obsolete_managed_file(
+        project,
+        ".claude/skills/caveman/scripts/run.py",
+        recorded_content=b"print('hi')\n",
+    )
+
+    report = upgrade_project(project)
+
+    link = project / ".claude" / "skills" / "caveman"
+    assert classify_path(link) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert not script.exists()
+    assert load_stamp(project).stamp_version == 5
+    assert ".claude/skills/caveman/SKILL.md" in report
+    assert ".claude/skills/caveman/scripts/run.py" in report
+
+
+def test_v3_missing_recorded_cohort_file_does_not_block_retirement(
+    tmp_path: Path,
+) -> None:
+    project = _make_pre_agent_target_project(tmp_path)
+    skill_dir = project / ".claude" / "skills" / "caveman"
+    _add_obsolete_managed_file(
+        project,
+        ".claude/skills/caveman/LICENSE",
+        recorded_content=b"MIT\n",
+    )
+    (skill_dir / "LICENSE").unlink()
+
+    upgrade_project(project)
+
+    link = project / ".claude" / "skills" / "caveman"
+    assert classify_path(link) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+
+
+def test_v3_modified_or_extra_entry_preserves_the_whole_cohort(
+    tmp_path: Path,
+) -> None:
+    project = _make_pre_agent_target_project(tmp_path)
+    skill_dir = project / ".claude" / "skills" / "caveman"
+    script = skill_dir / "scripts" / "run.py"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_bytes(b"print('hi')\n")
+    _add_obsolete_managed_file(
+        project,
+        ".claude/skills/caveman/scripts/run.py",
+        recorded_content=b"print('hi')\n",
+    )
+    script.write_bytes(b"print('edited')\n")
+    extra = skill_dir / "notes.md"
+    extra.write_text("mine\n", encoding="utf-8")
+    original_skill = (skill_dir / "SKILL.md").read_bytes()
+
+    report = upgrade_project(project)
+
+    assert (skill_dir / "SKILL.md").read_bytes() == original_skill
+    assert script.read_bytes() == b"print('edited')\n"
+    assert extra.read_text(encoding="utf-8") == "mine\n"
+    assert classify_path(skill_dir) == PathKind.DIRECTORY
+    assert ".claude/skills/caveman/scripts/run.py" in report
+    assert ".claude/skills/caveman/notes.md" in report or "notes.md" in report
+
+
+def test_legacy_directory_retirement_rolls_back_the_complete_cohort(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _make_pre_agent_target_project(tmp_path)
+    skill_dir = project / ".claude" / "skills" / "caveman"
+    script = skill_dir / "scripts" / "run.py"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_bytes(b"print('hi')\n")
+    _add_obsolete_managed_file(
+        project,
+        ".claude/skills/caveman/scripts/run.py",
+        recorded_content=b"print('hi')\n",
+    )
+    before = _tree_snapshot(project)
+    original = upgrade_module._write_target
+
+    def fail_stamp(path: Path, data: bytes) -> None:
+        if path.name == ".dev-ready.json":
+            raise OSError("injected stamp failure")
+        original(path, data)
+
+    monkeypatch.setattr(upgrade_module, "_write_target", fail_stamp)
+    with pytest.raises(UpgradeError, match="rolled back"):
+        upgrade_project(project)
+
+    assert _tree_snapshot(project) == before
+    assert script.read_bytes() == b"print('hi')\n"
+
+
+def _record_anchor_with_extra_name(
+    project: Path, skills_dir: str, extra_name: str
+) -> bytes:
+    names = [*_anchor_entries(project, skills_dir), extra_name]
+    data = render_ignore_anchor(names)
+    anchor = project / skills_dir / ".gitignore"
+    anchor.write_bytes(data)
+    _set_inventory_hash(project, f"{skills_dir}/.gitignore", data)
+    return data
+
+
+def test_unmodified_anchor_retires_a_stale_link_when_a_skill_disappears(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    canonical = project / ".agents" / "skills" / "caveman"
+    stale = project / ".claude" / "skills" / "retired-skill"
+    create_skill_link(stale, canonical)
+    _record_anchor_with_extra_name(project, ".claude/skills", "retired-skill")
+
+    report = upgrade_project(project)
+
+    assert classify_path(stale) == PathKind.ABSENT
+    assert "retired-skill" not in _anchor_entries(project, ".claude/skills")
+    assert "retired-skill" in report
+    assert ".claude/skills/retired-skill" in report
+    stamp = load_stamp(project)
+    assert not any(entry.path.endswith("/retired-skill") for entry in stamp.inventory)
+    repeat = upgrade_project(project, dry_run=True)
+    assert "retired-skill" not in repeat or "would remove" not in repeat
+    assert "No changes were needed." in repeat
+
+
+def test_real_occupant_at_a_stale_name_is_preserved_and_reported(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    occupant = project / ".claude" / "skills" / "retired-skill"
+    occupant.mkdir()
+    (occupant / "notes.md").write_text("mine\n", encoding="utf-8")
+    _record_anchor_with_extra_name(project, ".claude/skills", "retired-skill")
+
+    report = upgrade_project(project)
+
+    assert (occupant / "notes.md").read_text(encoding="utf-8") == "mine\n"
+    assert classify_path(occupant) == PathKind.DIRECTORY
+    assert "retired-skill" not in _anchor_entries(project, ".claude/skills")
+    assert ".claude/skills/retired-skill" in report
+
+
+def test_modified_anchor_preserves_stale_links_for_manual_reconciliation(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    canonical = project / ".agents" / "skills" / "caveman"
+    stale = project / ".claude" / "skills" / "retired-skill"
+    create_skill_link(stale, canonical)
+    names = [*_anchor_entries(project, ".claude/skills"), "retired-skill"]
+    (project / ".claude" / "skills" / ".gitignore").write_bytes(
+        render_ignore_anchor(names) + b"# user note\n"
+    )
+
+    report = upgrade_project(project)
+
+    assert classify_path(stale) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    assert "Skipped (user-modified)" in report
+    assert ".claude/skills/.gitignore" in report
+    assert ".claude/skills" in report
+
+
+def test_obsolete_unmodified_anchor_retires_its_trusted_links(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    windsurf_link = project / ".windsurf" / "skills" / "caveman"
+    assert classify_path(windsurf_link) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}
+    stamp_path = project / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["agent_targets"] = ["claude"]
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    report = upgrade_project(project)
+
+    assert classify_path(windsurf_link) == PathKind.ABSENT
+    assert not (project / ".windsurf" / "skills" / ".gitignore").exists()
+    assert ".windsurf/skills" in report or ".windsurf/skills/caveman" in report
+    assert not any(
+        entry.path.startswith(".windsurf/skills/")
+        for entry in load_stamp(project).inventory
+    )
+
+
+def test_stale_link_retirement_rolls_back_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _make_project(tmp_path)
+    canonical = project / ".agents" / "skills" / "caveman"
+    stale = project / ".claude" / "skills" / "retired-skill"
+    create_skill_link(stale, canonical)
+    _record_anchor_with_extra_name(project, ".claude/skills", "retired-skill")
+    before = _tree_snapshot(project)
+    original = upgrade_module._write_target
+
+    def fail_stamp(path: Path, data: bytes) -> None:
+        if path.name == ".dev-ready.json":
+            raise OSError("injected stamp failure")
+        original(path, data)
+
+    monkeypatch.setattr(upgrade_module, "_write_target", fail_stamp)
+    with pytest.raises(UpgradeError, match="rolled back"):
+        upgrade_project(project)
+
+    assert _tree_snapshot(project) == before
+    assert classify_path(stale) in {PathKind.JUNCTION, PathKind.SYMBOLIC_LINK}

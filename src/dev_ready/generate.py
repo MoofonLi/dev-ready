@@ -18,8 +18,14 @@ from typing import TypeVar
 from dev_ready.errors import TargetDirectoryError
 from dev_ready.fetch import fetch_snapshot
 from dev_ready.manifest import ComponentCatalog, UpstreamPin, VendoredPin
-from dev_ready.overlay import apply_overlay
+from dev_ready.overlay import apply_overlay, projected_skill_link_pairs
 from dev_ready.prompts import Answers
+from dev_ready.skill_links import (
+    PathKind,
+    classify_path,
+    create_skill_link,
+    remove_link_object,
+)
 from dev_ready.verify import verify_project
 
 __all__ = [
@@ -123,6 +129,8 @@ def generate(
             lambda: _finalize_project(
                 project_staging,
                 answers.target_dir,
+                answers,
+                catalog,
                 restore_empty_target=target_was_empty,
             ),
         )
@@ -257,7 +265,12 @@ def _is_third_party_origin(origin: str) -> bool:
 
 
 def _finalize_project(
-    project_staging: Path, target_dir: Path, *, restore_empty_target: bool
+    project_staging: Path,
+    target_dir: Path,
+    answers: Answers,
+    catalog: ComponentCatalog,
+    *,
+    restore_empty_target: bool,
 ) -> None:
     _prune_empty_dirs(project_staging)
     _finalize(
@@ -265,6 +278,43 @@ def _finalize_project(
         target_dir,
         restore_empty_target=restore_empty_target,
     )
+    created: list[Path] = []
+    try:
+        for link_rel, canonical_rel in projected_skill_link_pairs(answers, catalog):
+            canonical = target_dir / canonical_rel
+            if classify_path(canonical) != PathKind.DIRECTORY:
+                continue
+            link_path = target_dir / link_rel
+            create_skill_link(link_path, canonical)
+            created.append(link_path)
+    except OSError as error:
+        for link_path in created:
+            try:
+                remove_link_object(link_path)
+            except OSError:
+                pass
+        _restore_target_after_link_failure(
+            target_dir, restore_empty_target=restore_empty_target, cause=error
+        )
+
+
+def _restore_target_after_link_failure(
+    target_dir: Path, *, restore_empty_target: bool, cause: OSError
+) -> None:
+    try:
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+        if restore_empty_target:
+            target_dir.mkdir()
+    except OSError as restore_error:
+        raise TargetDirectoryError(
+            f"failed to create Skill Links in {target_dir}: {cause}; "
+            f"also failed to restore the original target ({target_dir}): {restore_error}. "
+            "Manual recovery may be required."
+        ) from cause
+    raise TargetDirectoryError(
+        f"failed to create Skill Links in {target_dir}: {cause}"
+    ) from cause
 
 
 def _template_data(answers: Answers) -> dict[str, str]:

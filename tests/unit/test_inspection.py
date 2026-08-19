@@ -192,8 +192,11 @@ def test_inspection_requires_only_selected_agent_target_artifacts(tmp_path: Path
         agent_targets=frozenset({"windsurf"}),
     )
     materialize_project_structure(tmp_path, CATALOG, selection)
-    missing_stub = tmp_path / ".windsurf/skills/caveman/SKILL.md"
-    missing_stub.unlink()
+    missing_link = tmp_path / ".windsurf/skills/caveman"
+    if missing_link.is_symlink() or missing_link.is_junction():
+        missing_link.unlink()
+    elif missing_link.exists():
+        missing_link.unlink()
 
     issues = inspect_project(
         tmp_path,
@@ -204,8 +207,131 @@ def test_inspection_requires_only_selected_agent_target_artifacts(tmp_path: Path
     assert any(
         issue.category == "missing agent target artifact"
         and "windsurf" in issue.detail
-        and ".windsurf/skills/caveman/SKILL.md" in issue.detail
+        and ".windsurf/skills/caveman" in issue.detail
         for issue in issues
     )
     assert not any("claude" in issue.detail for issue in issues)
     assert not any(".mcp.json" in issue.detail for issue in issues)
+
+
+def test_inspection_reports_incomplete_ignore_anchor_against_the_full_projection(
+    tmp_path: Path,
+) -> None:
+    selection = ProjectSelection.from_items(
+        CATALOG,
+        skills=frozenset({"caveman"}),
+        mcp=frozenset(),
+        agent_targets=frozenset({"claude"}),
+    )
+    materialize_project_structure(tmp_path, CATALOG, selection)
+    from dev_ready.overlay import render_ignore_anchor
+
+    anchor = tmp_path / ".claude" / "skills" / ".gitignore"
+    anchor.write_bytes(render_ignore_anchor(["setup-project"]))
+
+    issues = inspect_project(
+        tmp_path,
+        CATALOG,
+        ProjectExpectation.lifecycle(selection),
+    )
+
+    assert any(
+        ".claude/skills/.gitignore" in issue.detail
+        and "caveman" in issue.detail
+        for issue in issues
+    )
+
+
+def test_inspection_reports_redirected_skills_directory_without_traversing(
+    tmp_path: Path,
+) -> None:
+    from dev_ready.skill_links import create_skill_link
+
+    selection = ProjectSelection.from_items(
+        CATALOG,
+        skills=frozenset({"caveman"}),
+        mcp=frozenset(),
+        agent_targets=frozenset({"claude"}),
+    )
+    materialize_project_structure(tmp_path, CATALOG, selection)
+    skills = tmp_path / ".claude" / "skills"
+    real = tmp_path / ".claude" / "skills-real"
+    skills.rename(real)
+    create_skill_link(skills, real)
+
+    issues = inspect_project(
+        tmp_path,
+        CATALOG,
+        ProjectExpectation.lifecycle(selection),
+    )
+
+    details = [issue.detail for issue in issues]
+    assert any(
+        "claude" in detail and ".claude/skills" in detail and "must not be a link" in detail
+        for detail in details
+    )
+    assert not any("caveman" in detail for detail in details)
+    assert not any(".gitignore" in detail for detail in details)
+
+
+def test_inspection_reports_stale_links_and_extra_anchor_names(
+    tmp_path: Path,
+) -> None:
+    from dev_ready.overlay import render_ignore_anchor
+    from dev_ready.skill_links import create_skill_link
+
+    selection = ProjectSelection.from_items(
+        CATALOG,
+        skills=frozenset({"caveman"}),
+        mcp=frozenset(),
+        agent_targets=frozenset({"claude"}),
+    )
+    materialize_project_structure(tmp_path, CATALOG, selection)
+    canonical = tmp_path / ".agents" / "skills" / "caveman"
+    stale = tmp_path / ".claude" / "skills" / "retired-skill"
+    create_skill_link(stale, canonical)
+    names = ["setup-project", "caveman", "retired-skill"]
+    (tmp_path / ".claude" / "skills" / ".gitignore").write_bytes(
+        render_ignore_anchor(names)
+    )
+
+    issues = inspect_project(
+        tmp_path,
+        CATALOG,
+        ProjectExpectation.lifecycle(selection),
+    )
+    details = [issue.detail for issue in issues]
+    assert any("retired-skill" in detail and "stale" in detail for detail in details)
+    assert any(".gitignore" in detail and "retired-skill" in detail for detail in details)
+
+
+def test_inspection_reports_an_obsolete_unselected_nested_anchor(
+    tmp_path: Path,
+) -> None:
+    selection = ProjectSelection.from_items(
+        CATALOG,
+        skills=frozenset({"caveman"}),
+        mcp=frozenset(),
+        agent_targets=frozenset({"claude", "windsurf"}),
+    )
+    materialize_project_structure(tmp_path, CATALOG, selection)
+    claude_only = ProjectSelection.from_items(
+        CATALOG,
+        skills=frozenset({"caveman"}),
+        mcp=frozenset(),
+        agent_targets=frozenset({"claude"}),
+    )
+
+    issues = inspect_project(
+        tmp_path,
+        CATALOG,
+        ProjectExpectation.lifecycle(claude_only),
+    )
+    details = [issue.detail for issue in issues]
+    assert (tmp_path / ".windsurf" / "skills" / ".gitignore").is_file()
+    assert any(
+        "windsurf" in detail
+        and ".windsurf/skills/.gitignore" in detail
+        and "obsolete" in detail
+        for detail in details
+    )

@@ -13,6 +13,10 @@ from dev_ready.manifest import load_default_manifest
 from dev_ready.prompts import ProjectSelection
 from dev_ready.stamp import load_stamp
 from project_factory import materialize_project_structure
+from dev_ready.agent_targets import project_targets
+from dev_ready.inspection import _desired_skill_names
+from dev_ready.overlay import render_ignore_anchor
+from dev_ready.recorded import RecordedProject
 
 
 
@@ -80,8 +84,56 @@ def _create_minimal_valid_project(project_dir: Path, stamp_version: int = 2) -> 
         if stamp_version >= 5:
             stamp_data["categories"] = sorted(selection.categories)
             stamp_data["development_loop"] = selection.development_loop
+            loop_item = next(
+                item
+                for item in manifest.components.get("skills", ())
+                if item.id == selection.development_loop
+            )
+            loop_pin = (
+                vendored_map.get(loop_item.vendored_repo, loop_item.pin)
+                if loop_item.vendored_repo
+                else loop_item.pin
+            )
+            stamp_data["components"]["skills"]["items"].append(
+                {"id": loop_item.id, "pin": loop_pin}
+            )
 
     (project_dir / ".dev-ready.json").write_text(json.dumps(stamp_data, indent=2) + "\n", encoding="utf-8")
+    if stamp_version < 5:
+        _align_fixture_skill_projection(project_dir, manifest.components)
+
+
+def _align_fixture_skill_projection(project_dir: Path, catalog) -> None:
+    recorded = RecordedProject.observed(load_stamp(project_dir), load_default_manifest())
+    names = _desired_skill_names(
+        catalog, recorded.selection, recorded.selection.development_loop
+    )
+    projection = project_targets(catalog, recorded.selection.agent_targets)
+    for target in projection.skill_targets:
+        skills = project_dir / target.skills_dir
+        if not skills.is_dir() or skills.is_symlink() or skills.is_junction():
+            continue
+        for child in list(skills.iterdir()):
+            if child.name in names or child.name == ".gitignore":
+                continue
+            if child.is_symlink() or child.is_junction():
+                child.unlink()
+        if names:
+            (skills / ".gitignore").write_bytes(render_ignore_anchor(names))
+    selected_dirs = {target.skills_dir for target in projection.skill_targets}
+    declared = project_targets(catalog, catalog.agent_target_ids)
+    for target in declared.skill_targets:
+        if target.skills_dir in selected_dirs:
+            continue
+        skills = project_dir / target.skills_dir
+        if not skills.is_dir() or skills.is_symlink() or skills.is_junction():
+            continue
+        anchor = skills / ".gitignore"
+        if anchor.is_file():
+            anchor.unlink()
+        for child in list(skills.iterdir()):
+            if child.is_symlink() or child.is_junction():
+                child.unlink()
 
 
 def _get_tree_snapshot(root: Path) -> dict[str, str]:
@@ -185,14 +237,14 @@ def test_check_reports_missing_selected_agent_target_artifact(
     data = json.loads(stamp_path.read_text(encoding="utf-8"))
     data["agent_targets"] = ["windsurf"]
     stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    selected_skill_id = data["components"]["skills"]["items"][0]["id"]
-    missing = tmp_path / f".windsurf/skills/{selected_skill_id}/SKILL.md"
+    missing = tmp_path / ".windsurf" / "skills" / "setup-project"
+    assert missing.is_symlink() or missing.is_junction()
     missing.unlink()
 
     assert main(["check", str(tmp_path)]) == 7
     error = capsys.readouterr().err
     assert "missing agent target artifact" in error
-    assert f".windsurf/skills/{selected_skill_id}/SKILL.md" in error
+    assert missing.relative_to(tmp_path).as_posix() in error
 
 
 def test_check_reports_removed_recorded_agent_target(
@@ -424,3 +476,52 @@ def test_check_read_only_assertion(tmp_path: Path) -> None:
 
     after_snapshot = _get_tree_snapshot(tmp_path)
     assert before_snapshot == after_snapshot
+
+
+def test_check_reports_incomplete_nested_gitignore_as_drift(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=5)
+    from dev_ready.overlay import render_ignore_anchor
+
+    anchor = tmp_path / ".claude" / "skills" / ".gitignore"
+    assert anchor.is_file()
+    anchor.write_bytes(render_ignore_anchor(["setup-project"]))
+
+    assert main(["check", str(tmp_path)]) == 7
+    error = capsys.readouterr().err
+    assert ".claude/skills/.gitignore" in error
+
+
+def test_check_reports_stale_skill_link_as_drift(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=5)
+    from dev_ready.skill_links import create_skill_link
+
+    canonical = tmp_path / ".agents" / "skills" / "setup-project"
+    stale = tmp_path / ".claude" / "skills" / "retired-skill"
+    create_skill_link(stale, canonical)
+
+    assert main(["check", str(tmp_path)]) == 7
+    error = capsys.readouterr().err
+    assert "retired-skill" in error
+    assert "stale" in error
+
+
+def test_check_reports_an_obsolete_nested_anchor_as_drift(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _create_minimal_valid_project(tmp_path, stamp_version=5)
+    stamp_path = tmp_path / ".dev-ready.json"
+    data = json.loads(stamp_path.read_text(encoding="utf-8"))
+    data["agent_targets"] = ["claude"]
+    stamp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    leftover = tmp_path / ".windsurf" / "skills" / ".gitignore"
+    leftover.parent.mkdir(parents=True, exist_ok=True)
+    leftover.write_text("# leftover\n", encoding="utf-8")
+
+    assert main(["check", str(tmp_path)]) == 7
+    error = capsys.readouterr().err
+    assert ".windsurf/skills/.gitignore" in error
+    assert "obsolete" in error

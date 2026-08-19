@@ -118,9 +118,24 @@ same-filesystem atomic rename after revalidating the destination. There is no
 cross-filesystem copy fallback: a finalize failure leaves no partial target and
 restores an initially empty target directory.
 
+When the selection projects Skill Links, verify materializes the complete
+projected set with the production writer, inspects it, and removes those
+temporary links before finalize. Finalize recreates the same links after the
+atomic rename. A filesystem that cannot hold the required link kind fails
+verify (exit 5) with the attempted path, the operating-system cause, and a
+different-location remedy. A link failure after the rename restores the
+destination exactly and exits 4; a restoration failure keeps exit 4 and adds a
+manual-recovery warning. An explicit `--agents none` project projects no links
+and performs no capability probe. There is no fifth public stage and no new
+exit code.
+
 ### `dev-ready check [PATH]`
 
-Inspect an existing generated project directory against its `.dev-ready.json` stamp and the running CLI manifest. Read-only operation.
+Inspect an existing generated project directory against its `.dev-ready.json`
+stamp and the running CLI manifest. Read-only operation: it never creates a
+temporary Skill Link, never probes filesystem capability, and never repairs
+the project. Missing, stale, wrong, or unresolvable Skill Links and incorrect
+or obsolete nested ignore-anchor files are drift (exit 7).
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
@@ -163,10 +178,19 @@ Targets, and managed-file inventory are Overlay Currency and advance to the
 running CLI. A newer manifest base pin is a non-blocking advisory because
 `upgrade` does not rewrite upstream application content. Untouched obsolete
 managed files are deleted transactionally; modified obsolete files are
-preserved and reported. Dry run reports the complete plan without mutation,
-failure rolls writes and deletions back together, and repeating a successful
-upgrade plans no further changes. Exit codes: 0 success; 6 invalid or missing
-stamp; 8 pre-v3 stamp cannot be upgraded; 9 upgrade failure after rollback.
+preserved and reported. Skill Links are derived state and are never inventoried;
+`upgrade` creates missing links, repairs incorrect or broken ones, retires
+trusted stale links named by an unmodified nested `.gitignore`, and retires
+eligible legacy Pointer Stubs in the same transaction that writes Canonical
+Content and each nested Git safety-anchor `.gitignore`. The stamp stays at
+version 5. A real plan that creates or repairs a link probes link support
+inside the project before the first persistent mutation; dry run and `check`
+never probe. Capability or transactional failure exits 9 after restoring the
+pre-upgrade tree. Dry run reports the complete plan without mutation,
+failure rolls writes, deletions, anchors, and links back together, and
+repeating a successful upgrade plans no further changes. Exit codes: 0 success;
+6 invalid or missing stamp; 8 pre-v3 stamp cannot be upgraded; 9 upgrade
+failure after rollback.
 
 ### `dev-ready --version` / `dev-ready --help`
 

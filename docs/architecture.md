@@ -56,7 +56,10 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | [ADR-022](decisions/adr-022-upstream-config-not-application-source.md) | dev-ready modifies upstream configuration, never upstream application source (v0.10+) | Accepted (2026-08-04) |
 | [ADR-023](decisions/adr-023-upstream-facts-drift-guard.md) | Generated content may state facts about upstream only under a pinned-commit drift guard (v0.10+) | Accepted (2026-08-05) |
 | [ADR-024](decisions/adr-024-engineering-flow-selection-spine.md) | Engineering Flow is the user-facing selection spine, named after its source (v0.11) | Accepted (2026-08-12), amends ADR-012/017/018 |
-| [ADR-025](decisions/adr-025-skill-delivery-mode.md) | Agent Targets receive a chosen Skill Delivery Mode — symlink or copy — replacing Pointer Stubs (v0.12) | Accepted (2026-08-12), partly supersedes ADR-015 |
+| [ADR-025](decisions/adr-025-skill-delivery-mode.md) | Agent Targets receive a chosen Skill Delivery Mode — symlink or copy — replacing Pointer Stubs (v0.12) | Superseded in full by ADR-028 (2026-08-18), before implementation |
+| [ADR-026](decisions/adr-026-setup-project-is-project-infrastructure.md) | `setup-project` is unconditional project infrastructure, not a catalog item (v0.11) | Accepted (2026-08-14) |
+| [ADR-027](decisions/adr-027-repository-is-the-plugin.md) | The repository root is the Claude and Codex plugin; manifests describe, catalogs publish, directories sell (v0.11) | Accepted (2026-08-17) |
+| [ADR-028](decisions/adr-028-skill-links-replace-pointer-stubs.md) | Agent Targets receive one Skill Link per skill — no copy mode, no Pointer Stub (v0.12) | Accepted (2026-08-18), supersedes ADR-025 |
 
 ## Module Boundary
 
@@ -67,7 +70,8 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | `fetch` | Generate the upstream base via Copier at the manifest-pinned commit | know about overlay content |
 | `overlay` | Apply dev-ready files onto the fetched base; templating of names/values and Mount Point injection | fetch anything from the network |
 | `manifest` | Load/validate manifest.json; single source of truth for pins. `ComponentCatalog` is the catalog interface every module takes — items, Categories, development loops, Agent Targets, Default Set | be bypassed by other modules |
-| `agent_targets` | Project the selected Agent Targets onto their native paths: rules pointers, MCP config files, retargeted MCP items and effects, Pointer Stub paths (ADR-015) | import `prompts`, touch the filesystem, or perform network I/O |
+| `agent_targets` | Project the selected Agent Targets onto their native paths: rules pointers, MCP config files, retargeted MCP items and effects, Skill Link paths, nested ignore-anchor paths, and skill names from desired Canonical Content paths (ADR-015, ADR-028) | import `prompts`, touch the filesystem, or perform network I/O |
+| `skill_links` | Create and classify Skill Link objects: a relative directory symbolic link on POSIX, an elevation-free directory junction via `_winapi.CreateJunction` on Windows | import `prompts`, choose lifecycle policy, follow a link being classified, or perform network I/O |
 | `recorded` | Resolve a loaded stamp into a selection over the current catalog, applying stamp-version migration once | choose CLI error/report policy, write to the project, or perform network I/O |
 | `catalog_effects` | Validate, apply, and observe catalog-item injected effects through one local-project interface | read manifest.json, perform network I/O, choose CLI error/report policy, or touch overlay-managed content |
 | `report` | Post-generation summary and next steps | mutate the generated project |
@@ -83,13 +87,31 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 - Direction: `cli` -> `prompts`/`manifest`/`fetch`/`overlay`/`report`/`verify`. Lower modules never import `cli`.
 - `fetch`, `overlay`, and `verify` are independent of each other; only `generate` (called only by `cli`) sequences them. `manifest`, `overlay`, `verify`, `check`, and `upgrade` may depend on `catalog_effects`; `verify` and `check` may depend on `inspection`.
 - `upgrade` (called only by `cli`) sequences `overlay` and `stamp` offline, analogous to `generate`.
-- `agent_targets` sits directly above `manifest` and depends on nothing else, so `overlay`, `inspection`, `upgrade` and the lifecycle test fixtures can all read one projection. **No module may restate the Agent Target layout** — where an Agent Target's rules pointer, MCP config or Pointer Stub goes is decided in `agent_targets` and nowhere else.
+- `agent_targets` sits directly above `manifest` and depends on nothing else, so `overlay`, `inspection`, `upgrade` and the lifecycle test fixtures can all read one projection. **No module may restate the Agent Target layout** — where an Agent Target's rules pointer, MCP config, Skill Link or nested ignore-anchor goes is decided in `agent_targets` and nowhere else.
+- `skill_links` sits beside `overlay` and `upgrade` as the only filesystem writer for Skill Link objects. It may be imported by `generate`, `verify`, `inspection`, `upgrade` and tests. It does not import `agent_targets` — callers pass the paths the projection already computed.
 - `recorded` depends on `manifest`, `stamp` and `prompts`, and is the only place a stamp is resolved against the current catalog. `check` and `upgrade` read it and differ only in policy: `check` reports what was dropped, `upgrade` refuses. **Stamp-version migration rules live there once** — a new stamp version is one module's change.
 - **Content dev-ready owns is transformed inside `build_overlay_content`; content it does not own is mutated after the write, by `catalog_effects`.** The stamp inventory hashes `build_overlay_content`'s output, so a transform applied after the write records a hash that can never match the file it describes, and `upgrade` then treats a file nobody edited as user-modified forever. `classify_shared_targets` compounds it by classifying every effect target as shared and excluding it a second time. Mount Point injection therefore happens inside `build_overlay_content` and is not a `CatalogEffect`. Neither failure raises anything — the wrong side of this line is silent until a user runs `upgrade`.
 - Modules take `ComponentCatalog`, not the bare mapping it subclasses. Its Categories, Agent Targets, development loops and Default Set are part of the interface; reaching them with a defaulted `getattr` reintroduces a catalog shape the loader refuses to build.
 - Runtime dependencies are kept minimal (current: questionary, copier — see ADR-005; rich optional). Every new dependency requires a note here. Dev-only: `prompt-toolkit`, pinned `>=3.0.29,<4` so tests can drive `_questionary_asker` headlessly over `create_pipe_input()`/`DummyOutput()`; questionary already pulls it in, but at `>=2.0,<4.0` — too loose for an API the tests call directly.
 - No module reads `manifest.json` directly except `manifest`.
 - `scripts/` (CI-only maintainer tooling, e.g. `scripts/bump_upstream.py`) is not part of the wheel and is not subject to the `fetch/`-only network-call rule above, which governs `src/dev_ready` only.
+
+### Skill Link delivery (ADR-028)
+
+`agent_targets` is the pure projection: Skill Link paths, nested ignore-anchor
+paths, and skill names taken from desired Canonical Content. It performs no
+filesystem I/O. `skill_links` is the only writer that creates, classifies, or
+removes those link objects. `inspection` is the shared read-only classification
+seam for Canonical Content, target containers, anchors, and links, consumed by
+`verify` and `check`. When a selection projects links, `verify` materializes
+the complete set in staging with the production writer, inspects it, and
+removes those temporary links. Finalize then atomically renames staging into
+place and recreates the same links against the final Canonical Content.
+Each selected Agent Target skills directory receives a managed nested
+`.gitignore` as the Git safety gate; the project root `.gitignore` is not
+rewritten. `upgrade` writes Canonical Content, then exact state-aware nested
+anchors, then retires eligible legacy directories and creates, repairs, or
+retires links, and writes the stamp last.
 
 ### questionary (added phase 4)
 
@@ -108,7 +130,7 @@ The repo's first runtime dependency, sanctioned by the "target: questionary" lin
 dev-ready itself deploys as a PyPI package — there is no server component.
 
 - Release: tag -> GitHub Actions builds sdist/wheel -> publish to PyPI (trusted publishing).
-- CI workflows: `ci.yml` (lint, test, generate-and-verify on PRs), `upstream-bump.yml` (weekly pin bump PR), `release.yml` (publish on tag).
+- CI workflows: `ci.yml` (six jobs: `test`, `vendored-drift`, `agent-target-drift`, `upgrade-from-release`, `generate-and-verify`, and `windows-lifecycle`), `upstream-bump.yml` (weekly pin bump PR), `release.yml` (publish on tag). The `windows-lifecycle` job runs the offline suite plus real generation and the N−1 gate on Windows so junctions, Git exclusion, and moved-project repair are native.
 - Generated projects carry their own deployment story from upstream (Docker Compose); dev-ready does not modify it in v0.1.
 
 ## Sequence Diagrams
@@ -126,8 +148,9 @@ user            cli          prompts        generate      fetch/overlay/verify  
  |               |--generate(answers, pin)------->|                  |                |
  |               |               |               |--fetch_snapshot->staging           |
  |               |               |               |--apply_overlay-->staging           |
- |               |               |               |--verify_project->staging (checked) |
- |               |               |               |--move(staging)---------------->target_dir
+ |               |               |               |--verify_project->staging (links probed, then removed) |
+ |               |               |               |--rename(staging)---------------->target_dir
+ |               |               |               |--create Skill Links------------->target_dir
  |               |<--written[]---------------------|                  |                |
  |               |--render_report(answers, pin, written)                              |
  |<--summary-----|               |               |                  |                |

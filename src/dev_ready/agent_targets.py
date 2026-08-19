@@ -1,11 +1,10 @@
-"""Project the selected Agent Targets onto their native paths (ADR-015).
+"""Project the selected Agent Targets onto their native paths (ADR-015, ADR-028).
 
-Canonical Content is written once, at the open-standard location; every Agent
-Target reaches those same bytes through its own native layout. This module owns
-that mapping. The overlay writer, the structural inspector, the upgrade planner
-and the lifecycle fixtures all read it here instead of restating it, so a change
-to an Agent Target's layout — or to where the Agent Target Map comes from
-(ADR-019) — is one edit rather than five.
+Canonical Content is written once, at the open-standard location. This module
+owns the pure mapping: each target's rules pointer, MCP file, Skill Link path,
+nested ignore-anchor path, and the skill names derived from desired content.
+It performs no filesystem I/O. The overlay writer, inspector, upgrade planner
+and lifecycle fixtures all read the mapping here instead of restating it.
 
 Deliberately below `prompts`: callers hand over the selected target ids, not a
 `ProjectSelection`, so nothing in the dependency graph has to invert.
@@ -24,6 +23,7 @@ __all__ = [
     "TargetProjection",
     "canonical_skill_names",
     "project_targets",
+    "skill_names_from_content",
 ]
 
 # Where Canonical Content for a skill lives, regardless of Agent Target.
@@ -105,6 +105,14 @@ class TargetProjection:
         """Where one target's Pointer Stub for a canonical skill is written."""
         return Path(target.skills_dir) / skill_name / "SKILL.md"
 
+    def link_path(self, target: AgentTarget, skill_name: str) -> Path:
+        """Where one target's Skill Link for a canonical skill is written."""
+        return Path(target.skills_dir) / skill_name
+
+    def ignore_anchor_path(self, target: AgentTarget) -> Path:
+        """Where one target's nested Git safety-anchor file is written."""
+        return Path(target.skills_dir) / ".gitignore"
+
     def base_mcp_config_paths(
         self, catalog: ComponentCatalog, selected_mcp_items: Collection[str]
     ) -> tuple[Path, ...]:
@@ -154,14 +162,27 @@ def project_targets(
     )
 
 
+def skill_names_from_content(paths: Collection[str]) -> tuple[str, ...]:
+    """Skill names from every direct `.agents/skills/<name>/SKILL.md` path."""
+    names = {
+        parts[2]
+        for path in paths
+        if len(parts := Path(path).parts) == 4
+        and parts[:2] == CANONICAL_SKILLS_ROOT
+        and parts[3] == "SKILL.md"
+        and parts[2]
+    }
+    return tuple(sorted(names))
+
+
 def canonical_skill_names(
     catalog: ComponentCatalog, skill_ids: Collection[str]
 ) -> tuple[str, ...]:
     """Skill directory names the given skills write as Canonical Content.
 
-    A skill earns a Pointer Stub in every selected Agent Target exactly when it
-    writes a `.agents/skills/<name>/` directory, so this is also the list every
-    target's stub directory is expected to mirror.
+    A skill earns a Skill Link in every selected Agent Target exactly when it
+    writes a `.agents/skills/<name>/` directory. Prefer ``skill_names_from_content``
+    for desired overlay paths so non-catalog infrastructure participates.
     """
     selected = frozenset(skill_ids)
     names = {

@@ -79,6 +79,19 @@ Specs and tickets for this repository live as local Markdown files under `.scrat
 When a skill says to publish to or fetch from the issue tracker, use these local files."""
 
 
+def _clone_guidance(answers: Answers) -> str:
+    if not answers.agent_targets:
+        return ""
+    return (
+        "\nSelected coding agents discover those skills through machine-local "
+        "links in their native skill directories. The links are not stored in "
+        "git.\n\n"
+        "## After cloning\n\n"
+        "After cloning this repository, run `uvx dev-ready upgrade` once so "
+        "those links are recreated.\n"
+    )
+
+
 def template_values(answers: Answers) -> dict[str, str]:
     """Return every supported template token for one resolved selection."""
     flow_guidance = _selected_flow_guidance(answers)
@@ -89,6 +102,7 @@ def template_values(answers: Answers) -> dict[str, str]:
         "documentation_guidance": _DOCUMENTATION_GUIDANCE,
         "architecture_ownership": _ARCHITECTURE_OWNERSHIP,
         "issue_tracker_configuration": _issue_tracker_configuration(),
+        "clone_guidance": _clone_guidance(answers),
     }
 
 

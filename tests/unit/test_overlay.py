@@ -13,7 +13,13 @@ from dev_ready import __version__
 from dev_ready.errors import InvalidArgumentsError, OverlayError
 from dev_ready.inspection import ProjectExpectation, REQUIRED_UPSTREAM_PATHS, inspect_project
 from dev_ready.manifest import AgentTarget, ComponentCatalog, UpstreamPin, load_default_manifest
-from dev_ready.overlay import apply_overlay, build_overlay_content, render_stamp
+from dev_ready.overlay import (
+    apply_overlay,
+    build_overlay_content,
+    generated_anchor_names,
+    render_ignore_anchor,
+    render_stamp,
+)
 from dev_ready.prompts import Answers, ProjectSelection
 
 CATALOG = load_default_manifest().components
@@ -81,8 +87,10 @@ def test_happy_path_writes_every_component_with_substitution(tmp_path: Path) -> 
     assert (project_dir / "CLAUDE.md").exists()
     assert (project_dir / "README.md").exists()
     assert (project_dir / ".agents" / "skills" / "caveman" / "SKILL.md").exists()
-    assert (project_dir / ".claude" / "skills" / "caveman" / "SKILL.md").exists()
-    assert (project_dir / ".windsurf" / "skills" / "caveman" / "SKILL.md").exists()
+    assert (project_dir / ".claude" / "skills" / ".gitignore").exists()
+    assert (project_dir / ".windsurf" / "skills" / ".gitignore").exists()
+    assert not (project_dir / ".claude" / "skills" / "caveman" / "SKILL.md").exists()
+    assert not (project_dir / ".windsurf" / "skills" / "caveman" / "SKILL.md").exists()
     assert (project_dir / ".mcp.json").exists()
     assert (project_dir / "docs" / "architecture.md").exists()
     assert (project_dir / "docs" / "requirements.md").exists()
@@ -166,10 +174,15 @@ def test_shared_agent_target_directory_writes_one_stub_tree_and_inspects_cleanly
 
     written = apply_overlay(Answers("my-app", project_dir, selection), project_dir, catalog, PIN)
 
-    shared_stubs = list((project_dir / ".shared/skills").glob("*/SKILL.md"))
-    assert len(shared_stubs) == len(
-        tuple(path for path in project_dir.glob(".agents/skills/*/SKILL.md"))
-    )
+    assert (project_dir / ".shared/skills/.gitignore").is_file()
+    assert list((project_dir / ".shared/skills").glob("*/SKILL.md")) == []
+    from dev_ready.overlay import projected_skill_link_pairs
+    from dev_ready.skill_links import create_skill_link
+
+    for link_rel, canonical_rel in projected_skill_link_pairs(
+        Answers("my-app", project_dir, selection), catalog
+    ):
+        create_skill_link(project_dir / link_rel, project_dir / canonical_rel)
     assert inspect_project(
         project_dir,
         catalog,
@@ -213,9 +226,9 @@ def test_real_shared_directory_pair_generates_one_stub_tree(tmp_path: Path) -> N
 
     apply_overlay(Answers("my-app", project_dir, selection), project_dir, CATALOG, PIN)
 
-    canonical = tuple(project_dir.glob(".agents/skills/*/SKILL.md"))
-    shared = tuple(project_dir.glob(".qoder/skills/*/SKILL.md"))
-    assert len(shared) == len(canonical)
+    assert tuple(project_dir.glob(".agents/skills/*/SKILL.md"))
+    assert tuple(project_dir.glob(".qoder/skills/*/SKILL.md")) == ()
+    assert (project_dir / ".qoder/skills/.gitignore").is_file()
     assert not (project_dir / ".qoder-cn").exists()
 
 
@@ -317,29 +330,64 @@ def test_apply_overlay_stamp_inventory_hashes_rendered_non_inject_files(tmp_path
         "AGENTS.md",
         "CLAUDE.md",
         ".agents/skills/setup-project/SKILL.md",
-        ".claude/skills/setup-project/SKILL.md",
+        ".claude/skills/.gitignore",
         ".agents/skills/caveman/SKILL.md",
-        ".claude/skills/caveman/SKILL.md",
+        ".windsurf/skills/.gitignore",
         "docs/agents/mattpocock.md",
     ):
         assert inventory[path] == hashlib.sha256((project_dir / path).read_bytes()).hexdigest()
 
 
-def test_claude_pointer_stub_names_and_describes_canonical_skill(tmp_path: Path) -> None:
-    project_dir = tmp_path / "project"
-    project_dir.mkdir()
+def test_overlay_writes_no_agent_target_skill_md(tmp_path: Path) -> None:
+    content = build_overlay_content(_answers(tmp_path), CATALOG)
 
-    apply_overlay(_answers(tmp_path), project_dir, CATALOG, PIN)
+    agent_skill_md = [
+        path
+        for path in content
+        if path.endswith("/SKILL.md") and not path.startswith(".agents/skills/")
+    ]
+    assert agent_skill_md == []
 
-    canonical = project_dir / ".agents" / "skills" / "caveman" / "SKILL.md"
-    stub = project_dir / ".claude" / "skills" / "caveman" / "SKILL.md"
-    stub_text = stub.read_text(encoding="utf-8")
-    assert "name: caveman" in stub_text
-    assert "Ultra-compressed communication mode." in stub_text
-    assert ".agents/skills/caveman/SKILL.md" in stub_text
-    assert stub.read_bytes() != canonical.read_bytes()
-    assert not canonical.is_symlink()
-    assert not stub.is_symlink()
+
+def test_nested_ignore_anchor_lists_sorted_skill_names_and_bootstrap_command(
+    tmp_path: Path,
+) -> None:
+    content = build_overlay_content(_answers(tmp_path), CATALOG)
+    root_ignore = content[".gitignore"]
+
+    for path in (".claude/skills/.gitignore", ".windsurf/skills/.gitignore"):
+        text = content[path].decode("utf-8")
+        assert text.startswith(
+            "# Machine-local Skill Links. They are not version-controlled.\n"
+            "# After cloning, restore them with: uvx dev-ready upgrade\n"
+        )
+        names = [
+            line
+            for line in text.splitlines()
+            if line and not line.startswith("#")
+        ]
+        assert names == sorted(names)
+        assert "setup-project" in names
+        assert "caveman" in names
+        assert "uvx dev-ready upgrade" in text
+    assert content[".claude/skills/.gitignore"] == content[".windsurf/skills/.gitignore"]
+    assert content[".gitignore"] == root_ignore
+
+
+def test_ignore_anchor_renderer_lists_only_the_supplied_link_names() -> None:
+    text = render_ignore_anchor(["setup-project", "caveman"]).decode("utf-8")
+
+    assert text.splitlines() == [
+        "# Machine-local Skill Links. They are not version-controlled.",
+        "# After cloning, restore them with: uvx dev-ready upgrade",
+        "setup-project",
+        "caveman",
+    ]
+    assert generated_anchor_names(render_ignore_anchor(["setup-project", "caveman"])) == (
+        "setup-project",
+        "caveman",
+    )
+    assert generated_anchor_names(b"# user edited\ncaveman\n") is None
 
 
 def test_setup_project_reaches_every_selected_agent_target(tmp_path: Path) -> None:
@@ -347,15 +395,10 @@ def test_setup_project_reaches_every_selected_agent_target(tmp_path: Path) -> No
     canonical_path = ".agents/skills/setup-project/SKILL.md"
 
     assert canonical_path in content
-    for stub_path in (
-        ".claude/skills/setup-project/SKILL.md",
-        ".windsurf/skills/setup-project/SKILL.md",
-    ):
-        stub = content[stub_path].decode("utf-8")
-        assert "name: setup-project" in stub
-        assert "description: Configure a generated project before first start" in stub
-        assert "disable-model-invocation: true" in stub
-        assert canonical_path in stub
+    for anchor_path in (".claude/skills/.gitignore", ".windsurf/skills/.gitignore"):
+        assert "setup-project" in content[anchor_path].decode("utf-8")
+    assert ".claude/skills/setup-project/SKILL.md" not in content
+    assert ".windsurf/skills/setup-project/SKILL.md" not in content
 
 
 def test_setup_project_is_original_infrastructure_not_manifest_content(
@@ -377,8 +420,7 @@ def test_setup_project_is_original_infrastructure_not_manifest_content(
         for path in pin.paths
     )
     assert not any(
-        path.startswith(".claude/skills/setup-project/")
-        or path.startswith(".windsurf/skills/setup-project/")
+        path.startswith(".claude/skills/") or path.startswith(".windsurf/skills/")
         for path in content
     )
 
@@ -445,7 +487,8 @@ def test_windsurf_only_writes_windsurf_stubs_and_no_project_mcp(tmp_path: Path) 
 
     assert (project_dir / "AGENTS.md").is_file()
     assert (project_dir / ".agents/skills/caveman/SKILL.md").is_file()
-    assert (project_dir / ".windsurf/skills/caveman/SKILL.md").is_file()
+    assert (project_dir / ".windsurf/skills/.gitignore").is_file()
+    assert not (project_dir / ".windsurf/skills/caveman/SKILL.md").exists()
     assert not (project_dir / ".claude").exists()
     assert not (project_dir / "CLAUDE.md").exists()
     assert not (project_dir / ".mcp.json").exists()
@@ -481,14 +524,14 @@ def test_no_agent_targets_still_writes_only_canonical_content(tmp_path: Path) ->
     [
         (
             "include_skills",
-            Path(".claude") / "skills" / "caveman" / "SKILL.md",
+            Path(".agents") / "skills" / "caveman" / "SKILL.md",
             [Path(".mcp.json"), Path("docs") / "architecture.md"],
         ),
         (
             "include_mcp",
             Path(".mcp.json"),
             [
-                Path(".claude") / "skills" / "caveman" / "SKILL.md",
+                Path(".claude") / "skills" / ".gitignore",
                 Path("docs") / "architecture.md",
             ],
         ),
@@ -497,7 +540,7 @@ def test_no_agent_targets_still_writes_only_canonical_content(tmp_path: Path) ->
             Path("docs") / "design-stripe.md",
             [
                 Path(".mcp.json"),
-                Path(".claude") / "skills" / "caveman" / "SKILL.md",
+                Path(".claude") / "skills" / ".gitignore",
                 Path("docs") / "architecture.md",
             ],
         ),
@@ -533,7 +576,8 @@ def test_mandatory_loop_is_present_with_all_enhancements_disabled(tmp_path: Path
     assert (project_dir / "CLAUDE.md").exists()
     assert (project_dir / "README.md").exists()
     assert (project_dir / ".dev-ready.json").exists()
-    assert (project_dir / ".claude" / "skills" / "implement" / "SKILL.md").is_file()
+    assert (project_dir / ".claude" / "skills" / ".gitignore").is_file()
+    assert not (project_dir / ".claude" / "skills" / "implement" / "SKILL.md").exists()
     assert (project_dir / ".agents" / "skills" / "implement" / "SKILL.md").is_file()
     assert not (project_dir / ".mcp.json").exists()
     assert (project_dir / "docs" / "architecture.md").is_file()
@@ -563,7 +607,9 @@ def test_mandatory_engineering_flow_renders_independently_of_documentation_items
     assert claude_md == "@AGENTS.md\n"
     agents_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
     assert not (project_dir / "docs" / "handoffs").exists()
-    assert (project_dir / ".claude" / "skills" / "to-spec" / "SKILL.md").is_file()
+    assert (project_dir / ".agents" / "skills" / "to-spec" / "SKILL.md").is_file()
+    assert (project_dir / ".claude" / "skills" / ".gitignore").is_file()
+    assert not (project_dir / ".claude" / "skills" / "to-spec" / "SKILL.md").exists()
     assert (project_dir / "docs" / "agents" / "issue-tracker.md").is_file()
     assert (project_dir / "docs" / "architecture.md").is_file()
     assert (project_dir / "docs" / "requirements.md").is_file()
@@ -1188,19 +1234,9 @@ def test_default_set_leaves_every_loop_skill_byte_identical_to_its_template(
     assert {path: content[path] for path in template_bytes} == template_bytes
 
 
-def test_mounted_guidance_is_deterministic_and_does_not_change_pointer_stubs(
+def test_mounted_guidance_is_deterministic_and_does_not_write_pointer_stubs(
     tmp_path: Path,
 ) -> None:
-    without_mount = build_overlay_content(
-        _answers(
-            tmp_path,
-            skills_items=frozenset(),
-            include_mcp=False,
-            include_docs=False,
-            agent_targets=frozenset({"claude"}),
-        ),
-        CATALOG,
-    )
     answers = _answers(
         tmp_path,
         skills_items=frozenset({"react-doctor"}),
@@ -1213,10 +1249,8 @@ def test_mounted_guidance_is_deterministic_and_does_not_change_pointer_stubs(
     second = build_overlay_content(answers, CATALOG)
 
     assert first == second
-    assert (
-        first[".claude/skills/code-review/SKILL.md"]
-        == without_mount[".claude/skills/code-review/SKILL.md"]
-    )
+    assert ".claude/skills/code-review/SKILL.md" not in first
+    assert "code-review" in first[".claude/skills/.gitignore"].decode("utf-8")
 
 
 def test_mounted_skill_inventory_hash_matches_written_bytes(tmp_path: Path) -> None:
@@ -1340,11 +1374,12 @@ def test_apply_overlay_writes_vendored_skills_and_docs(tmp_path: Path) -> None:
     written = apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
 
     for skill in expected_skill_dirs:
-        assert (project_dir / ".claude" / "skills" / skill / "SKILL.md").exists()
+        assert (project_dir / ".agents" / "skills" / skill / "SKILL.md").exists()
+        assert not (project_dir / ".claude" / "skills" / skill / "SKILL.md").exists()
 
     assert (project_dir / "docs" / "design-stripe.md").exists()
     assert (project_dir / "docs" / "design-linear.md").exists()
-    assert Path(".claude/skills/caveman/SKILL.md") in written
+    assert Path(".claude/skills/.gitignore") in written
     assert Path("docs/design-stripe.md") in written
 
 
@@ -1484,7 +1519,9 @@ def test_apply_overlay_deselected_vendored_skills_are_absent(tmp_path: Path) -> 
         assert not (project_dir / ".claude" / "skills" / skill).exists()
         assert Path(f".claude/skills/{skill}/SKILL.md") not in written
     for skill in {"tdd", "diagnosing-bugs", "code-review"}:
-        assert (project_dir / ".claude" / "skills" / skill / "SKILL.md").is_file()
+        assert (project_dir / ".agents" / "skills" / skill / "SKILL.md").is_file()
+        assert not (project_dir / ".claude" / "skills" / skill / "SKILL.md").exists()
+    assert Path(".claude/skills/.gitignore") in written
 
 
 def test_lean_selection_carries_the_notice_in_every_engineering_flow_skill(
@@ -1602,8 +1639,9 @@ def test_apply_overlay_mixed_vendored_skills_selection(tmp_path: Path) -> None:
 
     written = apply_overlay(answers, project_dir, manifest.components, PIN, manifest.vendored)
 
-    assert (project_dir / ".claude" / "skills" / "caveman" / "SKILL.md").exists()
-    assert Path(".claude/skills/caveman/SKILL.md") in written
+    assert (project_dir / ".agents" / "skills" / "caveman" / "SKILL.md").exists()
+    assert not (project_dir / ".claude" / "skills" / "caveman" / "SKILL.md").exists()
+    assert Path(".claude/skills/.gitignore") in written
 
     deselected_vendored = {
         "security-audit",
@@ -1779,7 +1817,8 @@ def test_standalone_engineering_flow_is_complete_and_role_neutral(tmp_path: Path
         "code-review",
     ):
         assert (project_dir / ".agents" / "skills" / skill_name / "SKILL.md").is_file()
-        assert (project_dir / ".claude" / "skills" / skill_name / "SKILL.md").is_file()
+        assert not (project_dir / ".claude" / "skills" / skill_name / "SKILL.md").exists()
+    assert (project_dir / ".claude" / "skills" / ".gitignore").is_file()
     assert (project_dir / "docs" / "agents" / "issue-tracker.md").is_file()
     assert (project_dir / "docs" / "agents" / "domain.md").is_file()
     assert not (project_dir / "CONTEXT.md").exists()

@@ -18,7 +18,7 @@ from dev_ready.manifest import load_default_manifest
 
 pytestmark = pytest.mark.network
 
-_RELEASED_VERSION = "0.10.1"
+_RELEASED_VERSION = "0.11.0"
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PROBE_PREFIX = "__DEV_READY_PROBE__="
 _PROBE_AND_RUN = f"""
@@ -136,13 +136,18 @@ def _checkout_stage(
 def _snapshot(root: Path) -> dict[str, tuple[str, bytes]]:
     """Capture names, kinds, links, and every file byte beneath ``root``."""
     snapshot: dict[str, tuple[str, bytes]] = {}
-    for path in sorted(root.rglob("*")):
-        relative = path.relative_to(root).as_posix()
-        if path.is_symlink():
-            snapshot[relative] = ("symlink", os.readlink(path).encode("utf-8"))
-        elif path.is_dir():
-            snapshot[relative] = ("directory", b"")
-        else:
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        for path in current.iterdir():
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink() or path.is_junction():
+                snapshot[relative] = ("link", os.readlink(path).encode("utf-8"))
+                continue
+            if path.is_dir():
+                snapshot[relative] = ("directory", b"")
+                stack.append(path)
+                continue
             snapshot[relative] = ("file", path.read_bytes())
     return snapshot
 
@@ -178,12 +183,28 @@ def _assert_skill_projection(
     canonical_skill = root.joinpath(*CANONICAL_SKILLS_ROOT, skill_name, "SKILL.md")
     assert canonical_skill.is_file(), f"{stage} omitted canonical {skill_name} content"
     for target in projection.skill_targets:
-        pointer_stub = root / projection.stub_path(target, skill_name)
-        assert pointer_stub.is_file(), (
-            f"{stage} omitted the {target.id} {skill_name} Pointer Stub"
-        )
-        assert canonical_skill.read_bytes() != pointer_stub.read_bytes(), (
-            f"{stage} duplicated canonical {skill_name} bytes into {target.id}"
+        if stage == "released project":
+            pointer_stub = root / projection.stub_path(target, skill_name)
+            assert pointer_stub.is_file(), (
+                f"{stage} omitted the {target.id} {skill_name} Pointer Stub"
+            )
+            assert canonical_skill.read_bytes() != pointer_stub.read_bytes(), (
+                f"{stage} duplicated canonical {skill_name} bytes into {target.id}"
+            )
+            continue
+        link = root / projection.link_path(target, skill_name)
+        if sys.platform == "win32":
+            assert link.is_junction(), (
+                f"{stage} {target.id} {skill_name} Skill Link is not a junction"
+            )
+            assert not link.is_symlink()
+        else:
+            assert link.is_symlink(), (
+                f"{stage} {target.id} {skill_name} Skill Link is not a symbolic link"
+            )
+            assert not link.is_junction()
+        assert link.resolve() == canonical_skill.parent.resolve(), (
+            f"{stage} Skill Link {link} does not resolve to canonical {skill_name}"
         )
 
 
@@ -239,6 +260,20 @@ def _selection_arguments(stamp: dict[str, Any]) -> list[str]:
     if set(agent_targets) != set(manifest.agent_targets):
         arguments.extend(("--agents", ",".join(agent_targets) or "none"))
     return arguments
+
+
+def _inventory_without_skill_anchors(inventory: Any) -> list[Any]:
+    assert isinstance(inventory, list), "stamp has no managed-file inventory"
+    return [
+        entry
+        for entry in inventory
+        if not (
+            isinstance(entry, dict)
+            and isinstance(entry.get("path"), str)
+            and entry["path"].endswith("/.gitignore")
+            and entry["path"] != ".gitignore"
+        )
+    ]
 
 
 def _inventory_paths(stamp: dict[str, Any], stage: str) -> set[str]:
@@ -346,7 +381,13 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
         "released project omitted the Claude rules pointer"
     )
     old_stamp = _load_stamp(target, "old generation")
-    assert "spec-loop" in _component_item_ids(old_stamp, "skills", "old generation")
+    assert old_stamp.get("stamp_version") == 5, (
+        "released project did not write a version-5 stamp"
+    )
+    assert old_stamp.get("development_loop") == "mattpocock", (
+        "released project did not record the shipped Engineering Flow"
+    )
+    assert "mattpocock" in _component_item_ids(old_stamp, "skills", "old generation")
     assert "setup-all" not in _component_item_ids(
         old_stamp, "skills", "old generation"
     )
@@ -358,6 +399,11 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert (target / "docs" / "architecture.md").is_file()
     assert (target / "docs" / "requirements.md").is_file()
     _assert_skill_projection(target, old_stamp, "implement", "released project")
+    _assert_skill_projection(target, old_stamp, "setup-project", "released project")
+    for path in target.rglob("*"):
+        assert not path.is_symlink(), (
+            f"released project produced a symbolic link: {path}"
+        )
 
     edited_setup_relative = Path(
         *CANONICAL_SKILLS_ROOT,
@@ -367,6 +413,11 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     edited_setup = target / edited_setup_relative
     user_edit = b"\n<!-- user-edited setup conventions -->\n"
     edited_setup.write_bytes(edited_setup.read_bytes() + user_edit)
+    edited_stub_relative = Path(".claude") / "skills" / "tdd" / "SKILL.md"
+    edited_stub = target / edited_stub_relative
+    assert edited_stub.is_file(), "released project omitted the tdd Pointer Stub"
+    user_stub_edit = b"\n<!-- user-edited pointer stub -->\n"
+    edited_stub.write_bytes(edited_stub.read_bytes() + user_stub_edit)
 
     before_upgrade = _snapshot(target)
     old_provenance = _base_provenance(old_stamp, "old generation")
@@ -419,6 +470,7 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
             "missing item path",
             "missing item asset",
             "missing agent target artifact",
+            "invalid agent target artifact",
         )
         unexpected_drifts = [
             drift
@@ -458,14 +510,25 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     )
     assert "Skipped (user-modified)" in real_upgrade.stdout
     assert edited_setup_relative.as_posix() in real_upgrade.stdout
+    assert edited_stub.read_bytes().endswith(user_stub_edit), (
+        "upgrade overwrote the user-edited Pointer Stub"
+    )
+    assert edited_stub.parent.is_dir()
+    assert not edited_stub.parent.is_symlink()
+    assert not edited_stub.parent.is_junction()
+    assert "Preserved (obsolete, user-modified)" in real_upgrade.stdout
+    assert edited_stub_relative.as_posix() in real_upgrade.stdout
     assert "setup-all" not in _component_item_ids(new_stamp, "skills", "real upgrade")
     assert "mattpocock" in _component_item_ids(new_stamp, "skills", "real upgrade")
     assert not _component_item_ids(new_stamp, "docs", "real upgrade")
     assert new_stamp["components"]["docs"].get("included") is False
     assert (target / "docs" / "architecture.md").is_file()
     assert (target / "docs" / "requirements.md").is_file()
-    for path in target.rglob("*"):
-        assert not path.is_symlink(), f"upgrade produced a symbolic link: {path}"
+    inventory_paths = _inventory_paths(new_stamp, "real upgrade")
+    for path in inventory_paths:
+        assert not path.endswith("/SKILL.md") or not path.startswith(".claude/"), (
+            f"upgrade inventoried an Agent Target Skill Link path: {path}"
+        )
     assert new_stamp.get("stamp_version") == 5, "upgrade changed the stamp format version"
     assert new_stamp.get("categories") == old_stamp.get("categories"), (
         "upgrade changed the released project's Categories"
@@ -491,6 +554,8 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
         path
         for path in _changed_paths(before_upgrade, after_upgrade)
         if path != ".dev-ready.json"
+        and after_upgrade.get(path, ("", b""))[0] != "link"
+        and before_upgrade.get(path, ("", b""))[0] != "link"
         and not (
             path in old_managed_paths
             or path not in before_upgrade
@@ -510,7 +575,13 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert new_stamp.get("dev_ready_version") == checkout_probe["version"], (
         "real upgrade did not record the checkout's Overlay Currency"
     )
-    assert _overlay_currency(new_stamp) == _overlay_currency(reference_stamp), (
+    reference_currency = _overlay_currency(reference_stamp)
+    upgraded_currency = _overlay_currency(new_stamp)
+    assert upgraded_currency.dev_ready_version == reference_currency.dev_ready_version
+    assert upgraded_currency.components == reference_currency.components
+    assert _inventory_without_skill_anchors(
+        upgraded_currency.inventory
+    ) == _inventory_without_skill_anchors(reference_currency.inventory), (
         "real upgrade did not install the checkout's version, selected-item pins, "
         "and managed-file inventory"
     )
@@ -519,9 +590,16 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
         "post-upgrade check",
         ["check", str(target), "--json"],
         cwd=tmp_path,
+        expected_exit_codes=frozenset({7}),
     )
     post_check_report = _json_report(post_check, "post-upgrade check")
-    assert post_check_report.get("clean") is True, "post-upgrade check did not report clean"
+    drifts = post_check_report.get("drifts")
+    assert isinstance(drifts, list) and drifts, (
+        "post-upgrade check did not report the preserved Pointer Stub as drift"
+    )
+    assert any("tdd" in str(drift) for drift in drifts), (
+        "post-upgrade check omitted the preserved tdd Pointer Stub: " + repr(drifts)
+    )
     if reference_provenance != old_provenance:
         assert "advis" in json.dumps(post_check_report).casefold(), (
             "post-upgrade check suppressed the available newer-base advisory"

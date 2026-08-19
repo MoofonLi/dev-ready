@@ -11,7 +11,11 @@ from importlib import resources
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
-from dev_ready.agent_targets import CANONICAL_SKILLS_ROOT, AgentTarget, project_targets
+from dev_ready.agent_targets import (
+    CANONICAL_SKILLS_ROOT,
+    project_targets,
+    skill_names_from_content,
+)
 from dev_ready.catalog_effects import CatalogEffectError
 from dev_ready.errors import OverlayError
 from dev_ready.manifest import CATALOG_COMPONENTS, ComponentCatalog, UpstreamPin, VendoredPin
@@ -25,7 +29,15 @@ from dev_ready.overlay.rendering import render_asset as _render_asset
 from dev_ready.overlay.stamp_rendering import render_stamp
 from dev_ready.prompts import Answers
 
-__all__ = ["apply_overlay", "build_overlay_content", "content_inventory", "render_stamp"]
+__all__ = [
+    "apply_overlay",
+    "build_overlay_content",
+    "content_inventory",
+    "generated_anchor_names",
+    "projected_skill_link_pairs",
+    "render_ignore_anchor",
+    "render_stamp",
+]
 
 _DESIGN_REFERENCE_REPO = "VoltAgent/awesome-design-md"
 _DESIGN_REFERENCE_NOTICE = Path("docs/design-md-LICENSE.md")
@@ -106,55 +118,55 @@ def build_overlay_content(
     for source, destination in skill_infrastructure_paths():
         collect(templates_root.joinpath(source), destination)
 
-    canonical_root = Path(*CANONICAL_SKILLS_ROOT)
-    canonical_skill_files = {
-        path: data
-        for path, data in content.items()
-        if path.startswith(f"{canonical_root.as_posix()}/") and path.endswith("/SKILL.md")
-    }
-    for target in projection.skill_targets:
-        for canonical_path, canonical_bytes in canonical_skill_files.items():
-            relative = Path(canonical_path).relative_to(canonical_root)
-            if len(relative.parts) != 2 or relative.name != "SKILL.md":
-                continue
-            add_bytes(
-                projection.stub_path(target, relative.parts[0]),
-                _render_pointer_stub(canonical_bytes, relative.parts[0], canonical_path, target),
-            )
+    skill_names = skill_names_from_content(content)
+    if skill_names:
+        anchor = render_ignore_anchor(skill_names)
+        for target in projection.skill_targets:
+            add_bytes(projection.ignore_anchor_path(target), anchor)
 
     for source, destination in documentation_scaffold_paths():
         collect(templates_root.joinpath(source), destination)
     return content
 
 
-def _render_pointer_stub(
-    canonical: bytes,
-    skill_name: str,
-    canonical_path: str,
-    target: AgentTarget,
-) -> bytes:
-    """Preserve canonical frontmatter and replace the body with a native pointer."""
-    try:
-        text = canonical.decode("utf-8")
-    except UnicodeDecodeError as error:
-        raise OverlayError(f"canonical skill {canonical_path!r} is not UTF-8") from error
-    lines = text.splitlines()
-    if not lines or lines[0] != "---":
-        raise OverlayError(f"canonical skill {canonical_path!r} is missing YAML frontmatter")
-    try:
-        end = lines.index("---", 1)
-    except ValueError as error:
-        raise OverlayError(
-            f"canonical skill {canonical_path!r} has unterminated YAML frontmatter"
-        ) from error
-    frontmatter = "\n".join(lines[: end + 1])
+_IGNORE_ANCHOR_HEADER = (
+    "# Machine-local Skill Links. They are not version-controlled.\n"
+    "# After cloning, restore them with: uvx dev-ready upgrade\n"
+)
+
+
+def render_ignore_anchor(skill_names: Collection[str]) -> bytes:
+    """Render one nested Git safety anchor for the projected Skill Links."""
     return (
-        f"{frontmatter}\n\n"
-        f"# {skill_name} (pointer)\n\n"
-        f"The authoritative version of this skill lives at `{canonical_path}` "
-        f"(open Agent Skills format). This file is only a {target.id} discovery stub.\n\n"
-        f"Read `{canonical_path}` in full and follow it exactly. Do not act on this stub alone.\n"
+        _IGNORE_ANCHOR_HEADER + "".join(f"{name}\n" for name in skill_names)
     ).encode("utf-8")
+
+
+def generated_anchor_names(data: bytes) -> tuple[str, ...] | None:
+    """Return generated link names if ``data`` is an exact nested-anchor rendering."""
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    names = tuple(
+        line for line in text.splitlines() if line and not line.startswith("#")
+    )
+    if render_ignore_anchor(names) != data:
+        return None
+    return names
+
+
+def projected_skill_link_pairs(
+    answers: Answers, catalog: ComponentCatalog
+) -> tuple[tuple[Path, Path], ...]:
+    """Relative (link, canonical) pairs derived from desired overlay content."""
+    names = skill_names_from_content(build_overlay_content(answers, catalog))
+    projection = project_targets(catalog, answers.agent_targets)
+    return tuple(
+        (projection.link_path(target, name), Path(*CANONICAL_SKILLS_ROOT) / name)
+        for target in projection.skill_targets
+        for name in names
+    )
 
 
 def content_inventory(content: Mapping[str, bytes]) -> tuple[tuple[str, str], ...]:

@@ -12,10 +12,12 @@ from dev_ready import __version__
 from dev_ready.cli import ProgressRenderer, build_answers, build_parser, main
 from dev_ready.errors import (
     AbortedError,
+    DriftError,
     FetchError,
     InvalidArgumentsError,
     OverlayError,
     TargetDirectoryError,
+    UpgradeError,
     VerificationError,
 )
 from dev_ready.generate import (
@@ -614,6 +616,66 @@ def test_upgrade_success_and_dry_run_are_wiring_only(
 def test_upgrade_missing_stamp_exits_6(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["upgrade", str(tmp_path)]) == 6
     assert "missing .dev-ready.json" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("command", "patch_name", "error", "expected_exit_code"),
+    [
+        (
+            ["init", "my-app", "--yes"],
+            "generate",
+            TargetDirectoryError(
+                "failed to create Skill Link at .claude/skills/implement: "
+                "the destination was restored"
+            ),
+            4,
+        ),
+        (
+            ["init", "my-app", "--yes"],
+            "generate",
+            VerificationError(
+                "failed to create Skill Link at .claude/skills/implement: "
+                "[Errno 1] Operation not permitted. Choose a different destination "
+                "location on a filesystem that supports directory links."
+            ),
+            5,
+        ),
+        (
+            ["check", "."],
+            "check_project",
+            DriftError(
+                "[invalid agent target artifact] agent target 'claude' artifact "
+                "'.claude/skills/implement' must be a Skill Link"
+            ),
+            7,
+        ),
+        (
+            ["upgrade", "."],
+            "upgrade_project",
+            UpgradeError(
+                "failed to create Skill Link at .dev-ready-link-probe: "
+                "[Errno 1] Operation not permitted. Choose a different destination "
+                "location on a filesystem that supports directory links."
+            ),
+            9,
+        ),
+    ],
+)
+def test_cli_maps_skill_link_failures_without_a_new_exit_code(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    command: list[str],
+    patch_name: str,
+    error: Exception,
+    expected_exit_code: int,
+) -> None:
+    def _raise(*args: object, **kwargs: object) -> object:
+        raise error
+
+    monkeypatch.setattr(cli_module, patch_name, _raise)
+
+    assert main(command) == expected_exit_code
+    assert "error:" in capsys.readouterr().err
 
 
 def test_category_item_flag_variations() -> None:

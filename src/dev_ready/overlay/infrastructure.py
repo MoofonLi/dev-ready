@@ -1,6 +1,6 @@
 """Resolve infrastructure files implied by a selection.
 
-Agent-Target-shaped infrastructure (native MCP config paths, Pointer Stubs)
+Agent-Target-shaped infrastructure (native MCP config paths, Skill Links)
 lives in `dev_ready.agent_targets`, which owns that projection outright.
 """
 

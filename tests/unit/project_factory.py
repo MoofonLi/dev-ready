@@ -9,7 +9,13 @@ from pathlib import Path
 from importlib import resources
 from importlib.resources.abc import Traversable
 
-from dev_ready.agent_targets import canonical_skill_names, project_targets
+from dev_ready.agent_targets import (
+    CANONICAL_SKILLS_ROOT,
+    project_targets,
+    skill_names_from_content,
+)
+from dev_ready.overlay.infrastructure import skill_infrastructure_paths
+from dev_ready.skill_links import PathKind, classify_path, create_skill_link
 from dev_ready.inspection import REQUIRED_UPSTREAM_PATHS
 from dev_ready.manifest import CATALOG_COMPONENTS, ComponentCatalog
 from dev_ready.prompts import ProjectSelection
@@ -49,6 +55,11 @@ def materialize_project_structure(
     (root / "docs").mkdir(exist_ok=True)
 
     projection = project_targets(catalog, selection.agent_targets)
+    for source, destination in skill_infrastructure_paths():
+        _materialize_asset(
+            resources.files("dev_ready").joinpath("templates", *source.parts),
+            root / destination,
+        )
 
     for name in CATALOG_COMPONENTS:
         selected = selection.items(name)
@@ -73,17 +84,28 @@ def materialize_project_structure(
                         target.write_text("{}", encoding="utf-8")
                     entry.effect.apply(root)
 
-    skill_names = canonical_skill_names(catalog, selection.skills)
+    from dev_ready.overlay import render_ignore_anchor
+
+    skill_root = root.joinpath(*CANONICAL_SKILLS_ROOT)
+    skill_names = skill_names_from_content(
+        path.relative_to(root).as_posix()
+        for path in skill_root.glob("*/SKILL.md")
+        if skill_root.is_dir()
+    )
     for target in projection.skill_targets:
         if target.rules_file is not None:
             rules_file = root / target.rules_file
             rules_file.parent.mkdir(parents=True, exist_ok=True)
             rules_file.write_text("@AGENTS.md\n", encoding="utf-8")
+        if skill_names:
+            anchor = root / projection.ignore_anchor_path(target)
+            anchor.parent.mkdir(parents=True, exist_ok=True)
+            anchor.write_bytes(render_ignore_anchor(skill_names))
         for skill_name in skill_names:
-            stub = root / projection.stub_path(target, skill_name)
-            stub.parent.mkdir(parents=True, exist_ok=True)
-            stub.write_text(
-                f"---\nname: {skill_name}\ndescription: stub\n---\n\n"
-                f"Read `.agents/skills/{skill_name}/SKILL.md`.\n",
-                encoding="utf-8",
+            link = root / projection.link_path(target, skill_name)
+            if classify_path(link) in {PathKind.SYMBOLIC_LINK, PathKind.JUNCTION}:
+                continue
+            create_skill_link(
+                link,
+                root.joinpath(*CANONICAL_SKILLS_ROOT, skill_name),
             )

@@ -6,6 +6,7 @@ from dev_ready.agent_targets import (
     TargetProjection,
     canonical_skill_names,
     project_targets,
+    skill_names_from_content,
 )
 from dev_ready.catalog_effects import parse_catalog_effect
 from dev_ready.manifest import (
@@ -138,6 +139,105 @@ def test_projection_yields_each_shared_skill_destination_once() -> None:
         Path(".beta/skills/mattpocock/SKILL.md"),
     ]
     assert projection.rules_files == ("ALPHA.md", "GAMMA.md")
+
+
+def test_skill_names_from_content_include_each_direct_canonical_skill_md() -> None:
+    names = skill_names_from_content(
+        (
+            ".agents/skills/to-spec/SKILL.md",
+            ".agents/skills/implement/SKILL.md",
+            "docs/agents/mattpocock.md",
+        )
+    )
+
+    assert names == ("implement", "to-spec")
+
+
+def test_skill_names_from_content_ignore_nested_assets_and_malformed_paths() -> None:
+    names = skill_names_from_content(
+        (
+            ".agents/skills/tdd/SKILL.md",
+            ".agents/skills/tdd/references/SKILL.md",
+            ".agents/skills/tdd/scripts/hitl.sh",
+            ".agents/skills/SKILL.md",
+            ".claude/skills/tdd/SKILL.md",
+            "agents/skills/tdd/SKILL.md",
+            ".agents/skills//SKILL.md",
+            "../.agents/skills/tdd/SKILL.md",
+            ".agents/skills/tdd/extra/SKILL.md",
+            "SKILL.md",
+        )
+    )
+
+    assert names == ("tdd",)
+
+
+def test_real_desired_content_includes_setup_project_without_a_catalog_item(
+    tmp_path: Path,
+) -> None:
+    from dev_ready.overlay import build_overlay_content
+    from dev_ready.prompts import Answers, ProjectSelection
+
+    catalog = load_default_manifest().components
+    content = build_overlay_content(
+        Answers(
+            "my-app",
+            tmp_path / "my-app",
+            ProjectSelection.from_items(catalog, skills=frozenset({"caveman"})),
+        ),
+        catalog,
+    )
+
+    names = skill_names_from_content(content)
+    assert "setup-project" in names
+    assert "caveman" in names
+    assert "setup-project" not in {item.id for item in catalog.get("skills", ())}
+
+
+def test_link_path_is_the_target_skills_dir_plus_the_skill_name() -> None:
+    projection = project_targets(_catalog(), {"alpha"})
+
+    assert projection.link_path(_ALPHA, "setup-project") == Path(
+        ".alpha/skills/setup-project"
+    )
+    assert projection.link_path(_ALPHA, "setup-project").name != "SKILL.md"
+
+
+def test_ignore_anchor_path_is_the_targets_nested_gitignore() -> None:
+    projection = project_targets(_catalog(), {"alpha", "beta"})
+
+    assert projection.ignore_anchor_path(_ALPHA) == Path(".alpha/skills/.gitignore")
+    assert projection.ignore_anchor_path(_BETA) == Path(".beta/skills/.gitignore")
+
+
+def test_agent_targets_stays_a_pure_projection() -> None:
+    from dev_ready import agent_targets as module
+
+    bound = {
+        getattr(value, "__name__", "")
+        for value in vars(module).values()
+        if getattr(value, "__module__", None)
+    }
+    forbidden = (
+        "os",
+        "shutil",
+        "_winapi",
+        "dev_ready.prompts",
+        "dev_ready.overlay",
+        "dev_ready.generate",
+        "dev_ready.upgrade",
+        "dev_ready.inspection",
+        "dev_ready.verify",
+        "dev_ready.check",
+    )
+    assert not any(
+        name == banned or name.startswith(f"{banned}.")
+        for name in bound
+        for banned in forbidden
+    )
+    assert "os" not in vars(module)
+    assert "shutil" not in vars(module)
+    assert "_winapi" not in vars(module)
 
 
 def test_canonical_skill_names_reads_only_canonical_skill_destinations() -> None:

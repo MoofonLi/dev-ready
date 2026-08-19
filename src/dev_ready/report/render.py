@@ -43,6 +43,17 @@ def render_report(
         *_render_selection(answers, catalog),
         *_render_agent_targets(answers, catalog),
         "",
+        *_render_next_steps(answers),
+        "",
+        *_CREDENTIAL_DISCLOSURE,
+        "",
+        *_render_overlay_summary(written),
+    ]
+    return "\n".join(lines)
+
+
+def _render_next_steps(answers: Answers) -> list[str]:
+    steps = [
         "next steps:",
         f"  1. cd {answers.target_dir}",
         "  2. ask your coding agent to run `/setup-project` before the first start",
@@ -52,12 +63,15 @@ def render_report(
         # Update when a manifest bump changes the upstream workflow.
         "  3. docker compose watch   (see AGENTS.md for other commands)",
         "  4. read AGENTS.md for the full picture",
-        "",
-        *_CREDENTIAL_DISCLOSURE,
-        "",
-        *_render_overlay_summary(written),
     ]
-    return "\n".join(lines)
+    if answers.agent_targets:
+        steps.extend(
+            (
+                "  5. after cloning, run `uvx dev-ready upgrade` to recreate "
+                "machine-local skill links",
+            )
+        )
+    return steps
 
 
 def _render_overlay_summary(written: list[Path]) -> list[str]:
@@ -135,7 +149,7 @@ def _render_agent_targets(
         if target.rules_file is not None:
             artifacts.append(f"rules pointer {target.rules_file}")
         if answers.include_skills:
-            artifacts.append(f"skill stubs in {target.skills_dir}")
+            artifacts.append(f"skill links in {target.skills_dir}")
         if answers.include_mcp and target.mcp_file is not None:
             artifacts.append(f"MCP configuration {target.mcp_file}")
         received = ", ".join(artifacts) if artifacts else "no target-specific files"

@@ -119,12 +119,17 @@ def test_verify_raises_when_selected_item_path_is_missing(tmp_path: Path) -> Non
         verify_project(tmp_path, ans, CATALOG)
 
 
-def test_verify_rejects_missing_selected_agent_target_stub(tmp_path: Path) -> None:
+def test_verify_rejects_a_real_occupant_at_a_skill_link_path(tmp_path: Path) -> None:
     ans = _answers(tmp_path, skills_items=frozenset({"caveman"}))
     _make_complete_project(tmp_path, ans)
-    (tmp_path / ".claude" / "skills" / "caveman" / "SKILL.md").unlink()
+    link = tmp_path / ".claude" / "skills" / "caveman"
+    if link.is_symlink() or link.is_junction():
+        link.unlink()
+    elif link.exists():
+        shutil.rmtree(link)
+    link.write_text("not a link\n", encoding="utf-8")
 
-    with pytest.raises(VerificationError, match="agent target 'claude'.*is missing"):
+    with pytest.raises(VerificationError, match="invalid Skill Link structure"):
         verify_project(tmp_path, ans, CATALOG)
 
 
