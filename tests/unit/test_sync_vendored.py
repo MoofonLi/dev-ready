@@ -5,13 +5,15 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import importlib.util
 from pathlib import Path
+import subprocess
 
 import pytest
 
-from dev_ready.manifest.models import ItemPath, VendoredPin
 from dev_ready.manifest import load_default_manifest
+from dev_ready.manifest.models import ItemPath, VendoredPin
 
 _SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "sync_vendored.py"
 _spec = importlib.util.spec_from_file_location("sync_vendored", _SCRIPT_PATH)
@@ -35,7 +37,11 @@ def test_build_path_mappings_single_entry(tmp_path: Path) -> None:
             "JuliusBrussee/caveman",
             "a" * 40,
             "MIT",
-            [ItemPath(src="SKILL.md", dest="src/dev_ready/templates/claude/skills/caveman/SKILL.md")],
+            [
+                ItemPath(
+                    src="SKILL.md", dest="src/dev_ready/templates/claude/skills/caveman/SKILL.md"
+                )
+            ],
         )
     ]
     mappings = sync_vendored.build_path_mappings(vendored, tmp_path)
@@ -52,8 +58,12 @@ def test_build_path_mappings_multiple_entries(tmp_path: Path) -> None:
             "a" * 40,
             "MIT",
             [
-                ItemPath(src="SKILL.md", dest="src/dev_ready/templates/claude/skills/caveman/SKILL.md"),
-                ItemPath(src="README.md", dest="src/dev_ready/templates/claude/skills/caveman/README.md"),
+                ItemPath(
+                    src="SKILL.md", dest="src/dev_ready/templates/claude/skills/caveman/SKILL.md"
+                ),
+                ItemPath(
+                    src="README.md", dest="src/dev_ready/templates/claude/skills/caveman/README.md"
+                ),
             ],
         ),
         _pin(
@@ -65,8 +75,14 @@ def test_build_path_mappings_multiple_entries(tmp_path: Path) -> None:
     ]
     mappings = sync_vendored.build_path_mappings(vendored, tmp_path)
     assert len(mappings) == 3
-    assert mappings[0] == ("SKILL.md", tmp_path / "src/dev_ready/templates/claude/skills/caveman/SKILL.md")
-    assert mappings[1] == ("README.md", tmp_path / "src/dev_ready/templates/claude/skills/caveman/README.md")
+    assert mappings[0] == (
+        "SKILL.md",
+        tmp_path / "src/dev_ready/templates/claude/skills/caveman/SKILL.md",
+    )
+    assert mappings[1] == (
+        "README.md",
+        tmp_path / "src/dev_ready/templates/claude/skills/caveman/README.md",
+    )
     assert mappings[2] == ("foo.txt", tmp_path / "src/dev_ready/templates/mcp/foo.txt")
 
 
@@ -162,7 +178,7 @@ def test_sync_all_empty_vendored_returns_zero(tmp_path: Path) -> None:
     }
   },
   "vendored": [],
-  "components": {"skills": {"items": [{"id": "sample-loop", "kind": "development-loop", "steps": ["sample-step"], "category": "dev", "description": "Sample loop.", "mode": "builtin", "license": "MIT", "paths": [{"src": "sample", "dest": ".agents/skills/sample"}]}]}, "mcp": {"items": []}, "docs": {"items": []}},
+  "components": {"skills": {"items": [{"id": "sample-loop", "kind": "development-loop", "steps": ["sample-step"], "invocation": "user", "chain": ["sample-step"], "roles": {"build": ["sample-step"]}, "category": "dev", "description": "Sample loop.", "mode": "builtin", "license": "MIT", "paths": [{"src": "sample", "dest": ".agents/skills/sample-step"}]}]}, "mcp": {"items": []}, "docs": {"items": []}},
   "overlay_version": "0.1.0"
 }"""
         % ("a" * 40),
@@ -193,6 +209,38 @@ def test_sync_all_rejects_invalid_manifest(tmp_path: Path) -> None:
         sync_vendored.sync_all(manifest_path, tmp_path, tmp_path / ".sync-cache")
 
 
+def test_clone_or_fetch_disables_checkout_line_ending_conversion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[list[str]] = []
+
+    def successful_run(cmd: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", successful_run)
+
+    sync_vendored.clone_or_fetch("owner/repo", "a" * 40, tmp_path / "cache" / "owner_repo")
+
+    assert calls[0][:5] == [
+        "git",
+        "-c",
+        "core.autocrlf=false",
+        "-c",
+        "core.eol=lf",
+    ]
+    assert calls[0][5] == "clone"
+    assert calls[-1][:6] == [
+        "git",
+        "-c",
+        "core.autocrlf=false",
+        "-c",
+        "core.eol=lf",
+        "checkout",
+    ]
+    assert "--force" in calls[-1]
+
+
 def test_spec_loop_snapshot_declares_every_support_path() -> None:
     manifest = load_default_manifest()
     pin = next(entry for entry in manifest.vendored if entry.repo == "mattpocock/skills")
@@ -214,3 +262,143 @@ def test_spec_loop_snapshot_declares_every_support_path() -> None:
         "src/dev_ready/templates/claude/skills/setup-matt-pocock-skills",
     }
     assert notice_paths == {f"{directory}/LICENSE" for directory in skill_directories}
+
+
+def test_superpowers_snapshot_declares_every_support_path() -> None:
+    manifest = load_default_manifest()
+    pin = next(entry for entry in manifest.vendored if entry.repo == "obra/superpowers")
+    skill_directories = {path.dest for path in pin.paths if not path.dest.endswith("/LICENSE")}
+    notice_paths = {path.dest for path in pin.paths if path.dest.endswith("/LICENSE")}
+
+    assert skill_directories == {
+        "src/dev_ready/templates/claude/skills/brainstorming",
+        "src/dev_ready/templates/claude/skills/dispatching-parallel-agents",
+        "src/dev_ready/templates/claude/skills/executing-plans",
+        "src/dev_ready/templates/claude/skills/finishing-a-development-branch",
+        "src/dev_ready/templates/claude/skills/receiving-code-review",
+        "src/dev_ready/templates/claude/skills/requesting-code-review",
+        "src/dev_ready/templates/claude/skills/subagent-driven-development",
+        "src/dev_ready/templates/claude/skills/systematic-debugging",
+        "src/dev_ready/templates/claude/skills/test-driven-development",
+        "src/dev_ready/templates/claude/skills/using-git-worktrees",
+        "src/dev_ready/templates/claude/skills/verification-before-completion",
+        "src/dev_ready/templates/claude/skills/writing-plans",
+    }
+    assert notice_paths == {f"{directory}/LICENSE" for directory in skill_directories}
+    assert len(pin.paths) == 24
+
+
+def test_compare_executable_modes_detects_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clone_base = tmp_path / "cache"
+    repo_dir = clone_base / "owner_repo"
+    (repo_dir / ".git").mkdir(parents=True)
+
+    pin = _pin(
+        "owner/repo",
+        "a" * 40,
+        "MIT",
+        [ItemPath(src="skills/demo", dest="src/dev_ready/templates/claude/skills/demo")],
+    )
+    pin = replace(pin, executable=("skills/demo/run.sh", "skills/demo/missing.sh"))
+
+    def mock_run(cmd: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        output = (
+            "100755 abcdef 0\tskills/demo/run.sh\n"
+            "100755 123456 0\tskills/demo/extra.sh\n"
+            "100644 789012 0\tskills/demo/missing.sh\n"
+        )
+        return subprocess.CompletedProcess(cmd, returncode=0, stdout=output, stderr="")
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+
+    diffs = sync_vendored._compare_executable_modes(clone_base, [pin])
+    assert (
+        "owner/repo: skills/demo/missing.sh declared executable but upstream mode is not 100755"
+        in diffs
+    )
+    assert (
+        "owner/repo: skills/demo/extra.sh upstream mode is 100755 but not declared in executable"
+        in diffs
+    )
+
+
+def test_compare_executable_modes_fails_when_clone_metadata_is_missing(
+    tmp_path: Path,
+) -> None:
+    pin = replace(
+        _pin(
+            "owner/repo",
+            "a" * 40,
+            "MIT",
+            [ItemPath(src="skills/demo", dest="src/dev_ready/templates/claude/skills/demo")],
+        ),
+        executable=("skills/demo/run.sh",),
+    )
+
+    diffs = sync_vendored._compare_executable_modes(tmp_path / "cache", [pin])
+
+    assert diffs == ["owner/repo: clone metadata missing; executable modes were not checked"]
+
+
+def test_compare_executable_modes_fails_when_git_mode_query_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clone_base = tmp_path / "cache"
+    (clone_base / "owner_repo" / ".git").mkdir(parents=True)
+    pin = replace(
+        _pin(
+            "owner/repo",
+            "a" * 40,
+            "MIT",
+            [ItemPath(src="skills/demo", dest="src/dev_ready/templates/claude/skills/demo")],
+        ),
+        executable=("skills/demo/run.sh",),
+    )
+
+    def failed_run(cmd: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(cmd, returncode=1, stdout="", stderr="bad index")
+
+    monkeypatch.setattr(subprocess, "run", failed_run)
+
+    diffs = sync_vendored._compare_executable_modes(clone_base, [pin])
+
+    assert diffs == ["owner/repo: git ls-files failed; executable modes were not checked"]
+
+
+def test_compare_executable_line_endings_rejects_carriage_returns(tmp_path: Path) -> None:
+    executable = (
+        tmp_path
+        / "src"
+        / "dev_ready"
+        / "templates"
+        / "claude"
+        / "skills"
+        / "demo"
+        / "scripts"
+        / "run"
+    )
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"#!/usr/bin/env bash\r\necho demo\r\n")
+    pin = replace(
+        _pin(
+            "owner/repo",
+            "a" * 40,
+            "MIT",
+            [
+                ItemPath(
+                    src="skills/demo",
+                    dest="src/dev_ready/templates/claude/skills/demo",
+                )
+            ],
+        ),
+        executable=("skills/demo/scripts/run",),
+    )
+
+    diffs = sync_vendored._compare_executable_line_endings(tmp_path, [pin])
+
+    assert diffs == [
+        "src/dev_ready/templates/claude/skills/demo/scripts/run: "
+        "declared executable contains carriage returns"
+    ]

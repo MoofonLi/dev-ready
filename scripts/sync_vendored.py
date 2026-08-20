@@ -102,7 +102,18 @@ def clone_or_fetch(repo: str, commit: str, target_dir: Path) -> None:
     else:
         target_dir.parent.mkdir(parents=True, exist_ok=True)
         res = subprocess.run(
-            ["git", "clone", "--filter=blob:none", "--no-checkout", url, str(target_dir)],
+            [
+                "git",
+                "-c",
+                "core.autocrlf=false",
+                "-c",
+                "core.eol=lf",
+                "clone",
+                "--filter=blob:none",
+                "--no-checkout",
+                url,
+                str(target_dir),
+            ],
             capture_output=True,
             text=True,
             timeout=60,
@@ -111,7 +122,16 @@ def clone_or_fetch(repo: str, commit: str, target_dir: Path) -> None:
             raise RuntimeError(f"git clone failed for {repo}: {res.stderr}")
 
     res = subprocess.run(
-        ["git", "checkout", commit],
+        [
+            "git",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "core.eol=lf",
+            "checkout",
+            "--force",
+            commit,
+        ],
         cwd=target_dir,
         capture_output=True,
         text=True,
@@ -207,6 +227,86 @@ def _compare_trees(
     return diffs
 
 
+def _compare_executable_modes(
+    clone_base: Path,
+    vendored: tuple[VendoredPin, ...] | list[VendoredPin],
+) -> list[str]:
+    """Compare declared executable paths against upstream git file modes."""
+    diffs: list[str] = []
+    for entry in vendored:
+        if not entry.executable:
+            continue
+        clone_dir = clone_base / entry.repo.replace("/", "_")
+        if not (clone_dir / ".git").exists():
+            diffs.append(
+                f"{entry.repo}: clone metadata missing; executable modes were not checked"
+            )
+            continue
+        res = subprocess.run(
+            ["git", "ls-files", "-s"],
+            cwd=clone_dir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if res.returncode != 0:
+            diffs.append(
+                f"{entry.repo}: git ls-files failed; executable modes were not checked"
+            )
+            continue
+        upstream_executables: set[str] = set()
+        for line in res.stdout.splitlines():
+            parts = line.split("\t", 1)
+            if len(parts) != 2:
+                continue
+            meta, path = parts
+            mode = meta.split()[0]
+            if mode == "100755":
+                if any(
+                    path == p.src or path.startswith(f"{p.src.rstrip('/')}/")
+                    for p in entry.paths
+                ):
+                    upstream_executables.add(path)
+        declared_executables = set(entry.executable)
+        for missing in sorted(declared_executables - upstream_executables):
+            diffs.append(
+                f"{entry.repo}: {missing} declared executable but upstream mode is not 100755"
+            )
+        for extra in sorted(upstream_executables - declared_executables):
+            diffs.append(
+                f"{entry.repo}: {extra} upstream mode is 100755 but not declared in executable"
+            )
+    return diffs
+
+
+def _compare_executable_line_endings(
+    repo_root: Path,
+    vendored: tuple[VendoredPin, ...] | list[VendoredPin],
+) -> list[str]:
+    """Reject carriage returns in committed files declared executable."""
+    diffs: list[str] = []
+    for entry in vendored:
+        for executable in entry.executable:
+            for path_pair in entry.paths:
+                source_root = path_pair.src.rstrip("/")
+                if executable == source_root:
+                    relative = ""
+                elif executable.startswith(f"{source_root}/"):
+                    relative = executable[len(source_root) + 1 :]
+                else:
+                    continue
+                destination = Path(path_pair.dest)
+                if relative:
+                    destination /= relative
+                committed_path = repo_root / destination
+                if committed_path.is_file() and b"\r" in committed_path.read_bytes():
+                    diffs.append(
+                        f"{destination.as_posix()}: declared executable contains carriage returns"
+                    )
+                break
+    return diffs
+
+
 def _check_mode(manifest_path: Path, repo_root: Path, clone_base: Path) -> int:
     """Sync into a temp dir; byte-compare each file against committed snapshot.
 
@@ -224,6 +324,8 @@ def _check_mode(manifest_path: Path, repo_root: Path, clone_base: Path) -> int:
         (tmp_root / "templates").mkdir()
         sync_all(manifest_path, tmp_root, clone_base)
         diffs = _compare_trees(tmp_root, repo_root, vendored)
+        diffs.extend(_compare_executable_modes(clone_base, vendored))
+        diffs.extend(_compare_executable_line_endings(repo_root, vendored))
 
     if diffs:
         for d in diffs:

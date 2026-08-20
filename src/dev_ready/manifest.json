@@ -692,6 +692,117 @@
           "dest": "src/dev_ready/templates/claude/skills/frontend-design"
         }
       ]
+    },
+    {
+      "repo": "obra/superpowers",
+      "commit": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
+      "license": "MIT",
+      "executable": [
+        "skills/brainstorming/scripts/start-server.sh",
+        "skills/brainstorming/scripts/stop-server.sh",
+        "skills/subagent-driven-development/scripts/review-package",
+        "skills/subagent-driven-development/scripts/sdd-workspace",
+        "skills/subagent-driven-development/scripts/task-brief",
+        "skills/systematic-debugging/find-polluter.sh"
+      ],
+      "paths": [
+        {
+          "src": "skills/brainstorming",
+          "dest": "src/dev_ready/templates/claude/skills/brainstorming"
+        },
+        {
+          "src": "skills/dispatching-parallel-agents",
+          "dest": "src/dev_ready/templates/claude/skills/dispatching-parallel-agents"
+        },
+        {
+          "src": "skills/executing-plans",
+          "dest": "src/dev_ready/templates/claude/skills/executing-plans"
+        },
+        {
+          "src": "skills/finishing-a-development-branch",
+          "dest": "src/dev_ready/templates/claude/skills/finishing-a-development-branch"
+        },
+        {
+          "src": "skills/receiving-code-review",
+          "dest": "src/dev_ready/templates/claude/skills/receiving-code-review"
+        },
+        {
+          "src": "skills/requesting-code-review",
+          "dest": "src/dev_ready/templates/claude/skills/requesting-code-review"
+        },
+        {
+          "src": "skills/subagent-driven-development",
+          "dest": "src/dev_ready/templates/claude/skills/subagent-driven-development"
+        },
+        {
+          "src": "skills/systematic-debugging",
+          "dest": "src/dev_ready/templates/claude/skills/systematic-debugging"
+        },
+        {
+          "src": "skills/test-driven-development",
+          "dest": "src/dev_ready/templates/claude/skills/test-driven-development"
+        },
+        {
+          "src": "skills/using-git-worktrees",
+          "dest": "src/dev_ready/templates/claude/skills/using-git-worktrees"
+        },
+        {
+          "src": "skills/verification-before-completion",
+          "dest": "src/dev_ready/templates/claude/skills/verification-before-completion"
+        },
+        {
+          "src": "skills/writing-plans",
+          "dest": "src/dev_ready/templates/claude/skills/writing-plans"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/brainstorming/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/dispatching-parallel-agents/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/executing-plans/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/finishing-a-development-branch/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/receiving-code-review/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/requesting-code-review/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/subagent-driven-development/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/systematic-debugging/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/test-driven-development/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/using-git-worktrees/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/verification-before-completion/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/writing-plans/LICENSE"
+        }
+      ]
     }
   ],
   "components": {

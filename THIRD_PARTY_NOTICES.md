@@ -33,6 +33,16 @@ dev-ready does not ship a copy of this template inside the wheel. At generation 
 
 Copies of these skills written into generated projects may be modified by dev-ready and are distributed as derived works under the same MIT license. The vendored source snapshots in this repository remain byte-checked against the pinned commit.
 
+## obra/superpowers
+
+- License: MIT
+- Pinned Commit: b36e0829c6d0140e93cfef2ca599b1b07d4a7797
+- Source: https://github.com/obra/superpowers
+- Subset: `skills/brainstorming`, `skills/dispatching-parallel-agents`, `skills/executing-plans`, `skills/finishing-a-development-branch`, `skills/receiving-code-review`, `skills/requesting-code-review`, `skills/subagent-driven-development`, `skills/systematic-debugging`, `skills/test-driven-development`, `skills/using-git-worktrees`, `skills/verification-before-completion`, and `skills/writing-plans` vendored into `src/dev_ready/templates/claude/skills/`.
+- Notice paths: the upstream `LICENSE` is vendored into each of those twelve skill directories and travels with each generated copy.
+
+Copies of these skills written into generated projects may be modified by dev-ready and are distributed as derived works under the same MIT license. The vendored source snapshots in this repository remain byte-checked against the pinned commit.
+
 ## cloudflare/security-audit-skill
 
 - License: MIT

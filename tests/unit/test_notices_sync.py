@@ -23,13 +23,16 @@ _CURRENT_CATALOG_JSON = """"default_set": {
       "id": "sample-loop",
       "kind": "development-loop",
       "steps": ["sample-step"],
+      "invocation": "user",
+      "chain": ["sample-step"],
+      "roles": {"build": ["sample-step"]},
       "category": "dev",
       "description": "Sample loop.",
       "mode": "builtin",
       "license": "MIT",
       "paths": [{
         "src": "claude/skills/sample-loop",
-        "dest": ".agents/skills/sample-loop"
+        "dest": ".agents/skills/sample-step"
       }]
     }]},
     "mcp": {"items": []},
@@ -135,6 +138,33 @@ def test_mattpocock_notice_names_the_complete_spec_loop_subset() -> None:
     assert "project-orientation" not in notices
     assert "mounted Enhancement" not in notices
     assert "delimited block" not in notices
+
+
+def test_superpowers_notice_names_the_complete_curated_subset() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    notices = (repo_root / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+
+    assert "## obra/superpowers" in notices
+    for skill_name in (
+        "brainstorming",
+        "dispatching-parallel-agents",
+        "executing-plans",
+        "finishing-a-development-branch",
+        "receiving-code-review",
+        "requesting-code-review",
+        "subagent-driven-development",
+        "systematic-debugging",
+        "test-driven-development",
+        "using-git-worktrees",
+        "verification-before-completion",
+        "writing-plans",
+    ):
+        assert skill_name in notices
+
+    assert "using-superpowers" not in notices
+    assert "writing-skills" not in notices
+    assert "b36e0829c6d0140e93cfef2ca599b1b07d4a7797" in notices
+
 
 
 def test_reference_installer_notice_records_pathless_derived_data() -> None:
