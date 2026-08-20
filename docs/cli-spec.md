@@ -31,11 +31,11 @@ conflicts with an explicit `--categories` value that omits that Category. The
 explicit `--categories all` selection still selects every Category, and naming
 a Category without its item flag still selects all items in that Category.
 
-Dev is mandatory and currently has one Engineering Flow option: `mattpocock`.
-It is resolved for every generation, including `--categories none` and
-`--dev none`. Dev currently has no selectable Enhancements, so both `--dev all`
-and `--dev none` select no optional items. `--flow` is the structural
-single-select and remains data-driven if the manifest adds another flow;
+Dev is mandatory and currently offers two Engineering Flow options: `mattpocock`
+(the default) and `superpowers`. It is resolved for every generation, including
+`--categories none` and `--dev none`. Dev currently has no selectable Enhancements,
+so both `--dev all` and `--dev none` select no optional items. `--flow` is the
+structural single-select and remains data-driven as the manifest adds flows;
 `--development-loop` is a permanently accepted alias. Engineering Flow ids are
 never Dev Enhancement ids.
 
@@ -47,7 +47,7 @@ Engineering Flow failures also exit 2 and distinguish these cases:
 
 - `spec-loop` supplied to `--flow` or `--development-loop` says that the id was
   renamed to `mattpocock`.
-- An announced but unreleased Flow, such as `superpowers`, says that it is not
+- An announced but unreleased Flow, such as `addyosmani`, says that it is not
   yet available.
 - Any other unrecognised Flow id says that the Engineering Flow id is unknown.
 
@@ -202,9 +202,9 @@ This flow applies only to `init`. `check` and `upgrade` are non-interactive by
 construction and dispatch directly to their respective operations.
 
 1. Project name (if not given as argument)
-2. Engineering Flow single-selection, even while only `mattpocock` is
-   selectable. Announced Flows are shown with a `Not yet available` explanation
-   and cannot be selected.
+2. Engineering Flow single-selection (`mattpocock` by default, or `superpowers`).
+   Announced Flows are shown with a `Not yet available` explanation and cannot
+   be selected.
 3. Security item selection
 4. Quality item selection
 5. Design item selection

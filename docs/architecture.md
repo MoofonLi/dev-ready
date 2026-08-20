@@ -74,6 +74,7 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | `skill_links` | Create and classify Skill Link objects: a relative directory symbolic link on POSIX, an elevation-free directory junction via `_winapi.CreateJunction` on Windows | import `prompts`, choose lifecycle policy, follow a link being classified, or perform network I/O |
 | `recorded` | Resolve a loaded stamp into a selection over the current catalog, applying stamp-version migration once | choose CLI error/report policy, write to the project, or perform network I/O |
 | `catalog_effects` | Validate, apply, and observe catalog-item injected effects through one local-project interface | read manifest.json, perform network I/O, choose CLI error/report policy, or touch overlay-managed content |
+| `executable_modes` | Resolve selected manifest-declared executable paths and observe their modes through one read-only interface | write to the project, read manifest.json, perform network I/O, or choose CLI error/report policy |
 | `report` | Post-generation summary and next steps | mutate the generated project |
 | `inspection` | Read-only observation of generated-project structure shared by generation and lifecycle policies | perform network I/O, write to the project, or choose exit codes |
 | `verify` | Map the first shared inspection issue to a generation-blocking error | perform network I/O, write to the project, or duplicate structural traversal |
@@ -85,7 +86,7 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 ## Dependency Rules
 
 - Direction: `cli` -> `prompts`/`manifest`/`fetch`/`overlay`/`report`/`verify`. Lower modules never import `cli`.
-- `fetch`, `overlay`, and `verify` are independent of each other; only `generate` (called only by `cli`) sequences them. `manifest`, `overlay`, `verify`, `check`, and `upgrade` may depend on `catalog_effects`; `verify` and `check` may depend on `inspection`.
+- `fetch`, `overlay`, and `verify` are independent of each other; only `generate` (called only by `cli`) sequences them. `overlay` and `verify` may depend on the neutral, read-only `executable_modes` resolver. `manifest`, `overlay`, `verify`, `check`, and `upgrade` may depend on `catalog_effects`; `verify` and `check` may depend on `inspection`.
 - `upgrade` (called only by `cli`) sequences `overlay` and `stamp` offline, analogous to `generate`.
 - `agent_targets` sits directly above `manifest` and depends on nothing else, so `overlay`, `inspection`, `upgrade` and the lifecycle test fixtures can all read one projection. **No module may restate the Agent Target layout** — where an Agent Target's rules pointer, MCP config, Skill Link or nested ignore-anchor goes is decided in `agent_targets` and nowhere else.
 - `skill_links` sits beside `overlay` and `upgrade` as the only filesystem writer for Skill Link objects. It may be imported by `generate`, `verify`, `inspection`, `upgrade` and tests. It does not import `agent_targets` — callers pass the paths the projection already computed.

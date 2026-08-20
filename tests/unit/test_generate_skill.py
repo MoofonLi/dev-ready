@@ -245,7 +245,7 @@ def test_skill_documents_safe_failure_and_verification_behavior() -> None:
         assert required in text
     assert "--development-loop" not in original
     assert "Engineering Flow id 'spec-loop' was renamed to 'mattpocock'" in original
-    assert "Engineering Flow 'superpowers' is not yet available" in original
+    assert "Engineering Flow 'addyosmani' is not yet available" in original
     assert "unknown Engineering Flow id" in original
     for removed in ("--skills", "--mcp", "--no-docs", "--no-handoff", "--no-agents"):
         assert removed in text

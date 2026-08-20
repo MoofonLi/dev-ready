@@ -63,15 +63,14 @@ start of each line is the value to place in the corresponding selection flag.
 
 ### Engineering Flows
 
-- `mattpocock`: You want a staged workflow that starts with a written spec and ends with implementation and review.
+- `mattpocock`: You start each step yourself, and the work stays in one session.
+- `superpowers`: The agent starts each step on its own, and implementation can be split across fresh subagents.
 
-`superpowers` and `addyosmani` are announced Engineering Flows and cannot be
-selected yet. Do not put either in `--flow`. `--flow spec-loop` exits 2 with
-`Engineering Flow id 'spec-loop' was renamed to 'mattpocock'`. `--flow superpowers`
-and `--flow addyosmani` exit 2 with `Engineering Flow 'superpowers' is not yet available`
-(the requested id substituted). An unknown `--flow` id exits 2 with
-`unknown Engineering Flow id '<id>'; valid ids: ['mattpocock']`. Surface the
-failure and stop; do not guess a replacement.
+`addyosmani` is an announced Engineering Flow and cannot be selected yet. Do not
+put it in `--flow`. `--flow spec-loop` exits 2 with `Engineering Flow id 'spec-loop' was renamed to 'mattpocock'`.
+`--flow addyosmani` exits 2 with `Engineering Flow 'addyosmani' is not yet available`.
+An unknown `--flow` id exits 2 with `unknown Engineering Flow id '<id>'; valid ids: ['mattpocock', 'superpowers']`.
+Surface the failure and stop; do not guess a replacement.
 
 ### dev items
 
