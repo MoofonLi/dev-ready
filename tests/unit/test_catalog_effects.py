@@ -178,3 +178,50 @@ def test_shared_target_classification_stays_behind_effect_seam() -> None:
 
     assert "frontend/package.json" in targets.all
     assert ".mcp.json" in targets.selected
+
+
+def test_effects_write_lf_line_endings_on_every_platform(tmp_path: Path) -> None:
+    """A generated project must not depend on the platform that produced it.
+
+    Both effects write JSON into the user's project. Text mode translates
+    newlines to the platform default, so without an explicit newline the same
+    dev-ready version emits CRLF on Windows and LF elsewhere, which NFR-1
+    forbids.
+    """
+    mcp_target = tmp_path / ".mcp.json"
+    mcp_target.write_text('{"mcpServers": {}}', encoding="utf-8")
+    mcp_effect = parse_catalog_effect(
+        {
+            "kind": "mcp-server",
+            "target": ".mcp.json",
+            "package": "codebase-memory-mcp",
+            "server_name": "codebase-memory",
+            "command": "uvx",
+        },
+        mode="pinned-dependency",
+        pin="0.9.0",
+        location="manifest item 'code-memory'",
+    )
+    assert mcp_effect is not None
+    mcp_effect.apply(tmp_path)
+
+    npm_target = tmp_path / "package.json"
+    npm_target.write_text('{"devDependencies": {}}', encoding="utf-8")
+    npm_effect = parse_catalog_effect(
+        {
+            "kind": "npm-dev-dependency",
+            "target": "package.json",
+            "package": "react-scan",
+            "scripts": {"scan": "react-scan"},
+        },
+        mode="pinned-dependency",
+        pin="0.1.3",
+        location="manifest item 'react-scan'",
+    )
+    assert npm_effect is not None
+    npm_effect.apply(tmp_path)
+
+    for written in (mcp_target, npm_target):
+        raw = written.read_bytes()
+        assert b"\r\n" not in raw, f"{written.name} was written with CRLF"
+        assert raw.endswith(b"\n")

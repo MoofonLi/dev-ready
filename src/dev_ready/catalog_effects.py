@@ -84,7 +84,9 @@ class CatalogEffect(ABC):
 
     def _write_target(self, target_path: Path, data: dict[str, object]) -> None:
         try:
-            target_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+            target_path.write_text(
+                json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n"
+            )
         except OSError as error:
             raise CatalogEffectError(f"failed to write {self.target}: {error}") from error
 
