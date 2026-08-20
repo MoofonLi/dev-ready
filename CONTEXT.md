@@ -57,27 +57,36 @@ and each entry is deleted as its flow ships or the menu accumulates promises.
 _Avoid_: placeholder item, disabled item, stub flow, future flow
 
 **Flow Chain**:
-The ordered steps of an [[Engineering Flow]] as a generated project describes
-them, beginning with its [[Setup Step]]. A **default path, not a rule** — a
-change adding no observable behaviour may start partway along it. Steps a chain
-entry calls internally are not chain entries: `tdd` and `code-review` belong to
-`implement`, which invokes both, and listing them as peers turns tools into
-phases. Whether the user or the agent starts each entry is the chain's
-[[Flow Invocation]] and differs per flow, so a generated project describes its
-own chain and never the other's.
+The ordered steps of an [[Engineering Flow]], declared as manifest data in that
+flow's `chain` field and rendered from it (ADR-029). A **default path, not a
+rule** — a change adding no observable behaviour may start partway along it. An
+entry is one step, or a **choice between steps** where the flow offers one, as
+`superpowers` does at its fourth position. Steps a chain entry calls internally
+are not chain entries: `tdd` and `code-review` belong to `implement`, which
+invokes both, and listing them as peers turns tools into phases. The
+[[Setup Step]] heads every chain but is **not** a `chain` entry, because it is
+unconditional infrastructure rather than the flow's own (ADR-026). Whether the
+user or the agent starts each entry is the chain's [[Flow Invocation]] and
+differs per flow, so a generated project describes its own chain and never the
+other's.
 _Avoid_: pipeline, stages, the seven steps, phase order
 
 **Flow Invocation**:
 Who starts a [[Flow Chain]]'s entries — the user, or the agent on its own.
 Declared per [[Engineering Flow]] in the manifest as `user` or `model`, and
-guarded by a test that reads every shipped step's frontmatter, so the
-declaration cannot drift from the files (ADR-024, as amended 2026-08-18).
-`mattpocock` is `user`: measured 2026-08-14, exactly its chain entries declare
-`disable-model-invocation: true` and the tools they reach for do not.
-`superpowers` is `model`: measured 2026-08-18, none of its skills declares the
-flag and upstream calls them mandatory. dev-ready cannot change either, because
-FR-16 holds vendored files byte-identical to upstream — so this is recorded, not
-chosen. It is also the first of the two axes a flow recommendation may rest on.
+guarded by an **asymmetric** test so the declaration cannot drift from the files
+(ADR-024, as amended 2026-08-18 and corrected 2026-08-20; guard shape in
+ADR-029). `user` asserts every [[Flow Chain]] entry declares
+`disable-model-invocation: true`; `model` asserts no shipped step declares it. A
+symmetric rule fails on `setup-matt-pocock-skills`, which declares the flag and
+is not a chain entry. `mattpocock` is `user`: measured 2026-08-14, exactly its
+chain entries declare the flag and the tools they reach for do not.
+`superpowers` is `model`: measured 2026-08-18, none of its twelve skills
+declares it. dev-ready cannot change either, because FR-16 holds vendored files
+byte-identical to upstream — so this is recorded, not chosen. The [[Setup Step]]
+is user-invoked in **every** flow, so a `model` flow's chain is a user-invoked
+head followed by model-invoked entries, and the generated sentence says so. It
+is also the first of the two axes a flow recommendation may rest on.
 _Avoid_: trigger mode, auto-invoke, activation, enforcement
 
 **Setup Step**:
@@ -146,14 +155,17 @@ it attaches to. Everything a user can add or drop is an Enhancement.
 _Avoid_: plugin, extra, addon, optional skill
 
 **Mount Point**:
-The Spec Loop skill an [[Enhancement]] attaches to, declared as manifest data
-and optional — an Enhancement whose guidance has no single right moment
-declares none. A mount decides *when* an agent is reminded, never whether it can
-find the skill: a [[Pointer Stub]] already makes every selected skill
-discoverable, so a mount at the wrong step is worse than no mount. Guidance is
-injected at generation time; nothing rewrites a skill at runtime (ADR-018, as
-amended 2026-08-03).
-_Avoid_: hook, anchor, attachment point, phase
+The **role** an [[Enhancement]] attaches to — `build`, `test`, or `review` —
+declared as manifest data and optional; an Enhancement whose guidance has no
+single right moment declares none. A role, not a skill name, because two flows
+share no step names: each [[Engineering Flow]] declares which of its own steps
+plays each role, and one role may resolve to **more than one** step where the
+[[Flow Chain]] forks (ADR-029, amending ADR-018). A mount decides *when* an
+agent is reminded, never whether it can find the skill: a [[Skill Link]] already
+makes every selected skill discoverable, so a mount at the wrong step is worse
+than no mount. Guidance is injected at generation time; nothing rewrites a
+vendored skill at runtime (ADR-018, as amended 2026-08-03).
+_Avoid_: hook, anchor, attachment point, phase, mount role
 
 **Default Set**:
 What a generated project receives when the user accepts every default: the Spec

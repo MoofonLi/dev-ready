@@ -189,3 +189,47 @@ A skill ships whole or not at all. FR-16 compares directories byte for byte, so
 splitting one skill's files would make the drift guard finer-grained and the
 sync tooling more complex than the saving is worth — which is why
 `systematic-debugging` ships its own test fixtures and creation log with it.
+
+## 2026-08-20 correction — two claims in the amendment above are wrong
+
+Found in the `grill-with-docs` session of 2026-08-20 opening v0.12 Phase 2, run
+against the code rather than against the decision. The 2026-08-18 amendment's
+conclusions stand: a flow declares `invocation`, the generated text renders from
+it, and the recommendation rests on two guarded axes. Two of the sentences
+supporting them do not.
+
+**The guard as specified cannot be written.** The amendment asks
+`tests/unit/test_flow_frontmatter.py` to assert the declared `invocation`
+"matches the frontmatter of every step that flow ships". `mattpocock` declares
+`user` and ships twelve steps, of which six declare `disable-model-invocation:
+true` and six do not — the split this ADR states correctly two paragraphs
+earlier and `CONTEXT.md`'s [[Flow Invocation]] entry states correctly as well.
+Implemented literally, the test fails on the day it is written. The list it
+needs — which steps are chain entries — is not in the manifest at all; it exists
+only as prose inside `overlay/rendering.py`'s `_FLOW_GUIDANCE`.
+
+[ADR-029](adr-029-a-flow-declares-its-own-shape.md) supplies that list as a
+`chain` field and settles the guard's shape: `invocation: user` asserts every
+**chain entry** declares the flag, and `invocation: model` asserts **no shipped
+step** declares it. The rule is asymmetric because a symmetric one fails on
+`setup-matt-pocock-skills`, which declares the flag and is not a chain entry.
+
+**`steps` is not validated against `paths`.** The amendment rests the second
+recommendation axis on `steps`, "which `manifest/loader.py` already validates
+against the paths each item writes". It does not. Verified on 2026-08-20 by
+appending `this-skill-does-not-exist` to `mattpocock`'s `steps`: the manifest
+loaded without error. `_parse_item_kind_and_steps` (`loader.py:797-843`) checks
+that the list is non-empty, that each entry matches the id pattern, and that no
+entry repeats. The rule at `loader.py:150-156` — that no other Catalog Item
+reuses a step id — is a different guarantee and is probably what was remembered.
+
+The axis is sound once the missing rule exists, and ADR-029 builds it. With it,
+a description's claim chains from the named behaviour to a `chain` entry, to a
+`paths` entry, to a file `vendored-drift` holds byte-identical to the pin. That
+is ADR-023's mechanism working as intended. It guards the file, not its meaning:
+a pin bump touching a step named in a `description` requires re-reading that
+step, and the spec says so rather than leaving it to a reviewer's attention.
+
+**Unchanged by this correction:** the Default Set still resolves `mattpocock`,
+`--flow`'s default is still `mattpocock`, and the curation standard recorded
+above is untouched.
