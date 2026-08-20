@@ -165,11 +165,11 @@ def _validate_development_loops(
                 "exactly one path"
             )
         if item.mount is not None and not all(
-            item.mount in loop.steps for loop in loops
+            item.mount in loop.roles for loop in loops
         ):
             raise ManifestError(
                 f"{source}: catalog item {item.id!r} mount {item.mount!r} must name "
-                "a step of every development loop"
+                "a role declared by every development loop"
             )
     return tuple(item.id for item in loops)
 
@@ -517,11 +517,34 @@ def _parse_vendored_pin(index: int, entry: object, source: str) -> VendoredPin:
             dest = _parse_catalog_path("vendored", f"entry[{index}]", "dest", path_entry.get("dest"), source)
             parsed_paths.append(ItemPath(src=src, dest=dest))
 
+    exec_raw = entry.get("executable")
+    parsed_executable: list[str] = []
+    if exec_raw is not None:
+        if not isinstance(exec_raw, list):
+            raise ManifestError(
+                f"{source}: vendored entry[{index}] field 'executable' must be a list"
+            )
+        for exec_path in exec_raw:
+            if not isinstance(exec_path, str) or not exec_path:
+                raise ManifestError(
+                    f"{source}: vendored entry[{index}] executable entry must be a non-empty string"
+                )
+            if not any(
+                exec_path == p.src or exec_path.startswith(f"{p.src.rstrip('/')}/")
+                for p in parsed_paths
+            ):
+                raise ManifestError(
+                    f"{source}: vendored entry[{index}] declared executable path {exec_path!r} "
+                    "is not carried by any path in this pin"
+                )
+            parsed_executable.append(exec_path)
+
     return VendoredPin(
         repo=repo,
         commit=commit,
         license=lic,
         paths=tuple(parsed_paths),
+        executable=tuple(parsed_executable),
     )
 
 
@@ -633,13 +656,16 @@ def _parse_components(
                 materialization_fields = sorted(
                     set(item_entry)
                     & {
+                        "chain",
                         "inject",
+                        "invocation",
                         "license",
                         "mode",
                         "mount",
                         "paths",
                         "pin",
                         "requires",
+                        "roles",
                         "steps",
                         "vendored_repo",
                     }
@@ -771,6 +797,28 @@ def _parse_components(
                     f"{source}: component '{comp_name}' item '{item_id}' must define paths, inject, or both"
                 )
 
+            if kind == "enhancement":
+                for prohibited in ("invocation", "chain", "roles"):
+                    if prohibited in item_entry:
+                        raise ManifestError(
+                            f"{source}: component '{comp_name}' item '{item_id}' field '{prohibited}' "
+                            "is only allowed for a development loop"
+                        )
+                invocation = None
+                chain = ()
+                roles = ()
+            else:
+                invocation = _parse_loop_invocation(comp_name, item_id, item_entry, source)
+                chain = _parse_loop_chain(comp_name, item_id, item_entry, steps, source)
+                roles = _parse_loop_roles(comp_name, item_id, item_entry, steps, source)
+                dest_leaves = {Path(p.dest).name for p in parsed_paths}
+                for step in steps:
+                    if step not in dest_leaves:
+                        raise ManifestError(
+                            f"{source}: component '{comp_name}' item '{item_id}' declared step {step!r} "
+                            "has no matching destination path"
+                        )
+
             parsed_items.append(
                 CatalogItem(
                     id=item_id,
@@ -787,6 +835,9 @@ def _parse_components(
                     effect=effect,
                     vendored_repo=vendored_repo_val if mode == "vendor" else None,
                     requires=requires,
+                    invocation=invocation,
+                    chain=chain,
+                    role_bindings=roles,
                 )
             )
 
@@ -843,6 +894,126 @@ def _parse_item_kind_and_steps(
     return kind, tuple(steps)
 
 
+def _parse_loop_invocation(
+    component: str,
+    item_id: str,
+    entry: dict[str, object],
+    source: str,
+) -> str:
+    if "invocation" not in entry:
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' field 'invocation' is required"
+        )
+    raw = entry["invocation"]
+    if not isinstance(raw, str) or raw not in {"user", "model"}:
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' field 'invocation' "
+            f"must be 'user' or 'model', got {raw!r}"
+        )
+    return raw
+
+
+def _parse_loop_chain(
+    component: str,
+    item_id: str,
+    entry: dict[str, object],
+    steps: tuple[str, ...],
+    source: str,
+) -> tuple[str | tuple[str, ...], ...]:
+    raw = entry.get("chain")
+    if "chain" not in entry:
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' field 'chain' is required"
+        )
+    if not isinstance(raw, list):
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' field 'chain' must be a list"
+        )
+    chain_entries: list[str | tuple[str, ...]] = []
+    for element in raw:
+        if isinstance(element, str):
+            if not element or not _ITEM_ID_PATTERN.fullmatch(element):
+                raise ManifestError(
+                    f"{source}: component '{component}' item '{item_id}' chain entry must match pattern, got {element!r}"
+                )
+            if element not in steps:
+                raise ManifestError(
+                    f"{source}: component '{component}' item '{item_id}' chain entry {element!r} "
+                    "must name a declared step of the loop"
+                )
+            chain_entries.append(element)
+        elif isinstance(element, list):
+            if not element:
+                raise ManifestError(
+                    f"{source}: component '{component}' item '{item_id}' chain alternative list cannot be empty"
+                )
+            alt_steps: list[str] = []
+            for alt in element:
+                if not isinstance(alt, str) or not alt or not _ITEM_ID_PATTERN.fullmatch(alt):
+                    raise ManifestError(
+                        f"{source}: component '{component}' item '{item_id}' chain alternative must match pattern, got {alt!r}"
+                    )
+                if alt not in steps:
+                    raise ManifestError(
+                        f"{source}: component '{component}' item '{item_id}' chain alternative {alt!r} "
+                        "must name a declared step of the loop"
+                    )
+                alt_steps.append(alt)
+            chain_entries.append(tuple(alt_steps))
+        else:
+            raise ManifestError(
+                f"{source}: component '{component}' item '{item_id}' chain entry must be a string or list of strings"
+            )
+    return tuple(chain_entries)
+
+
+def _parse_loop_roles(
+    component: str,
+    item_id: str,
+    entry: dict[str, object],
+    steps: tuple[str, ...],
+    source: str,
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    raw = entry.get("roles")
+    if "roles" not in entry:
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' field 'roles' is required"
+        )
+    if not isinstance(raw, dict):
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' field 'roles' must be an object"
+        )
+    roles: dict[str, tuple[str, ...]] = {}
+    for role_name, target_steps in raw.items():
+        if not isinstance(role_name, str) or not role_name or not _ITEM_ID_PATTERN.fullmatch(role_name):
+            raise ManifestError(
+                f"{source}: component '{component}' item '{item_id}' role name must match pattern, got {role_name!r}"
+            )
+        if not isinstance(target_steps, list) or not target_steps:
+            raise ManifestError(
+                f"{source}: component '{component}' item '{item_id}' role {role_name!r} must be a non-empty list of steps"
+            )
+        role_targets: list[str] = []
+        for step in target_steps:
+            if not isinstance(step, str) or not step or not _ITEM_ID_PATTERN.fullmatch(step):
+                raise ManifestError(
+                    f"{source}: component '{component}' item '{item_id}' role {role_name!r} step must match pattern, got {step!r}"
+                )
+            if step not in steps:
+                raise ManifestError(
+                    f"{source}: component '{component}' item '{item_id}' role {role_name!r} target {step!r} "
+                    "must name a declared step of the loop"
+                )
+            if step in role_targets:
+                raise ManifestError(
+                    f"{source}: component '{component}' item '{item_id}' role {role_name!r} "
+                    f"repeats target {step!r}"
+                )
+            role_targets.append(step)
+        roles[role_name] = tuple(role_targets)
+    return tuple(roles.items())
+
+
 def _validate_non_empty_categories(
     components: dict[str, tuple[CatalogItem, ...]],
     categories: dict[str, Category],
@@ -866,7 +1037,6 @@ def _parse_requirements(
         raise ManifestError(
             f"{source}: component '{component}' item '{item_id}' field 'requires' must be a list"
         )
-
     requirements: list[str] = []
     for required_id in raw:
         if (

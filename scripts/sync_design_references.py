@@ -75,7 +75,7 @@ def derive_design_references(
                     "id": identifier,
                     "title": title,
                     "category": "design",
-                    "mount": "implement",
+                    "mount": "build",
                     "description": f"{title}-inspired DESIGN.md reference.",
                     "mode": "vendor",
                     "license": "MIT",

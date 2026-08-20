@@ -1,7 +1,11 @@
 """Data models for the upstream pin manifest."""
 
+from __future__ import annotations
+
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
+from typing import cast
 
 from dev_ready.catalog_effects import CatalogEffect
 
@@ -13,6 +17,7 @@ RETIRED_LOOP_ITEM_IDS = frozenset(
 # loader rejects any other key, so this tuple is the complete set — iterate it
 # instead of restating the literal at a call site.
 CATALOG_COMPONENTS: tuple[str, ...] = ("skills", "mcp", "docs")
+_UNSET = object()
 
 
 @dataclass(frozen=True)
@@ -61,6 +66,7 @@ class VendoredPin:
     commit: str
     license: str
     paths: tuple[ItemPath, ...]
+    executable: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -96,11 +102,19 @@ class CatalogItem:
     effect: CatalogEffect | None = None
     vendored_repo: str | None = None
     requires: tuple[str, ...] = ()
+    invocation: str | None = None
+    chain: tuple[str | tuple[str, ...], ...] = ()
+    role_bindings: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     @property
     def display_name(self) -> str:
         """The user-facing name, falling back to the stable identifier."""
         return self.title or self.id
+
+    @property
+    def roles(self) -> Mapping[str, tuple[str, ...]]:
+        """The immutable mapping from mount roles to this flow's steps."""
+        return MappingProxyType(dict(self.role_bindings))
 
 
 @dataclass(frozen=True)
@@ -142,6 +156,37 @@ class ComponentCatalog(dict[str, tuple[CatalogItem, ...]]):
         )
         self.development_loop_ids = tuple(item.id for item in loops)
         self.development_loop_steps = {item.id: item.steps for item in loops}
+
+    @classmethod
+    def replace(
+        cls,
+        catalog: ComponentCatalog,
+        *,
+        components: Mapping[str, tuple[CatalogItem, ...]] | None = None,
+        agent_targets: Mapping[str, AgentTarget] | None = None,
+        categories: Mapping[str, Category] | None = None,
+        default_set: DefaultSet | None | object = _UNSET,
+        standard_compliant_agents: Iterable[str] | None = None,
+        announced_loops: Iterable[CatalogItem] | None = None,
+    ) -> ComponentCatalog:
+        """Copy a catalog, replacing only explicitly supplied axes."""
+        resolved_default_set = (
+            catalog.default_set
+            if default_set is _UNSET
+            else cast(DefaultSet | None, default_set)
+        )
+        return cls(
+            components if components is not None else catalog,
+            agent_targets if agent_targets is not None else catalog.agent_targets,
+            categories if categories is not None else catalog.categories,
+            resolved_default_set,
+            (
+                standard_compliant_agents
+                if standard_compliant_agents is not None
+                else catalog.standard_compliant_agents
+            ),
+            announced_loops if announced_loops is not None else catalog.announced_loops,
+        )
 
     def all_items(self) -> tuple[CatalogItem, ...]:
         """Every declared item, in Component then declaration order."""

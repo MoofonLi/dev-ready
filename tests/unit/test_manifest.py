@@ -7,6 +7,7 @@ import pytest
 
 from dev_ready.errors import ManifestError
 from dev_ready.manifest import (
+    ComponentCatalog,
     load_default_manifest,
     load_manifest,
     parse_manifest,
@@ -50,6 +51,9 @@ VALID = {
                     "id": "sample-skill",
                     "kind": "development-loop",
                     "steps": ["sample-step"],
+                    "invocation": "user",
+                    "chain": ["sample-step"],
+                    "roles": {"build": ["sample-step"]},
                     "category": "dev",
                     "description": "Sample skill for manifest parsing.",
                     "mode": "builtin",
@@ -57,7 +61,7 @@ VALID = {
                     "paths": [
                         {
                             "src": "claude/skills/sample-skill",
-                            "dest": ".agents/skills/sample-skill",
+                            "dest": ".agents/skills/sample-step",
                         }
                     ],
                 }
@@ -104,7 +108,10 @@ def test_parse_valid_manifest() -> None:
     assert skill.mode == "builtin"
     assert skill.license == "MIT"
     assert skill.paths[0].src == "claude/skills/sample-skill"
-    assert skill.paths[0].dest == ".agents/skills/sample-skill"
+    assert skill.paths[0].dest == ".agents/skills/sample-step"
+    assert skill.invocation == "user"
+    assert skill.chain == ("sample-step",)
+    assert skill.roles == {"build": ("sample-step",)}
     assert len(manifest.components["mcp"]) == 1
     mcp = manifest.components["mcp"][0]
     assert mcp.id == "mcp-config"
@@ -189,12 +196,13 @@ def test_announced_flow_cannot_declare_materialized_content() -> None:
         parse_manifest(json.dumps(data))
 
 
-def test_bundled_manifest_loads_with_two_announced_flows() -> None:
+def test_bundled_manifest_loads_with_announced_flows() -> None:
     catalog = load_default_manifest().components
 
+    assert [flow.id for flow in catalog.loops()] == ["mattpocock", "superpowers"]
     assert catalog.loops()[0].display_name == "Matt Pocock's skills"
+    assert catalog.loops()[1].display_name == "Superpowers"
     assert [flow.id for flow in catalog.announced_loops] == [
-        "superpowers",
         "addyosmani",
     ]
     assert all("coming soon" not in flow.display_name.casefold() for flow in catalog.announced_loops)
@@ -239,6 +247,9 @@ def test_declared_category_must_contain_an_item() -> None:
     security_item["id"] = "security-item"
     security_item["kind"] = "enhancement"
     security_item.pop("steps")
+    security_item.pop("invocation")
+    security_item.pop("chain")
+    security_item.pop("roles")
     security_item["category"] = "security"
     data["components"]["skills"]["items"].append(security_item)
     assert "security" in parse_manifest(json.dumps(data)).categories
@@ -248,12 +259,20 @@ def test_dev_category_must_declare_a_development_loop() -> None:
     data = json.loads(json.dumps(VALID))
     del data["components"]["skills"]["items"][0]["kind"]
     del data["components"]["skills"]["items"][0]["steps"]
+    del data["components"]["skills"]["items"][0]["invocation"]
+    del data["components"]["skills"]["items"][0]["chain"]
+    del data["components"]["skills"]["items"][0]["roles"]
 
     with pytest.raises(ManifestError, match="Dev Category.*development loop"):
         parse_manifest(json.dumps(data))
 
     data["components"]["skills"]["items"][0]["kind"] = "development-loop"
     data["components"]["skills"]["items"][0]["steps"] = ["sample-step"]
+    data["components"]["skills"]["items"][0]["invocation"] = "user"
+    data["components"]["skills"]["items"][0]["chain"] = ["sample-step"]
+    data["components"]["skills"]["items"][0]["roles"] = {
+        "build": ["sample-step"]
+    }
     assert parse_manifest(json.dumps(data)).components["skills"][0].id == "sample-skill"
 
 
@@ -262,7 +281,9 @@ def test_second_development_loop_is_valid_manifest_data() -> None:
     alternate = json.loads(json.dumps(data["components"]["skills"]["items"][0]))
     alternate["id"] = "alternate-loop"
     alternate["steps"] = ["alternate-step"]
-    alternate["paths"][0]["dest"] = ".agents/skills/alternate-loop"
+    alternate["chain"] = ["alternate-step"]
+    alternate["roles"] = {"build": ["alternate-step"]}
+    alternate["paths"][0]["dest"] = ".agents/skills/alternate-step"
     data["components"]["skills"]["items"].append(alternate)
 
     manifest = parse_manifest(json.dumps(data))
@@ -274,13 +295,14 @@ def test_second_development_loop_is_valid_manifest_data() -> None:
     assert manifest.default_set.development_loop == "sample-skill"
 
 
-def test_enhancement_mount_is_parsed_as_a_development_loop_step() -> None:
+def test_enhancement_mount_is_parsed_as_a_development_loop_role() -> None:
     data = json.loads(json.dumps(VALID))
-    data["components"]["mcp"]["items"][0]["mount"] = "sample-step"
+    data["components"]["skills"]["items"][0]["roles"] = {"build": ["sample-step"]}
+    data["components"]["mcp"]["items"][0]["mount"] = "build"
 
     item = parse_manifest(json.dumps(data)).components["mcp"][0]
 
-    assert item.mount == "sample-step"
+    assert item.mount == "build"
 
 
 @pytest.mark.parametrize("mount", [None, "", 42])
@@ -292,30 +314,34 @@ def test_declared_mount_must_be_a_non_empty_string(mount: object) -> None:
         parse_manifest(json.dumps(data))
 
 
-def test_mount_must_name_a_step_of_the_development_loop() -> None:
+def test_mount_must_name_a_role_of_the_development_loop() -> None:
     data = json.loads(json.dumps(VALID))
-    data["components"]["mcp"]["items"][0]["mount"] = "unknown-step"
+    data["components"]["skills"]["items"][0]["roles"] = {"build": ["sample-step"]}
+    data["components"]["mcp"]["items"][0]["mount"] = "unknown-role"
 
-    with pytest.raises(ManifestError, match="mount 'unknown-step'.*every development loop"):
+    with pytest.raises(ManifestError, match="mount 'unknown-role'.*every development loop"):
         parse_manifest(json.dumps(data))
 
 
-def test_mount_must_name_a_step_shared_by_every_development_loop() -> None:
+def test_mount_must_name_a_role_shared_by_every_development_loop() -> None:
     data = json.loads(json.dumps(VALID))
-    data["components"]["mcp"]["items"][0]["mount"] = "sample-step"
+    data["components"]["skills"]["items"][0]["roles"] = {"build": ["sample-step"]}
+    data["components"]["mcp"]["items"][0]["mount"] = "build"
     alternate = json.loads(json.dumps(data["components"]["skills"]["items"][0]))
     alternate["id"] = "alternate-loop"
     alternate["steps"] = ["alternate-step"]
-    alternate["paths"][0]["dest"] = ".agents/skills/alternate-loop"
+    alternate["paths"][0]["dest"] = ".agents/skills/alternate-step"
+    alternate["chain"] = ["alternate-step"]
+    alternate["roles"] = {"other-role": ["alternate-step"]}
     data["components"]["skills"]["items"].append(alternate)
 
-    with pytest.raises(ManifestError, match="mount 'sample-step'.*every development loop"):
+    with pytest.raises(ManifestError, match="mount 'build'.*every development loop"):
         parse_manifest(json.dumps(data))
 
 
 def test_development_loop_cannot_declare_a_mount() -> None:
     data = json.loads(json.dumps(VALID))
-    data["components"]["skills"]["items"][0]["mount"] = "sample-step"
+    data["components"]["skills"]["items"][0]["mount"] = "build"
 
     with pytest.raises(ManifestError, match="development loop 'sample-skill'.*mount"):
         parse_manifest(json.dumps(data))
@@ -323,8 +349,9 @@ def test_development_loop_cannot_declare_a_mount() -> None:
 
 def test_mounted_enhancement_must_declare_one_content_path() -> None:
     data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["roles"] = {"build": ["sample-step"]}
     item = data["components"]["mcp"]["items"][0]
-    item["mount"] = "sample-step"
+    item["mount"] = "build"
     item["mode"] = "pinned-dependency"
     item["pin"] = "1.2.3"
     item.pop("paths")
@@ -342,8 +369,9 @@ def test_mounted_enhancement_must_declare_one_content_path() -> None:
 
 def test_mounted_enhancement_cannot_declare_two_content_paths() -> None:
     data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["roles"] = {"build": ["sample-step"]}
     item = data["components"]["mcp"]["items"][0]
-    item["mount"] = "sample-step"
+    item["mount"] = "build"
     item["paths"].append(
         {"src": "mcp/other.json", "dest": ".config/other.json"}
     )
@@ -370,6 +398,9 @@ def test_retired_loop_catalog_ids_cannot_be_declared(retired_id: str) -> None:
 def test_catalog_item_cannot_duplicate_a_development_loop_step() -> None:
     data = json.loads(json.dumps(VALID))
     data["components"]["skills"]["items"][0]["steps"] = ["unit-test"]
+    data["components"]["skills"]["items"][0]["paths"][0]["dest"] = ".agents/skills/unit-test"
+    data["components"]["skills"]["items"][0]["chain"] = ["unit-test"]
+    data["components"]["skills"]["items"][0]["roles"] = {"build": ["unit-test"]}
     _add_required_skill(data, item_id="unit-test")
 
     with pytest.raises(ManifestError, match="duplicates development loop step 'unit-test'"):
@@ -504,13 +535,13 @@ def test_default_manifest_mounts_every_design_reference_and_keeps_skill_mounts()
     docs_mounts = {item.id: item.mount for item in catalog["docs"]}
 
     assert skill_mounts == {
-        "frontend-design": "implement",
-        "react-doctor": "code-review",
-        "security-audit": "code-review",
-        "webapp-testing": "tdd",
+        "frontend-design": "build",
+        "react-doctor": "review",
+        "security-audit": "review",
+        "webapp-testing": "test",
     }
     assert len(docs_mounts) == 74
-    assert set(docs_mounts.values()) == {"implement"}
+    assert set(docs_mounts.values()) == {"build"}
     assert next(item for item in catalog["skills"] if item.id == "caveman").mount is None
     assert next(item for item in catalog["mcp"] if item.id == "code-memory").mount is None
 
@@ -622,7 +653,7 @@ def test_default_manifest_contains_complete_spec_loop_bundle() -> None:
     manifest = load_default_manifest()
     skills = {item.id: item for item in manifest.components["skills"]}
 
-    assert len(skills) == 6
+    assert len(skills) == 7
     assert "project-orientation" not in skills
     assert {"tdd", "diagnosing-bugs", "code-review", "setup-all"}.isdisjoint(skills)
     assert skills["mattpocock"].vendored_repo == "mattpocock/skills"
@@ -1337,4 +1368,282 @@ def test_vendored_repo_on_non_vendor_item_rejected() -> None:
 
 
 
+
+
+
+@pytest.mark.parametrize("invocation", ["user", "model"])
+def test_development_loop_accepts_legal_invocation(invocation: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["invocation"] = invocation
+    manifest = parse_manifest(json.dumps(data))
+    assert manifest.components["skills"][0].invocation == invocation
+
+
+@pytest.mark.parametrize("field", ["invocation", "chain", "roles"])
+def test_development_loop_requires_shape_field(field: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    del data["components"]["skills"]["items"][0][field]
+
+    with pytest.raises(ManifestError, match=f"field '{field}'.*required"):
+        parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize("bad_invocation", ["agent", "cli", "", 42, False])
+def test_development_loop_rejects_illegal_invocation(bad_invocation: object) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["invocation"] = bad_invocation
+    with pytest.raises(ManifestError, match="invocation.*must be 'user' or 'model'"):
+        parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize("field", ["invocation", "chain", "roles"])
+def test_enhancement_cannot_declare_loop_fields(field: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["mcp"]["items"][0][field] = "user" if field == "invocation" else []
+    with pytest.raises(ManifestError, match=f"field '{field}' is only allowed for a development loop"):
+        parse_manifest(json.dumps(data))
+
+
+def test_development_loop_accepts_chain_with_single_and_alternative_steps() -> None:
+    data = json.loads(json.dumps(VALID))
+    loop = data["components"]["skills"]["items"][0]
+    loop["steps"] = ["step-a", "step-b", "step-c", "step-d"]
+    loop["paths"] = [{"src": f"skills/{s}", "dest": f".agents/skills/{s}"} for s in loop["steps"]]
+    loop["chain"] = [
+        "step-a",
+        ["step-b", "step-c"],
+        "step-d",
+    ]
+    loop["roles"] = {"build": ["step-a"]}
+    manifest = parse_manifest(json.dumps(data))
+    item = manifest.components["skills"][0]
+    assert item.chain == ("step-a", ("step-b", "step-c"), "step-d")
+
+
+def test_development_loop_chain_rejects_undeclared_step() -> None:
+    data = json.loads(json.dumps(VALID))
+    loop = data["components"]["skills"]["items"][0]
+    loop["chain"] = ["sample-step", "unshipped-step"]
+    with pytest.raises(ManifestError, match="chain entry 'unshipped-step' must name a declared step"):
+        parse_manifest(json.dumps(data))
+
+
+def test_development_loop_chain_alternative_rejects_undeclared_step() -> None:
+    data = json.loads(json.dumps(VALID))
+    loop = data["components"]["skills"]["items"][0]
+    loop["chain"] = [["sample-step", "unshipped-step"]]
+    with pytest.raises(ManifestError, match="chain alternative 'unshipped-step' must name a declared step"):
+        parse_manifest(json.dumps(data))
+
+
+def test_development_loop_accepts_role_mapping() -> None:
+    data = json.loads(json.dumps(VALID))
+    loop = data["components"]["skills"]["items"][0]
+    loop["steps"] = ["step-build-1", "step-build-2", "step-test", "step-review"]
+    loop["paths"] = [{"src": f"skills/{s}", "dest": f".agents/skills/{s}"} for s in loop["steps"]]
+    loop["roles"] = {
+        "build": ["step-build-1", "step-build-2"],
+        "test": ["step-test"],
+        "review": ["step-review"],
+    }
+    loop["chain"] = ["step-build-1", "step-test", "step-review"]
+    manifest = parse_manifest(json.dumps(data))
+    item = manifest.components["skills"][0]
+    assert item.roles == {
+        "build": ("step-build-1", "step-build-2"),
+        "test": ("step-test",),
+        "review": ("step-review",),
+    }
+
+
+def test_development_loop_role_mapping_preserves_frozen_item_semantics() -> None:
+    data = json.loads(json.dumps(VALID))
+    loop = data["components"]["skills"]["items"][0]
+    loop["roles"] = {"build": ["sample-step"]}
+    item = parse_manifest(json.dumps(data)).components["skills"][0]
+
+    assert isinstance(hash(item), int)
+    with pytest.raises(TypeError):
+        item.roles["build"] = ("other-step",)  # type: ignore[index]
+
+
+def test_component_catalog_replace_inherits_unspecified_axes_and_accepts_empty_overrides() -> None:
+    catalog = load_default_manifest().components
+
+    replaced = ComponentCatalog.replace(
+        catalog,
+        standard_compliant_agents=(),
+        announced_loops=(),
+    )
+
+    assert dict(replaced) == dict(catalog)
+    assert replaced.agent_targets == catalog.agent_targets
+    assert replaced.categories == catalog.categories
+    assert replaced.default_set == catalog.default_set
+    assert replaced.standard_compliant_agents == ()
+    assert replaced.announced_loops == ()
+
+
+def test_development_loop_roles_rejects_undeclared_step() -> None:
+    data = json.loads(json.dumps(VALID))
+    loop = data["components"]["skills"]["items"][0]
+    loop["roles"] = {"build": ["unshipped-step"]}
+    with pytest.raises(ManifestError, match="role 'build' target 'unshipped-step' must name a declared step"):
+        parse_manifest(json.dumps(data))
+
+
+def test_development_loop_roles_rejects_duplicate_target_step() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["roles"] = {
+        "build": ["sample-step", "sample-step"]
+    }
+
+    with pytest.raises(
+        ManifestError,
+        match="role 'build' repeats target 'sample-step'",
+    ):
+        parse_manifest(json.dumps(data))
+
+
+def test_development_loop_step_without_matching_path_dest_leaf_fails() -> None:
+    data = json.loads(json.dumps(VALID))
+    loop = data["components"]["skills"]["items"][0]
+    loop["steps"] = ["sample-step", "missing-dest-step"]
+    loop["paths"] = [{"src": "claude/skills/sample-step", "dest": ".agents/skills/sample-step"}]
+    with pytest.raises(ManifestError, match="declared step 'missing-dest-step' has no matching destination path"):
+        parse_manifest(json.dumps(data))
+
+
+def test_development_loop_path_not_matching_step_is_allowed() -> None:
+    data = json.loads(json.dumps(VALID))
+    loop = data["components"]["skills"]["items"][0]
+    loop["steps"] = ["sample-step"]
+    loop["paths"] = [
+        {"src": "claude/skills/sample-step", "dest": ".agents/skills/sample-step"},
+        {"src": "docs/agents", "dest": "docs/agents/sample-skill.md"},
+        {"src": "LICENSE", "dest": ".agents/skills/sample-step/LICENSE"},
+    ]
+    manifest = parse_manifest(json.dumps(data))
+    assert manifest.components["skills"][0].steps == ("sample-step",)
+    assert len(manifest.components["skills"][0].paths) == 3
+
+
+def test_default_manifest_loads_mattpocock_declarations() -> None:
+    manifest = load_default_manifest()
+    mattpocock = next(item for item in manifest.components.loops() if item.id == "mattpocock")
+    assert mattpocock.invocation == "user"
+    assert mattpocock.chain == (
+        "grill-with-docs",
+        "to-spec",
+        "to-tickets",
+        "implement",
+        "improve-codebase-architecture",
+    )
+    assert mattpocock.roles == {
+        "build": ("implement",),
+        "test": ("tdd",),
+        "review": ("code-review",),
+    }
+
+
+def test_vendored_pin_parses_executable_field() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["vendored"] = [
+        {
+            "repo": "owner/repo",
+            "commit": "a" * 40,
+            "license": "MIT",
+            "executable": ["skills/demo/script.sh"],
+            "paths": [{"src": "skills/demo", "dest": "src/dev_ready/templates/claude/skills/demo"}],
+        }
+    ]
+    manifest = parse_manifest(json.dumps(data))
+    assert manifest.vendored[0].executable == ("skills/demo/script.sh",)
+
+
+@pytest.mark.parametrize("bad_executable", ["single-string", 42, True, {"path": "val"}])
+def test_vendored_pin_rejects_executable_not_a_list(bad_executable: object) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["vendored"] = [
+        {
+            "repo": "owner/repo",
+            "commit": "a" * 40,
+            "license": "MIT",
+            "executable": bad_executable,
+            "paths": [{"src": "skills/demo", "dest": "src/dev_ready/templates/claude/skills/demo"}],
+        }
+    ]
+    with pytest.raises(ManifestError, match="field 'executable' must be a list"):
+        parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize("bad_entry", ["", None, 42])
+def test_vendored_pin_rejects_executable_with_invalid_entry(bad_entry: object) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["vendored"] = [
+        {
+            "repo": "owner/repo",
+            "commit": "a" * 40,
+            "license": "MIT",
+            "executable": [bad_entry],
+            "paths": [{"src": "skills/demo", "dest": "src/dev_ready/templates/claude/skills/demo"}],
+        }
+    ]
+    with pytest.raises(ManifestError, match="executable entry must be a non-empty string"):
+        parse_manifest(json.dumps(data))
+
+
+def test_vendored_pin_rejects_executable_not_carried_by_pin() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["vendored"] = [
+        {
+            "repo": "owner/repo",
+            "commit": "a" * 40,
+            "license": "MIT",
+            "executable": ["other/script.sh"],
+            "paths": [{"src": "skills/demo", "dest": "src/dev_ready/templates/claude/skills/demo"}],
+        }
+    ]
+    with pytest.raises(ManifestError, match="declared executable path 'other/script.sh' is not carried"):
+        parse_manifest(json.dumps(data))
+
+
+def test_default_manifest_loads_superpowers_executable_paths() -> None:
+    manifest = load_default_manifest()
+    superpowers = next(entry for entry in manifest.vendored if entry.repo == "obra/superpowers")
+    assert superpowers.executable == (
+        "skills/brainstorming/scripts/start-server.sh",
+        "skills/brainstorming/scripts/stop-server.sh",
+        "skills/subagent-driven-development/scripts/review-package",
+        "skills/subagent-driven-development/scripts/sdd-workspace",
+        "skills/subagent-driven-development/scripts/task-brief",
+        "skills/systematic-debugging/find-polluter.sh",
+    )
+
+
+def test_default_manifest_loads_superpowers_declarations() -> None:
+    manifest = load_default_manifest()
+    superpowers = next(item for item in manifest.components.loops() if item.id == "superpowers")
+    assert superpowers.title == "Superpowers"
+    assert superpowers.display_name == "Superpowers"
+    assert superpowers.invocation == "model"
+    assert superpowers.description == (
+        "The agent starts each step on its own, and implementation can be split across fresh subagents."
+    )
+    assert superpowers.chain == (
+        "brainstorming",
+        "using-git-worktrees",
+        "writing-plans",
+        ("subagent-driven-development", "executing-plans"),
+        "test-driven-development",
+        "requesting-code-review",
+        "finishing-a-development-branch",
+    )
+    assert superpowers.roles == {
+        "build": ("subagent-driven-development", "executing-plans"),
+        "test": ("test-driven-development",),
+        "review": ("requesting-code-review",),
+    }
+    assert len(superpowers.steps) == 12
+    assert len(superpowers.paths) == 13
 
