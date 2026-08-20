@@ -16,3 +16,4 @@ backend/app/frontend/
 # cannot be quietly withdrawn from history.
 .env
 .env*
+.superpowers/

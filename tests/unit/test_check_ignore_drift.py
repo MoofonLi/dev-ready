@@ -36,6 +36,7 @@ backend/app/frontend/
 # --- dev-ready ---
 .env
 .env*
+.superpowers/
 """
 
 
@@ -51,6 +52,7 @@ def test_entries_drop_comments_and_blank_lines() -> None:
         "/playwright/.cache/",
         ".env",
         ".env*",
+        ".superpowers/",
     )
 
 

@@ -1,7 +1,10 @@
 """Unit tests for dev_ready.generate (no network; filesystem confined to tmp_path)."""
 
+import inspect
 import tempfile
 from pathlib import Path
+import stat
+import sys
 
 import pytest
 
@@ -12,9 +15,10 @@ from dev_ready.generate import (
     GenerationStage,
     ProgressEvent,
     ProgressStatus,
-    generate,
+    generate as _generate,
 )
 from dev_ready.manifest import UpstreamPin, load_default_manifest
+from dev_ready.overlay import apply_overlay
 from dev_ready.prompts import Answers, ProjectSelection
 from dev_ready.verify import REQUIRED_UPSTREAM_PATHS
 
@@ -24,9 +28,27 @@ PIN = UpstreamPin(
     commit="4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2",
     license="MIT",
 )
-CATALOG = load_default_manifest().components
+MANIFEST = load_default_manifest()
+CATALOG = MANIFEST.components
 
 _VERIFY_DIRECTORY_ENTRIES = {"backend", "frontend"}
+
+
+def test_executable_metadata_is_mandatory_at_generation_seams() -> None:
+    from dev_ready.verify import verify_project
+
+    for seam in (_generate, apply_overlay, verify_project):
+        assert (
+            inspect.signature(seam).parameters["vendored"].default
+            is inspect.Parameter.empty
+        )
+
+
+def generate(*args: object, **kwargs: object) -> list[Path]:
+    """Call the production seam with the test manifest's required metadata."""
+    if len(args) < 4:
+        kwargs.setdefault("vendored", MANIFEST.vendored)
+    return _generate(*args, **kwargs)  # type: ignore[arg-type]
 
 
 def _answers(target_dir: Path, *, project_name: str = "my-app") -> Answers:
@@ -94,6 +116,56 @@ def test_generate_happy_path_merges_upstream_and_overlay(
     assert (target_dir / ".mcp.json").exists()
     assert Path("AGENTS.md") in written
     assert Path("CLAUDE.md") in written
+
+
+def test_superpowers_generation_preserves_declared_executable_modes_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
+    manifest = load_default_manifest()
+    target_dir = tmp_path / "superpowers-app"
+    answers = Answers(
+        project_name="superpowers-app",
+        target_dir=target_dir,
+        selection=ProjectSelection.from_items(
+            manifest.components,
+            skills=frozenset({"superpowers"}),
+            agent_targets=frozenset(),
+        ),
+    )
+
+    generate(
+        answers,
+        PIN,
+        manifest.components,
+        vendored=manifest.vendored,
+    )
+
+    executable_paths = (
+        ".agents/skills/brainstorming/scripts/start-server.sh",
+        ".agents/skills/brainstorming/scripts/stop-server.sh",
+        ".agents/skills/subagent-driven-development/scripts/review-package",
+        ".agents/skills/subagent-driven-development/scripts/sdd-workspace",
+        ".agents/skills/subagent-driven-development/scripts/task-brief",
+        ".agents/skills/systematic-debugging/find-polluter.sh",
+    )
+    ordinary_program_paths = (
+        ".agents/skills/brainstorming/scripts/frame-template.html",
+        ".agents/skills/brainstorming/scripts/helper.js",
+        ".agents/skills/brainstorming/scripts/server.cjs",
+        ".agents/skills/systematic-debugging/condition-based-waiting-example.ts",
+    )
+    assert all((target_dir / path).is_file() for path in executable_paths)
+    assert all((target_dir / path).is_file() for path in ordinary_program_paths)
+    if sys.platform != "win32":
+        assert all(
+            (target_dir / path).stat().st_mode & stat.S_IXUSR
+            for path in executable_paths
+        )
+        assert all(
+            not ((target_dir / path).stat().st_mode & stat.S_IXUSR)
+            for path in ordinary_program_paths
+        )
 
 
 # Upstream's own `.env` at the manifest-pinned commit, reduced to the lines this
@@ -466,7 +538,9 @@ def test_finalize_refuses_empty_target_created_during_generation(
     monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
     target_dir = tmp_path / "my-app"
 
-    def _create_racing_target(project_dir: Path, answers: Answers, catalog) -> None:
+    def _create_racing_target(
+        project_dir: Path, answers: Answers, catalog, **kwargs: object
+    ) -> None:
         target_dir.mkdir()
 
     monkeypatch.setattr(generate_module, "verify_project", _create_racing_target)
@@ -630,7 +704,9 @@ def test_verify_runs_after_overlay_and_before_move(
         call_order.append("overlay")
         return []
 
-    def _spy_verify(project_dir: Path, passed_answers: Answers, cat) -> None:
+    def _spy_verify(
+        project_dir: Path, passed_answers: Answers, cat, **kwargs: object
+    ) -> None:
         call_order.append("verify")
         # verify must run before the staging dir is moved into target_dir
         assert not target_dir.exists()

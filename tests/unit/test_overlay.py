@@ -14,7 +14,7 @@ from dev_ready.errors import InvalidArgumentsError, OverlayError
 from dev_ready.inspection import ProjectExpectation, REQUIRED_UPSTREAM_PATHS, inspect_project
 from dev_ready.manifest import AgentTarget, ComponentCatalog, UpstreamPin, load_default_manifest
 from dev_ready.overlay import (
-    apply_overlay,
+    apply_overlay as _apply_overlay,
     build_overlay_content,
     generated_anchor_names,
     render_ignore_anchor,
@@ -22,13 +22,21 @@ from dev_ready.overlay import (
 )
 from dev_ready.prompts import Answers, ProjectSelection
 
-CATALOG = load_default_manifest().components
+MANIFEST = load_default_manifest()
+CATALOG = MANIFEST.components
 PIN = UpstreamPin(
     repo="fastapi/full-stack-fastapi-template",
     ref="master",
     commit="4cd0d9e51aebd1af6f82d91ad0df4c9e41f4dea2",
     license="MIT",
 )
+
+
+def apply_overlay(*args: object, **kwargs: object) -> list[Path]:
+    """Call the production seam with the test manifest's required metadata."""
+    if len(args) < 5:
+        kwargs.setdefault("vendored", MANIFEST.vendored)
+    return _apply_overlay(*args, **kwargs)  # type: ignore[arg-type]
 
 
 def _answers(
@@ -157,7 +165,7 @@ def test_shared_agent_target_directory_writes_one_stub_tree_and_inspects_cleanly
         )
         for target_id in ("alpha", "beta")
     }
-    catalog = ComponentCatalog(CATALOG, shared_targets)
+    catalog = ComponentCatalog.replace(CATALOG, agent_targets=shared_targets)
     selection = ProjectSelection.from_items(
         catalog,
         skills=frozenset({"mattpocock"}),
@@ -193,9 +201,9 @@ def test_shared_agent_target_directory_writes_one_stub_tree_and_inspects_cleanly
 
 
 def test_overlay_still_rejects_a_genuine_duplicate_destination(tmp_path: Path) -> None:
-    catalog = ComponentCatalog(
+    catalog = ComponentCatalog.replace(
         CATALOG,
-        {
+        agent_targets={
             "collision": AgentTarget(
                 id="collision",
                 description="Rules collide with overlay infrastructure.",
@@ -722,6 +730,46 @@ def test_selected_flow_writes_its_human_explainer_and_unselected_flow_does_not(
     assert "otherwise start at `grill-with-docs`" in explainer
 
 
+def test_superpowers_flow_overlay_generation(tmp_path: Path) -> None:
+    selection = ProjectSelection.all(CATALOG, development_loop="superpowers")
+    answers = Answers("my-superpowers-app", tmp_path / "superpowers", selection)
+    content = build_overlay_content(answers, CATALOG)
+
+    assert "docs/agents/superpowers.md" in content
+    assert "docs/agents/mattpocock.md" not in content
+
+    explainer = content["docs/agents/superpowers.md"].decode("utf-8")
+    assert "Superpowers Engineering Flow" in explainer
+    assert "subagent-driven-development" in explainer
+    assert "executing-plans" in explainer
+    assert "does not need to finish in one session" in explainer
+
+    agents_md = content["AGENTS.md"].decode("utf-8")
+    assert (
+        "The default Flow Chain is `setup-project` → `brainstorming` → `using-git-worktrees` → "
+        "`writing-plans` → (`subagent-driven-development` or `executing-plans`) → "
+        "`test-driven-development` → `requesting-code-review` → `finishing-a-development-branch`. "
+        "`setup-project` is user-invoked; subsequent steps are model-invoked."
+    ) in agents_md
+    assert "Plans live under `docs/superpowers/plans/` and design documents live under `docs/superpowers/specs/`." in agents_md
+    requesting_review = content[
+        ".agents/skills/requesting-code-review/SKILL.md"
+    ].decode("utf-8")
+    receiving_review = content[
+        ".agents/skills/receiving-code-review/SKILL.md"
+    ].decode("utf-8")
+    assert "## Mounted enhancements" in requesting_review
+    assert "## Mounted enhancements" not in receiving_review
+
+    gitignore = content[".gitignore"].decode("utf-8")
+    assert ".superpowers/" in gitignore
+    assert "docs/superpowers/" not in gitignore
+
+    setup_skill = content[".agents/skills/setup-project/SKILL.md"].decode("utf-8")
+    assert "## Issue tracker and domain conventions" not in setup_skill
+
+
+
 def test_readme_is_about_the_project_not_the_template(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
@@ -790,7 +838,7 @@ def test_generated_ignore_file_keeps_upstream_entries_and_adds_only_the_env_line
     apply_overlay(_bare_answers(tmp_path), project_dir, CATALOG, PIN)
 
     entries = _ignore_entries((project_dir / ".gitignore").read_text(encoding="utf-8"))
-    assert entries == _UPSTREAM_IGNORE_ENTRIES + [".env", ".env*"]
+    assert entries == _UPSTREAM_IGNORE_ENTRIES + [".env", ".env*", ".superpowers/"]
 
 
 def test_generated_ignore_file_is_inventoried_and_matches_the_bytes_on_disk(
@@ -1880,9 +1928,9 @@ def test_engineering_flow_stamp_records_the_resolved_selection_and_complete_inve
 
 
 def test_manifest_only_project_mcp_path_retargets_catalog_effects(tmp_path: Path) -> None:
-    custom_catalog = ComponentCatalog(
+    custom_catalog = ComponentCatalog.replace(
         CATALOG,
-        {
+        agent_targets={
             "custom": AgentTarget(
                 id="custom",
                 description="Custom project-local MCP target.",
@@ -1911,6 +1959,290 @@ def test_manifest_only_project_mcp_path_retargets_catalog_effects(tmp_path: Path
     assert not (project_dir / ".mcp.json").exists()
 
 
+def test_role_resolving_to_multiple_steps_writes_guidance_to_all_of_them(
+    tmp_path: Path,
+) -> None:
+    from dev_ready.manifest.models import CatalogItem, ItemPath
+
+    custom_loop = CatalogItem(
+        id="multi-step-flow",
+        category="dev",
+        kind="development-loop",
+        title="Multi-step Flow",
+        description="Flow with multi-step roles.",
+        mode="builtin",
+        license="MIT",
+        steps=("step-build-1", "step-build-2", "step-test", "step-review"),
+        paths=(
+            ItemPath(src="claude/skills/implement", dest=".agents/skills/step-build-1"),
+            ItemPath(src="claude/skills/implement", dest=".agents/skills/step-build-2"),
+            ItemPath(src="claude/skills/tdd", dest=".agents/skills/step-test"),
+            ItemPath(src="claude/skills/code-review", dest=".agents/skills/step-review"),
+        ),
+        role_bindings=(
+            ("build", ("step-build-1", "step-build-2")),
+            ("test", ("step-test",)),
+            ("review", ("step-review",)),
+        ),
+    )
+    custom_catalog = ComponentCatalog(
+        {
+            "skills": (custom_loop, *[item for item in CATALOG["skills"] if item.kind != "development-loop"]),
+            "mcp": CATALOG["mcp"],
+            "docs": CATALOG["docs"],
+        },
+        CATALOG.agent_targets,
+        CATALOG.categories,
+        replace(CATALOG.default_set, development_loop="multi-step-flow"),
+    )
+    answers = Answers(
+        project_name="my-app",
+        target_dir=tmp_path / "project",
+        selection=ProjectSelection.from_items(
+            custom_catalog,
+            skills=frozenset({"multi-step-flow", "frontend-design"}),
+            agent_targets=frozenset(),
+        ),
+    )
+    from dev_ready.overlay.rendering import mounted_enhancements
+
+    grouped = mounted_enhancements(answers, custom_catalog)
+    assert ".agents/skills/step-build-1/SKILL.md" in grouped
+    assert ".agents/skills/step-build-2/SKILL.md" in grouped
+    assert [item.id for item in grouped[".agents/skills/step-build-1/SKILL.md"]] == ["frontend-design"]
+    assert [item.id for item in grouped[".agents/skills/step-build-2/SKILL.md"]] == ["frontend-design"]
 
 
+def test_mounted_enhancements_rejects_selected_flow_missing_from_catalog() -> None:
+    from dev_ready.overlay.rendering import mounted_enhancements
+
+    answers = Answers(
+        project_name="my-app",
+        target_dir=Path("project"),
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            skills=frozenset({"superpowers", "frontend-design"}),
+            agent_targets=frozenset(),
+        ),
+    )
+    incomplete_catalog = ComponentCatalog(
+        {
+            component: tuple(item for item in items if item.id != "superpowers")
+            for component, items in CATALOG.items()
+        },
+        CATALOG.agent_targets,
+        CATALOG.categories,
+        CATALOG.default_set,
+    )
+
+    with pytest.raises(
+        OverlayError,
+        match="development loop 'superpowers' not found in catalog",
+    ):
+        mounted_enhancements(answers, incomplete_catalog)
+
+
+def test_apply_overlay_marks_declared_executable_files(tmp_path: Path) -> None:
+    import stat
+    import sys
+    manifest = load_default_manifest()
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    answers = Answers(
+        project_name="my-app",
+        target_dir=project_dir,
+        selection=ProjectSelection.from_items(
+            manifest.components,
+            skills=frozenset({"superpowers"}),
+            agent_targets=frozenset(),
+        ),
+    )
+
+    apply_overlay(
+        answers,
+        project_dir,
+        manifest.components,
+        PIN,
+        manifest.vendored,
+    )
+
+    if sys.platform != "win32":
+        run_file = (
+            project_dir
+            / ".agents"
+            / "skills"
+            / "subagent-driven-development"
+            / "scripts"
+            / "task-brief"
+        )
+        plain_file = run_file.parent.parent / "SKILL.md"
+        assert (run_file.stat().st_mode & stat.S_IXUSR) != 0
+        assert (plain_file.stat().st_mode & stat.S_IXUSR) == 0
+
+
+def test_apply_overlay_chmod_failure_raises_overlay_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = load_default_manifest()
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    answers = Answers(
+        project_name="my-app",
+        target_dir=project_dir,
+        selection=ProjectSelection.from_items(
+            manifest.components,
+            skills=frozenset({"superpowers"}),
+            agent_targets=frozenset(),
+        ),
+    )
+
+    def failing_chmod(path: Path, mode: int) -> None:
+        raise OSError("Permission denied test")
+
+    monkeypatch.setattr(Path, "chmod", failing_chmod)
+
+    with pytest.raises(OverlayError, match="failed to set permissions on"):
+        apply_overlay(
+            answers,
+            project_dir,
+            manifest.components,
+            PIN,
+            manifest.vendored,
+        )
+
+
+def test_render_chain_sentence_user_invoked_linear() -> None:
+    from dev_ready.manifest.models import CatalogItem
+    from dev_ready.overlay.rendering import render_chain_sentence
+
+    loop = CatalogItem(
+        id="mattpocock",
+        category="dev",
+        kind="development-loop",
+        description="Matt Pocock loop.",
+        mode="builtin",
+        license="MIT",
+        invocation="user",
+        chain=(
+            "grill-with-docs",
+            "to-spec",
+            "to-tickets",
+            "implement",
+            "improve-codebase-architecture",
+        ),
+    )
+    sentence = render_chain_sentence(loop)
+    assert sentence == (
+        "The default Flow Chain is `setup-project` → `grill-with-docs` → `to-spec` → `to-tickets` → `implement` → `improve-codebase-architecture`. Every step is user-invoked."
+    )
+
+
+def test_render_chain_sentence_model_invoked_with_choice() -> None:
+    from dev_ready.manifest.models import CatalogItem
+    from dev_ready.overlay.rendering import render_chain_sentence
+
+    loop = CatalogItem(
+        id="superpowers",
+        category="dev",
+        kind="development-loop",
+        description="Superpowers loop.",
+        mode="vendor",
+        license="MIT",
+        invocation="model",
+        chain=(
+            "brainstorming",
+            "using-git-worktrees",
+            "writing-plans",
+            ("subagent-driven-development", "executing-plans"),
+            "test-driven-development",
+            "requesting-code-review",
+            "finishing-a-development-branch",
+        ),
+    )
+    sentence = render_chain_sentence(loop)
+    assert sentence == (
+        "The default Flow Chain is `setup-project` → `brainstorming` → `using-git-worktrees` → `writing-plans` → (`subagent-driven-development` or `executing-plans`) → `test-driven-development` → `requesting-code-review` → `finishing-a-development-branch`. `setup-project` is user-invoked; subsequent steps are model-invoked."
+    )
+
+
+def test_flow_without_authored_guidance_raises_overlay_error() -> None:
+    from dev_ready.manifest.models import CatalogItem
+    from dev_ready.overlay.rendering import _selected_flow_guidance
+
+    unknown_loop = CatalogItem(
+        id="unknown-loop",
+        category="dev",
+        kind="development-loop",
+        description="Unknown loop.",
+        mode="builtin",
+        license="MIT",
+        invocation="user",
+        chain=("step-1",),
+    )
+    custom_catalog = ComponentCatalog(
+        {
+            "skills": (*CATALOG["skills"], unknown_loop),
+            "mcp": CATALOG["mcp"],
+            "docs": CATALOG["docs"],
+        },
+        CATALOG.agent_targets,
+        CATALOG.categories,
+        CATALOG.default_set,
+    )
+    answers = Answers(
+        project_name="my-app",
+        target_dir=Path("project"),
+        selection=ProjectSelection.from_items(
+            custom_catalog,
+            skills=frozenset({"unknown-loop"}),
+            agent_targets=frozenset(),
+        ),
+    )
+    with pytest.raises(OverlayError, match="flow guidance is missing: unknown-loop"):
+        _selected_flow_guidance(answers, custom_catalog)
+
+
+def test_flow_guidance_rejects_selected_flow_missing_from_passed_catalog() -> None:
+    from dev_ready.overlay.rendering import _selected_flow_guidance
+
+    answers = Answers(
+        project_name="my-app",
+        target_dir=Path("project"),
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            skills=frozenset({"superpowers"}),
+            agent_targets=frozenset(),
+        ),
+    )
+    incomplete_catalog = ComponentCatalog(
+        {
+            component: tuple(item for item in items if item.id != "superpowers")
+            for component, items in CATALOG.items()
+        },
+        CATALOG.agent_targets,
+        CATALOG.categories,
+        CATALOG.default_set,
+    )
+
+    with pytest.raises(
+        OverlayError,
+        match="development loop 'superpowers' not found in catalog",
+    ):
+        _selected_flow_guidance(answers, incomplete_catalog)
+
+
+def test_generated_agents_md_preserves_mattpocock_user_invoked_claim() -> None:
+    answers = Answers(
+        project_name="my-app",
+        target_dir=Path("project"),
+        selection=ProjectSelection.from_items(
+            CATALOG,
+            skills=frozenset({"mattpocock"}),
+            agent_targets=frozenset(),
+        ),
+    )
+    content = build_overlay_content(answers, CATALOG)
+    agents_md = content["AGENTS.md"].decode("utf-8")
+    assert "The default Flow Chain is `setup-project` → `grill-with-docs` → `to-spec` → `to-tickets` → `implement` → `improve-codebase-architecture`. Every step is user-invoked." in agents_md
+    assert "A step may reach for `tdd`, `code-review`, `diagnosing-bugs`, `codebase-design`, or `domain-modeling` as a tool" in agents_md
 

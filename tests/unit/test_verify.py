@@ -1,12 +1,18 @@
 """Unit tests for dev_ready.verify (no network, filesystem confined to tmp_path)."""
 
 from pathlib import Path
+import os
 import shutil
+import stat
 
 import pytest
 
 from dev_ready.errors import VerificationError
-from dev_ready.verify import FORBIDDEN_PATHS, REQUIRED_UPSTREAM_PATHS, verify_project
+from dev_ready.verify import (
+    FORBIDDEN_PATHS,
+    REQUIRED_UPSTREAM_PATHS,
+    verify_project as _verify_project,
+)
 
 
 from dev_ready.manifest import load_default_manifest
@@ -17,6 +23,13 @@ from project_factory import materialize_project_structure
 CATALOG = load_default_manifest().components
 MANIFEST = load_default_manifest()
 PIN = MANIFEST.upstream["base_template"]
+
+
+def verify_project(*args: object, **kwargs: object) -> None:
+    """Call the production seam with the test manifest's required metadata."""
+    if len(args) < 4:
+        kwargs.setdefault("vendored", MANIFEST.vendored)
+    _verify_project(*args, **kwargs)  # type: ignore[arg-type]
 
 
 def _answers(
@@ -260,6 +273,49 @@ def test_verify_detects_a_missing_nested_spec_loop_asset(tmp_path: Path) -> None
         match="selected development loop item 'mattpocock'.*ADR-FORMAT.md.*missing",
     ):
         verify_project(tmp_path, ans, CATALOG)
+
+
+def test_verify_detects_a_missing_declared_executable_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import dev_ready.executable_modes as executable_module
+
+    ans = _answers(
+        tmp_path,
+        skills_items=frozenset({"superpowers"}),
+        mcp_items=frozenset(),
+    )
+    _make_generated_project(tmp_path, ans)
+    script = (
+        tmp_path
+        / ".agents"
+        / "skills"
+        / "subagent-driven-development"
+        / "scripts"
+        / "task-brief"
+    )
+    real_stat = Path.stat
+
+    def posix_mode_stat(path: Path, *args: object, **kwargs: object) -> os.stat_result:
+        result = real_stat(path, *args, **kwargs)
+        values = list(result)
+        values[0] = (
+            result.st_mode & ~stat.S_IXUSR
+            if path == script
+            else result.st_mode | stat.S_IXUSR
+        )
+        return os.stat_result(values)
+
+    monkeypatch.setattr(Path, "stat", posix_mode_stat)
+    monkeypatch.setattr(executable_module.sys, "platform", "linux")
+
+    with pytest.raises(VerificationError, match="task-brief.*not executable"):
+        verify_project(
+            tmp_path,
+            ans,
+            CATALOG,
+            vendored=MANIFEST.vendored,
+        )
 
 
 def test_verify_rejects_a_partial_loop_for_a_malformed_empty_selection(

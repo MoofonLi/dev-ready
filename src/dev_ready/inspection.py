@@ -492,8 +492,27 @@ def _inspect_item_paths(
                 )
                 issues.append(ProjectIssue("missing item asset", detail, detail))
         elif not expected and present:
-            detail = f"unselected {name} item {item.id!r} left path {item_path.dest!r} in the output"
-            issues.append(ProjectIssue("unexpected item path", detail, detail))
+            source = resources.files("dev_ready").joinpath(
+                "templates", *item_path.src.split("/")
+            )
+            if source.is_dir() and target.is_dir():
+                leftover_files = [
+                    (Path(item_path.dest) / relative).as_posix()
+                    for relative in _resource_files(source)
+                    if (target / relative).exists()
+                ]
+                if leftover_files:
+                    detail = (
+                        f"unselected {name} item {item.id!r} left path "
+                        f"{leftover_files[0]!r} in the output"
+                    )
+                    issues.append(ProjectIssue("unexpected item path", detail, detail))
+            else:
+                detail = (
+                    f"unselected {name} item {item.id!r} left path "
+                    f"{item_path.dest!r} in the output"
+                )
+                issues.append(ProjectIssue("unexpected item path", detail, detail))
 
 
 def _resource_files(

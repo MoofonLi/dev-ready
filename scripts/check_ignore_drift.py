@@ -38,7 +38,7 @@ ADOPTED_IGNORE_PATH = Path("src", "dev_ready", "templates", "gitignore", "gitign
 # lets the rest of the file be compared verbatim; it also means an upstream that
 # adopts `.env` itself still shows up as drift, which is the correct outcome —
 # the maintainer decides what to do about it.
-DEV_READY_ADDITIONS: tuple[str, ...] = (".env", ".env*")
+DEV_READY_ADDITIONS: tuple[str, ...] = (".env", ".env*", ".superpowers/")
 
 
 def ignore_entries(text: str) -> tuple[str, ...]:

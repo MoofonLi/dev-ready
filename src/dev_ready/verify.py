@@ -5,9 +5,14 @@ module translates the first local structural issue into ``VerificationError``;
 the inspection implementation is shared with the offline ``check`` command.
 """
 
+from collections.abc import Collection
 from pathlib import Path
 
 from dev_ready.errors import VerificationError
+from dev_ready.executable_modes import (
+    declared_executable_paths,
+    executable_mode_issues,
+)
 from dev_ready.inspection import (
     FORBIDDEN_PATHS,
     REQUIRED_OVERLAY_PATHS,
@@ -15,7 +20,7 @@ from dev_ready.inspection import (
     ProjectExpectation,
     inspect_project,
 )
-from dev_ready.manifest import ComponentCatalog
+from dev_ready.manifest import ComponentCatalog, VendoredPin
 from dev_ready.overlay import projected_skill_link_pairs
 from dev_ready.prompts import Answers
 from dev_ready.skill_links import (
@@ -37,6 +42,7 @@ def verify_project(
     project_dir: Path,
     answers: Answers,
     catalog: ComponentCatalog,
+    vendored: Collection[VendoredPin],
 ) -> None:
     """Raise the generation policy's typed error for the first observed issue."""
     created: list[Path] = []
@@ -49,6 +55,12 @@ def verify_project(
         )
         if issues:
             raise VerificationError(issues[0].verification_message)
+        mode_issues = executable_mode_issues(
+            project_dir,
+            declared_executable_paths(catalog, answers, vendored),
+        )
+        if mode_issues:
+            raise VerificationError(f"generated project {mode_issues[0]}")
     finally:
         for link_path in created:
             try:

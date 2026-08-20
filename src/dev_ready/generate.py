@@ -81,7 +81,7 @@ def generate(
     answers: Answers,
     pin: UpstreamPin,
     catalog: ComponentCatalog,
-    vendored: Collection[VendoredPin] = (),
+    vendored: Collection[VendoredPin],
     progress: ProgressCallback | None = None,
     *,
     clock: Callable[[], float] = time.monotonic,
@@ -120,7 +120,12 @@ def generate(
             GenerationStage.VERIFY,
             progress,
             clock,
-            lambda: verify_project(project_staging, answers, catalog),
+            lambda: verify_project(
+                project_staging,
+                answers,
+                catalog,
+                vendored=vendored,
+            ),
         )
         _run_stage(
             GenerationStage.FINALIZE,

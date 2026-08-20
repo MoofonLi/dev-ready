@@ -21,19 +21,21 @@ _DOCUMENTATION_GUIDANCE = """## Architecture documentation
 Read `docs/architecture.md` before structural changes; it records the system overview, module boundaries, and dependency rules."""
 
 @dataclass(frozen=True)
+class _AuthoredFlowGuidance:
+    convention: str
+    setup_project: str
+
+
+@dataclass(frozen=True)
 class _FlowGuidance:
     rules: str
     setup_project: str
 
 
 _EMPTY_FLOW_GUIDANCE = _FlowGuidance(rules="", setup_project="")
-_FLOW_GUIDANCE = {
-    "mattpocock": _FlowGuidance(
-        rules="""## Engineering Flow
-
-The default Flow Chain is `setup-project` → `grill-with-docs` → `to-spec` → `to-tickets` → `implement` → `improve-codebase-architecture`. Every step is user-invoked.
-
-A step may reach for `tdd`, `code-review`, `diagnosing-bugs`, `codebase-design`, or `domain-modeling` as a tool; those tools are not additional chain entries.
+_FLOW_GUIDANCE: dict[str, _AuthoredFlowGuidance] = {
+    "mattpocock": _AuthoredFlowGuidance(
+        convention="""A step may reach for `tdd`, `code-review`, `diagnosing-bugs`, `codebase-design`, or `domain-modeling` as a tool; those tools are not additional chain entries.
 
 Start at `implement` when the change adds no behaviour a user can observe — a rename, a formatting fix, a dependency bump, or a test for behaviour that already works. Start at `setup-project` or `grill-with-docs` for everything else.
 
@@ -53,17 +55,61 @@ dev-ready upgrade preserves them and stops updating them. After the user accepts
 that cost, hand off to `/setup-matt-pocock-skills`. Do not invoke that skill when
 the user only asked to inspect current state.""",
     ),
+    "superpowers": _AuthoredFlowGuidance(
+        convention="Plans live under `docs/superpowers/plans/` and design documents live under `docs/superpowers/specs/`.",
+        setup_project="",
+    ),
 }
 
 
-def _selected_flow_guidance(answers: Answers) -> _FlowGuidance:
+def _render_chain_entry(entry: str | tuple[str, ...]) -> str:
+    if isinstance(entry, str):
+        return f"`{entry}`"
+    return f"({' or '.join(f'`{opt}`' for opt in entry)})"
+
+
+def render_chain_sentence(loop: CatalogItem) -> str:
+    """Render the Flow Chain sentence from the loop's declared chain and invocation."""
+    elements = ["`setup-project`", *(_render_chain_entry(e) for e in loop.chain)]
+    chain_str = " → ".join(elements)
+    if loop.invocation == "user":
+        invocation_str = "Every step is user-invoked."
+    elif loop.invocation == "model":
+        invocation_str = "`setup-project` is user-invoked; subsequent steps are model-invoked."
+    else:
+        invocation_str = ""
+    if invocation_str:
+        return f"The default Flow Chain is {chain_str}. {invocation_str}"
+    return f"The default Flow Chain is {chain_str}."
+
+
+def render_flow_rules(loop: CatalogItem, guidance: _AuthoredFlowGuidance) -> str:
+    """Render the full ## Engineering Flow section for AGENTS.md."""
+    chain_sentence = render_chain_sentence(loop)
+    if guidance.convention:
+        return f"## Engineering Flow\n\n{chain_sentence}\n\n{guidance.convention}"
+    return f"## Engineering Flow\n\n{chain_sentence}"
+
+
+def _selected_flow_guidance(
+    answers: Answers, catalog: ComponentCatalog
+) -> _FlowGuidance:
     flow_id = answers.selection.development_loop
     if not flow_id:
         return _EMPTY_FLOW_GUIDANCE
-    try:
-        return _FLOW_GUIDANCE[flow_id]
-    except KeyError as error:
-        raise OverlayError(f"flow guidance is missing: {flow_id}") from error
+    if flow_id not in _FLOW_GUIDANCE:
+        raise OverlayError(f"flow guidance is missing: {flow_id}")
+
+    guidance = _FLOW_GUIDANCE[flow_id]
+    loop = next(
+        (item for item in catalog.get("skills", ()) if item.id == flow_id),
+        None,
+    )
+    if loop is None:
+        raise OverlayError(f"development loop {flow_id!r} not found in catalog")
+
+    rules = render_flow_rules(loop, guidance)
+    return _FlowGuidance(rules=rules, setup_project=guidance.setup_project)
 
 
 def _issue_tracker_configuration() -> str:
@@ -92,13 +138,20 @@ def _clone_guidance(answers: Answers) -> str:
     )
 
 
-def template_values(answers: Answers) -> dict[str, str]:
+def template_values(
+    answers: Answers, catalog: ComponentCatalog
+) -> dict[str, str]:
     """Return every supported template token for one resolved selection."""
-    flow_guidance = _selected_flow_guidance(answers)
+    flow_guidance = _selected_flow_guidance(answers, catalog)
+    setup_snippet = (
+        f"\n{flow_guidance.setup_project}\n"
+        if flow_guidance.setup_project
+        else ""
+    )
     return {
         "project_name": answers.project_name,
         "engineering_flow_guidance": flow_guidance.rules,
-        "engineering_flow_setup": flow_guidance.setup_project,
+        "engineering_flow_setup": setup_snippet,
         "documentation_guidance": _DOCUMENTATION_GUIDANCE,
         "architecture_ownership": _ARCHITECTURE_OWNERSHIP,
         "issue_tracker_configuration": _issue_tracker_configuration(),
@@ -107,7 +160,10 @@ def template_values(answers: Answers) -> dict[str, str]:
 
 
 def render_asset(
-    source: Traversable, dest_rel: Path, answers: Answers | str
+    source: Traversable,
+    dest_rel: Path,
+    answers: Answers | str,
+    catalog: ComponentCatalog | None = None,
 ) -> bytes:
     """Render one package asset without writing it."""
     if not source.is_file():
@@ -115,11 +171,12 @@ def render_asset(
     try:
         if source.name.endswith(TEMPLATE_SUFFIX):
             rendered = source.read_text(encoding="utf-8")
-            values = (
-                template_values(answers)
-                if isinstance(answers, Answers)
-                else {"project_name": answers}
-            )
+            if isinstance(answers, Answers):
+                if catalog is None:
+                    raise OverlayError("catalog is required to render project templates")
+                values = template_values(answers, catalog)
+            else:
+                values = {"project_name": answers}
             for name, value in values.items():
                 rendered = rendered.replace(f"{{{{{name}}}}}", value)
             if "{{" in rendered or "}}" in rendered:
@@ -172,19 +229,33 @@ def mounted_enhancements(
     answers: Answers, catalog: ComponentCatalog
 ) -> dict[str, tuple[CatalogItem, ...]]:
     """Group selected mounted Enhancements by canonical loop-skill path."""
+    selected_loop_id = answers.development_loop
+    loop = next(
+        (candidate for candidate in catalog.loops() if candidate.id == selected_loop_id),
+        None,
+    )
+    if loop is None and selected_loop_id:
+        raise OverlayError(
+            f"development loop {selected_loop_id!r} not found in catalog"
+        )
+    roles = loop.roles if loop is not None else {}
+
     mounted_items = tuple(
         item
         for component in CATALOG_COMPONENTS
         for item in catalog.get(component, ())
         if item.mount is not None and item.id in answers.items(component)
     )
+
+    step_items: dict[str, list[CatalogItem]] = {}
+    for item in mounted_items:
+        if item.mount is not None:
+            for step in roles.get(item.mount, ()):
+                step_items.setdefault(step, []).append(item)
+
     return {
-        Path(*CANONICAL_SKILLS_ROOT, mount, "SKILL.md").as_posix(): tuple(
-            item
-            for item in sorted(mounted_items, key=lambda candidate: candidate.id)
-            if item.mount == mount
+        Path(*CANONICAL_SKILLS_ROOT, step, "SKILL.md").as_posix(): tuple(
+            sorted(items, key=lambda candidate: candidate.id)
         )
-        for mount in sorted(
-            {item.mount for item in mounted_items if item.mount is not None}
-        )
+        for step, items in sorted(step_items.items())
     }

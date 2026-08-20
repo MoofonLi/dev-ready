@@ -23,6 +23,8 @@ from dev_ready.overlay.infrastructure import (
     documentation_scaffold_paths,
     skill_infrastructure_paths,
 )
+from dev_ready.executable_modes import declared_executable_paths
+from dev_ready.overlay.executable import apply_executable_modes
 from dev_ready.overlay.rendering import TEMPLATE_SUFFIX as _TEMPLATE_SUFFIX
 from dev_ready.overlay.rendering import inject_mounted_enhancements as _inject_mounts
 from dev_ready.overlay.rendering import render_asset as _render_asset
@@ -63,7 +65,7 @@ def build_overlay_content(
         content[path] = data
 
     def add(source: Traversable, dest_rel: Path) -> None:
-        add_bytes(dest_rel, _render_asset(source, dest_rel, answers))
+        add_bytes(dest_rel, _render_asset(source, dest_rel, answers, catalog=catalog))
 
     def collect(source: Traversable, dest_rel: Path) -> None:
         if source.is_dir():
@@ -181,7 +183,7 @@ def apply_overlay(
     project_dir: Path,
     catalog: ComponentCatalog,
     pin: UpstreamPin,
-    vendored: Collection[VendoredPin] = (),
+    vendored: Collection[VendoredPin],
 ) -> list[Path]:
     """Apply selected overlay content and return paths written relative to the project."""
     content = build_overlay_content(answers, catalog)
@@ -198,6 +200,11 @@ def apply_overlay(
         except OSError as error:
             raise OverlayError(f"failed to write {dest_rel}: {error}") from error
         written.append(dest_rel)
+
+    apply_executable_modes(
+        project_dir,
+        declared_executable_paths(catalog, answers, vendored),
+    )
 
     for component in ("skills", "mcp"):
         selected = answers.items(component)
