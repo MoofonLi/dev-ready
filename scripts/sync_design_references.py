@@ -154,8 +154,8 @@ def synchronize_outputs(
     )
     if check or not drifted:
         return drifted
-    manifest_path.write_text(rendered_manifest, encoding="utf-8")
-    skill_path.write_text(rendered_skill, encoding="utf-8")
+    manifest_path.write_text(rendered_manifest, encoding="utf-8", newline="\n")
+    skill_path.write_text(rendered_skill, encoding="utf-8", newline="\n")
     return True
 
 

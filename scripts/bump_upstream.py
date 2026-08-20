@@ -70,7 +70,9 @@ def update_manifest(manifest_path: Path, commit: str, verified_at: str) -> bool:
 
     pin["commit"] = commit
     pin["verified_at"] = verified_at
-    manifest_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n"
+    )
     return True
 
 

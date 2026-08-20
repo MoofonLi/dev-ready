@@ -128,6 +128,7 @@ def synchronize_manifest(
     manifest_path.write_text(
         json.dumps(updated, indent=2, ensure_ascii=True) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
     return True
 
