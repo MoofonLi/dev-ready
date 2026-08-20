@@ -535,8 +535,8 @@ def test_init_help_calls_the_public_concept_engineering_flow(
     ("arguments", "expected"),
     [
         (("--flow", "spec-loop"), "renamed to 'mattpocock'"),
-        (("--flow", "superpowers"), "not yet available"),
-        (("--flow", "nonesuch"), "unknown Engineering Flow id 'nonesuch'"),
+        (("--flow", "addyosmani"), "not yet available"),
+        (("--flow", "nonesuch"), "unknown Engineering Flow id 'nonesuch'; valid ids: ['mattpocock', 'superpowers']"),
         (("--dev", "spec-loop"), "retired Dev item id(s) 'spec-loop'"),
     ],
 )
@@ -548,6 +548,25 @@ def test_flow_selection_failures_are_mutually_distinguishable(
     assert main(["init", "my-app", "--yes", *arguments]) == 2
 
     assert expected in capsys.readouterr().err
+
+
+def test_selectable_flow_flag_superpowers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_answers = None
+
+    def _capture(answers, *args, **kwargs) -> list[Path]:
+        nonlocal captured_answers
+        captured_answers = answers
+        return []
+
+    monkeypatch.setattr(cli_module, "generate", _capture)
+
+    assert main(["init", "my-app", "--yes", "--flow", "superpowers"]) == 0
+    assert captured_answers is not None
+    assert captured_answers.development_loop == "superpowers"
+    assert "superpowers" in captured_answers.skills_items
+    assert "mattpocock" not in captured_answers.skills_items
 
 
 def test_unknown_agents_flag_fails_before_generation(

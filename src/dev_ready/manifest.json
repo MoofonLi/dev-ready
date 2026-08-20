@@ -865,7 +865,7 @@
           "title": "Matt Pocock's skills",
           "kind": "development-loop",
           "category": "dev",
-          "description": "Complete Spec Loop for grilling, durable specs, tracer-bullet tickets, TDD, review, diagnosis, and architecture improvement.",
+          "description": "You start each step yourself, and the work stays in one session.",
           "mode": "vendor",
           "license": "MIT",
           "vendored_repo": "mattpocock/skills",
@@ -959,11 +959,106 @@
         },
         {
           "id": "superpowers",
+          "title": "Superpowers",
           "kind": "development-loop",
           "category": "dev",
-          "title": "Superpowers",
-          "status": "coming-soon",
-          "description": "Obra's Superpowers Engineering Flow, announced but not yet available."
+          "description": "The agent starts each step on its own, and implementation can be split across fresh subagents.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "obra/superpowers",
+          "steps": [
+            "brainstorming",
+            "dispatching-parallel-agents",
+            "executing-plans",
+            "finishing-a-development-branch",
+            "receiving-code-review",
+            "requesting-code-review",
+            "subagent-driven-development",
+            "systematic-debugging",
+            "test-driven-development",
+            "using-git-worktrees",
+            "verification-before-completion",
+            "writing-plans"
+          ],
+          "paths": [
+            {
+              "src": "claude/skills/brainstorming",
+              "dest": ".agents/skills/brainstorming"
+            },
+            {
+              "src": "claude/skills/dispatching-parallel-agents",
+              "dest": ".agents/skills/dispatching-parallel-agents"
+            },
+            {
+              "src": "claude/skills/executing-plans",
+              "dest": ".agents/skills/executing-plans"
+            },
+            {
+              "src": "claude/skills/finishing-a-development-branch",
+              "dest": ".agents/skills/finishing-a-development-branch"
+            },
+            {
+              "src": "claude/skills/receiving-code-review",
+              "dest": ".agents/skills/receiving-code-review"
+            },
+            {
+              "src": "claude/skills/requesting-code-review",
+              "dest": ".agents/skills/requesting-code-review"
+            },
+            {
+              "src": "claude/skills/subagent-driven-development",
+              "dest": ".agents/skills/subagent-driven-development"
+            },
+            {
+              "src": "claude/skills/systematic-debugging",
+              "dest": ".agents/skills/systematic-debugging"
+            },
+            {
+              "src": "claude/skills/test-driven-development",
+              "dest": ".agents/skills/test-driven-development"
+            },
+            {
+              "src": "claude/skills/using-git-worktrees",
+              "dest": ".agents/skills/using-git-worktrees"
+            },
+            {
+              "src": "claude/skills/verification-before-completion",
+              "dest": ".agents/skills/verification-before-completion"
+            },
+            {
+              "src": "claude/skills/writing-plans",
+              "dest": ".agents/skills/writing-plans"
+            },
+            {
+              "src": "claude/superpowers",
+              "dest": "docs/agents"
+            }
+          ],
+          "invocation": "model",
+          "chain": [
+            "brainstorming",
+            "using-git-worktrees",
+            "writing-plans",
+            [
+              "subagent-driven-development",
+              "executing-plans"
+            ],
+            "test-driven-development",
+            "requesting-code-review",
+            "finishing-a-development-branch"
+          ],
+          "roles": {
+            "build": [
+              "subagent-driven-development",
+              "executing-plans"
+            ],
+            "test": [
+              "test-driven-development"
+            ],
+            "review": [
+              "requesting-code-review"
+            ]
+          }
         },
         {
           "id": "addyosmani",

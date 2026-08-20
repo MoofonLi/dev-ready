@@ -202,14 +202,23 @@ class ProjectSelection:
         )
 
     @classmethod
-    def all(cls, catalog: ComponentCatalog) -> ProjectSelection:
-        default_loop = catalog.default_development_loop
+    def all(
+        cls,
+        catalog: ComponentCatalog,
+        *,
+        development_loop: str | None = None,
+    ) -> ProjectSelection:
+        chosen_loop = (
+            development_loop
+            if development_loop is not None
+            else catalog.default_development_loop
+        )
         return cls.from_items(
             catalog,
             skills=frozenset(
                 item.id
                 for item in catalog.get("skills", ())
-                if item.kind != "development-loop" or item.id == default_loop
+                if item.kind != "development-loop" or item.id == chosen_loop
             ),
             mcp=catalog.item_ids("mcp"),
             docs_items=catalog.item_ids("docs"),
@@ -569,6 +578,10 @@ class Answers:
     @property
     def include_docs(self) -> bool:
         return self.includes("docs")
+
+    @property
+    def development_loop(self) -> str:
+        return self.selection.development_loop
 
     @property
     def agent_targets(self) -> frozenset[str]:

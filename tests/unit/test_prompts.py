@@ -58,9 +58,10 @@ ALL_ITEM_LABELS = [
     for item in items
     if item.id not in CATALOG.development_loop_ids
 ]
-SELECTABLE_FLOW_LABEL = next(
+SELECTABLE_FLOW_LABELS = [
     f"{item.display_name} — {item.description}" for item in CATALOG.loops()
-)
+]
+SELECTABLE_FLOW_LABEL = SELECTABLE_FLOW_LABELS[0]
 ANNOUNCED_FLOW_LABELS = [
     f"{item.display_name} — Not yet available"
     for item in CATALOG.announced_loops
@@ -310,7 +311,7 @@ def test_flow_prompt_lists_announced_flows_as_disabled_choices() -> None:
     )
 
     assert asker.select_choices == [
-        [SELECTABLE_FLOW_LABEL, *ANNOUNCED_FLOW_LABELS]
+        [*SELECTABLE_FLOW_LABELS, *ANNOUNCED_FLOW_LABELS]
     ]
     assert asker.select_disabled_choices == [ANNOUNCED_FLOW_LABELS]
     reasons = [label.rsplit(" — ", 1)[1] for label in ANNOUNCED_FLOW_LABELS]
@@ -320,6 +321,27 @@ def test_flow_prompt_lists_announced_flows_as_disabled_choices() -> None:
     assert answers.selection.development_loop not in {
         item.id for item in CATALOG.announced_loops
     }
+
+
+def test_interactive_selects_superpowers_flow() -> None:
+    superpowers_label = next(
+        f"{item.display_name} — {item.description}"
+        for item in CATALOG.loops()
+        if item.id == "superpowers"
+    )
+    asker = FakeAsker(
+        selects=[superpowers_label],
+        checkboxes=[[], [], [], [], CLAUDE_AGENT_LABELS],
+    )
+
+    answers = collect_answers(
+        _partial(selection_explicit=False), catalog=CATALOG, asker=asker
+    )
+
+    assert answers.selection.development_loop == "superpowers"
+    assert "superpowers" in answers.skills_items
+    assert "mattpocock" not in answers.skills_items
+
 
 
 def test_all_enter_interview_and_accept_defaults_render_identical_stamps(

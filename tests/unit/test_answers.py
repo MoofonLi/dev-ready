@@ -154,13 +154,25 @@ def test_second_loop_is_a_data_addition_with_one_resolved_default() -> None:
 
 
 def test_explicit_whole_catalog_selection_still_includes_every_enhancement() -> None:
-    selection = ProjectSelection.all(CATALOG)
-
-    assert selection.items("skills") == frozenset(
-        item.id for item in CATALOG["skills"]
+    selection_default = ProjectSelection.all(CATALOG)
+    expected_mattpocock = frozenset(
+        item.id
+        for item in CATALOG["skills"]
+        if item.kind != "development-loop" or item.id == "mattpocock"
     )
-    assert selection.items("mcp") == frozenset(item.id for item in CATALOG["mcp"])
-    assert selection.items("docs") == frozenset(item.id for item in CATALOG["docs"])
+    assert selection_default.items("skills") == expected_mattpocock
+    assert selection_default.items("mcp") == frozenset(item.id for item in CATALOG["mcp"])
+    assert selection_default.items("docs") == frozenset(item.id for item in CATALOG["docs"])
+    assert selection_default.development_loop == "mattpocock"
+
+    selection_superpowers = ProjectSelection.all(CATALOG, development_loop="superpowers")
+    expected_superpowers = frozenset(
+        item.id
+        for item in CATALOG["skills"]
+        if item.kind != "development-loop" or item.id == "superpowers"
+    )
+    assert selection_superpowers.items("skills") == expected_superpowers
+    assert selection_superpowers.development_loop == "superpowers"
 
 
 def test_no_selection_flags_leave_selection_unresolved() -> None:
@@ -179,7 +191,11 @@ def test_no_selection_flags_leave_selection_unresolved() -> None:
     [
         (
             "all",
-            frozenset(item.id for item in CATALOG["skills"]),
+            frozenset(
+                item.id
+                for item in CATALOG["skills"]
+                if item.kind != "development-loop" or item.id == "mattpocock"
+            ),
             frozenset(item.id for item in CATALOG["mcp"]),
             True,
         ),
@@ -223,16 +239,12 @@ def test_declining_every_category_still_resolves_the_development_loop() -> None:
 
 
 def test_one_category_item_flag_resolves_to_default_set_plus_that_item() -> None:
-    catalog = ComponentCatalog(
+    catalog = ComponentCatalog.replace(
         CATALOG,
-        CATALOG.agent_targets,
-        CATALOG.categories,
-        DefaultSet(
+        default_set=DefaultSet(
             development_loop="mattpocock",
             enhancements=("frontend-design",),
         ),
-        CATALOG.standard_compliant_agents,
-        CATALOG.announced_loops,
     )
     selection = ProjectSelection.from_flags(
         catalog=catalog,
@@ -250,11 +262,9 @@ def test_one_category_item_flag_resolves_to_default_set_plus_that_item() -> None
 
 
 def test_explicit_category_item_replaces_that_category_default() -> None:
-    catalog = ComponentCatalog(
+    catalog = ComponentCatalog.replace(
         CATALOG,
-        CATALOG.agent_targets,
-        CATALOG.categories,
-        DefaultSet(
+        default_set=DefaultSet(
             development_loop="mattpocock",
             enhancements=("frontend-design",),
         ),
