@@ -224,3 +224,4 @@ docs/temp/
 .vscode/
 .sync-cache/
 
+.claude/settings.local.json
