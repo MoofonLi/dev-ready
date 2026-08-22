@@ -748,18 +748,34 @@ def test_removed_project_orientation_id_uses_standard_unknown_item_error(
     "retired_id",
     ["spec-loop", "tdd", "diagnosing-bugs", "code-review", "setup-all"],
 )
-def test_retired_loop_item_ids_exit_2_with_their_replacement(
+@pytest.mark.parametrize("flow", ["mattpocock", "superpowers"])
+def test_retired_loop_item_ids_exit_2_naming_the_mandatory_engineering_flow(
     retired_id: str,
+    flow: str,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setattr(cli_module, "generate", lambda *args, **kwargs: [])
-    assert main(["init", "my-app", "--yes", "--dev", retired_id]) == 2
+    assert main(["init", "my-app", "--yes", "--flow", flow, "--dev", retired_id]) == 2
 
     error = capsys.readouterr().err
-    assert retired_id in error
-    assert "mandatory Dev development loop" in error
-    assert "'mattpocock'" in error
+    assert f"retired Dev item id(s) '{retired_id}'" in error
+    assert "mandatory Engineering Flow" in error
+    assert "mattpocock" not in error
+    assert "superpowers" not in error
+
+
+def test_retired_dev_item_error_is_identical_for_both_flows(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["init", "my-app", "--yes", "--flow", "mattpocock", "--dev", "tdd"]) == 2
+    mattpocock_error = capsys.readouterr().err
+    assert main(["init", "my-app", "--yes", "--flow", "superpowers", "--dev", "tdd"]) == 2
+    superpowers_error = capsys.readouterr().err
+
+    assert mattpocock_error == superpowers_error
+    assert "mattpocock" not in superpowers_error
+    assert "superpowers" not in superpowers_error
 
 
 def test_dev_category_accepts_no_enhancement_items() -> None:

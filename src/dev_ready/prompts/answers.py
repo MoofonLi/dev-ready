@@ -403,7 +403,7 @@ def _resolve_category_items(
         joined = ", ".join(repr(item_id) for item_id in retired)
         raise InvalidArgumentsError(
             f"retired Dev item id(s) {joined}; each is now part of the mandatory "
-            "Dev development loop 'mattpocock'"
+            "Engineering Flow"
         )
     unknown = sorted(requested - valid_ids)
     if unknown:

@@ -52,8 +52,8 @@ Engineering Flow failures also exit 2 and distinguish these cases:
 - Any other unrecognised Flow id says that the Engineering Flow id is unknown.
 
 The former selectable loop identifiers are retired. Supplying any of them to
-`--dev` fails with an invalid-arguments error (exit 2) naming the mandatory Dev
-Engineering Flow, `mattpocock`, as its replacement:
+`--dev` fails with an invalid-arguments error (exit 2) naming the mandatory
+Engineering Flow as their replacement, without naming which flow:
 
 | Retired identifier |
 |---|

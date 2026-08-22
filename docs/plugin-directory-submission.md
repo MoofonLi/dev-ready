@@ -1,7 +1,7 @@
 # Plugin directory submission cases
 
 This is the Codex plugin-directory submission material for dev-ready — the
-eight cases the universal Plugin Directory requires. Reuse this document at
+nine cases a directory reviewer walks through. Reuse this document at
 the next version's submission rather than rewriting it.
 
 Each case is a user prompt paired with the behaviour a reviewer should observe
@@ -69,19 +69,31 @@ approved command is non-interactive and includes `--yes`:
 uvx dev-ready init dual-app --yes --agents claude,windsurf --dir ./dual-app
 ```
 
+### 6. Agent-driven Engineering Flow
+
+A developer says, "I want the agent to start each step on its own, and
+implementation can be split across fresh subagents."
+
+The interview rule is the `superpowers` Engineering Flow criterion: "The agent starts each step on its own, and implementation can be split across fresh subagents."
+Put it in `--flow`. The approved command is non-interactive and includes `--yes`:
+
+```shell
+uvx dev-ready init superpowers-app --yes --flow superpowers --dir ./superpowers-app
+```
+
 ## Negative cases
 
 These cases have no command to parse. The skill refuses before composing one,
 so they are not machine-checked.
 
-### 6. Init aimed at an existing generated project
+### 7. Init aimed at an existing generated project
 
 A developer says, "Run init on my existing generated project to add Design."
 
 The skill creates new projects only. For an existing generated project it uses
 `check` or `upgrade`; `init` must never be aimed at a generated project.
 
-### 7. Destination exists and is not empty
+### 8. Destination exists and is not empty
 
 A developer says, "Create the project in `./my-app`" when `./my-app` already
 exists and is not empty.
@@ -90,7 +102,7 @@ The skill inspects the destination first, stops, and asks the user to choose
 another destination or resolve the existing content themselves. It does not
 delete, empty, overwrite, or automatically retry into a non-empty target.
 
-### 8. Retired Engineering Flow value
+### 9. Retired Engineering Flow value
 
 A developer says, "Use the spec-loop flow."
 

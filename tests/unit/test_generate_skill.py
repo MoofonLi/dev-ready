@@ -197,7 +197,7 @@ def test_skill_category_and_item_ids_match_the_current_manifest() -> None:
         args = build_parser().parse_args(
             ["init", "skill-test", "--yes", "--dev", retired_id]
         )
-        with pytest.raises(InvalidArgumentsError, match="mandatory Dev development loop"):
+        with pytest.raises(InvalidArgumentsError, match="mandatory Engineering Flow"):
             build_answers(args, CATALOG)
 
 
@@ -383,8 +383,14 @@ def test_repository_root_ships_only_the_distributed_skill() -> None:
 
 
 def test_submission_positive_cases_parse_through_the_real_cli() -> None:
-    commands = _init_examples(SUBMISSION_PATH.read_text(encoding="utf-8"))
-    assert len(commands) == 5
+    submission = SUBMISSION_PATH.read_text(encoding="utf-8")
+    commands = _init_examples(submission)
+    assert len(commands) == 6
+    assert any("--flow superpowers" in command for command in commands)
+    assert (
+        "The agent starts each step on its own, and implementation can be split "
+        "across fresh subagents."
+    ) in submission
     for command in commands:
         tokens = shlex.split(command)
         assert tokens[:2] == ["uvx", "dev-ready"]

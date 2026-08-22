@@ -272,12 +272,12 @@ Every selection flag accepts:
 - `none` selects no Category, item, or Agent Target on that flag.
 - A comma-separated list selects those ids. Do not add spaces inside the list.
 
-Every generated project resolves `mattpocock`; `--categories none` and
-`--dev none` decline Enhancements without removing it. The former selectable
-ids `spec-loop`, `tdd`, `diagnosing-bugs`, `code-review`, and `setup-all` now
-exit 2 when passed to `--dev`, because their content is part of the mandatory
-Engineering Flow. Treat the resolved selection shown in the report and
-stamp as authoritative.
+Every generated project resolves its Engineering Flow, which cannot be
+declined; `--categories none` and `--dev none` decline Enhancements without
+removing it. The former selectable ids `spec-loop`, `tdd`, `diagnosing-bugs`,
+`code-review`, and `setup-all` now exit 2 when passed to `--dev`, because
+their content is part of the mandatory Engineering Flow. Treat the resolved
+selection shown in the report and stamp as authoritative.
 
 Unknown Category ids, unknown item ids, unknown Agent Target ids, unknown
 Engineering Flow ids, and conflicting flags are exit 2 failures; surface the
