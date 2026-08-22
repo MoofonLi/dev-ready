@@ -156,6 +156,14 @@ jobs:
     needs: test
     runs-on: windows-latest
     timeout-minutes: 40
+    # Forces UTF-8 for pytest's own stdio and everything it spawns (PEP 540).
+    # Without it, windows-latest defaults console I/O to the cp1252 codepage;
+    # a subprocess's non-ASCII output (e.g. the em dash in a released wheel's
+    # report text) decodes cleanly as UTF-8 but then can't be re-printed on a
+    # cp1252 stdout, crashing the test harness with UnicodeEncodeError before
+    # any assertion runs.
+    env:
+      PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
