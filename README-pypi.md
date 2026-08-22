@@ -21,9 +21,10 @@ A generated project based on
 - Canonical project instructions in `AGENTS.md` and skills under
   `.agents/skills/`, readable directly by Cursor, Codex, Cline, Zed, OpenCode,
   and other standard-compliant agents.
-- A named Engineering Flow, chosen first — today Matt Pocock’s — covering
-  grilling, durable specs, tracer-bullet tickets, implementation, TDD,
-  diagnosis, two-axis review, and architecture cleanup.
+- A named Engineering Flow, chosen first, from two selectable methods:
+  `mattpocock` (you start each step yourself, and the work stays in one
+  session) or `superpowers` (the agent starts each step on its own, and
+  implementation can be split across fresh subagents).
 - A lean Default Set: that Engineering Flow plus the project’s own architecture
   and requirements skeletons. Every Enhancement is off by default.
 - A setup step in every project, so the login, email, and error reporting can
@@ -35,8 +36,9 @@ A generated project based on
   test, lint, format, and type-check commands, and the rules no tool enforces.
 - Optional Agent Targets. dev-ready declares one for every coding agent that its
   pinned reference list gives a project-level directory of its own, held to that
-  list by CI. Each selected target is rendered as Pointer Stubs over the one
-  Canonical Content copy—not symbolic links or content copies.
+  list by CI. Each selected target receives one Skill Link per skill — machine-local
+  and excluded from version control. A cloned project needs one
+  `uvx dev-ready upgrade` before its agent sees anything.
 - Project-level `.mcp.json` only when a selected Enhancement needs it.
 - A generated `.env` of per-project random secrets that git ignores, and a
   project that tells you its default administrator login and where that password
@@ -60,6 +62,7 @@ behind. Full description:
 - Python 3.12 or newer
 - git
 - Network access to github.com during generation
+- A filesystem that can hold links, unless no Agent Target is selected
 - Docker only to run the generated project, not to generate it
 
 ## Installation
@@ -112,10 +115,9 @@ Category, then Agent Targets. Enter through all of them gives the Default Set.
 Enhancement. Category selection accepts `all`, `none`, or comma-separated
 identifiers through `--categories`, `--dev`, `--security`, `--quality`,
 `--design`, and `--token-optimize`; `--flow` names the mandatory Engineering
-Flow (currently `mattpocock`) and `--agents` independently selects Agent
+Flow (`mattpocock` or `superpowers`) and `--agents` independently selects Agent
 Targets. `--development-loop` is a permanently accepted alias for `--flow`. `--agents` defaults to `claude`,
-as does `--yes`; `--agents all` selects every declared target and writes a
-great many Pointer Stub files.
+as does `--yes`; `--agents all` selects every declared target.
 
 | Category | Enhancement identifiers |
 |---|---|
@@ -156,7 +158,7 @@ upgrade failed and rolled back.
 
 - Source and issues: <https://github.com/MoofonLi/dev-ready>
 - CLI spec, architecture, and ADRs: <https://github.com/MoofonLi/dev-ready/tree/main/docs>
-- v0.11 overview: <https://github.com/MoofonLi/dev-ready/blob/main/docs/version_overview/v0.11-overview.md>
+- v0.12 overview: <https://github.com/MoofonLi/dev-ready/blob/main/docs/version_overview/v0.12-overview.md>
 
 ## License
 

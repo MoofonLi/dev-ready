@@ -2,6 +2,47 @@
 
 All notable changes to dev-ready are documented here.
 
+## [0.12.0] — 2026-08-22
+
+### Breaking changes
+
+- **Agent skill directories are now links, not files, and they are excluded
+  from version control.** A cloned project needs one `uvx dev-ready upgrade`
+  before its agent sees anything.
+- **A filesystem that cannot hold links can no longer receive a project with a
+  selected Agent Target**, where v0.11 could. An explicit `--agents none`
+  project is unaffected.
+- **An existing project with a selected Agent Target on such a filesystem can
+  no longer be upgraded.** The attempt exits 9, rolls back completely, and
+  leaves the project on v0.11 until it is moved somewhere links work.
+
+### Added
+
+- A second development method is selectable. Its steps are started by the
+  agent itself. A project using it keeps its plans under
+  `docs/superpowers/plans/` and its design documents under
+  `docs/superpowers/specs/`. Executable files arrive executable on macOS and
+  Linux; on Windows, execution depends on the shell.
+
+### Changed
+
+- The first method's description is rewritten as a selection criterion. The
+  new wording is what the interactive prompt shows.
+
+### Upgrade from v0.11
+
+Run `dev-ready upgrade PATH` with v0.12; no new selection input is required,
+and the stamp stays at version 5.
+
+The old pointer files at each selected Agent Target are retired once and
+replaced by links. A hand-edited pointer file is preserved and reported; its
+link is not created until that directory is empty.
+
+`--dry-run` reports the complete plan without mutation; a failure restores
+writes, deletions, and links together; a repeated successful upgrade plans no
+further changes. Base Provenance and upstream application content remain
+unchanged.
+
 ## [0.11.0] — 2026-08-18
 
 ### Breaking changes

@@ -1596,8 +1596,9 @@ cannot drift from the files it describes.
 FR-47's rule — criteria, never a comparison of upstream projects — leaves exactly
 two axes traceable to something dev-ready ships and tests: who invokes the method
 (from `invocation`) and whether work is split across subagents (from the declared
-`steps`, which the loader already validates). Anything further describes
-upstream's features and has no drift guard.
+`steps`). The 2026-08-18 text claimed the loader already validated `steps`
+against the paths each item writes; that rule was absent and Phase 2 added it
+(ADR-029). Anything further describes upstream's features and has no drift guard.
 
 The criteria live in **one string per flow**, the catalog entry's `description`.
 `prompts/collect.py` already renders the interactive flow row as
@@ -1620,3 +1621,46 @@ first per-flow document that must explain a choice inside a chain.
   path. It is a ten-second confirmation, not an open risk.
 - The v0.10.1 Spec Loop escape-hatch leftover stays deferred. This session did
   not reopen it.
+
+---
+
+## 2026-08-22 amendment — v0.12 Phase 2 grilling record (CEO-confirmed, Moofon)
+
+The 2026-08-18 amendment kept a claim that was false when it was written: FR-46
+first would make FR-47's addition data-only. Phase 2 grilling found four things
+that were never data. Reasoning lives in [ADR-029](decisions/adr-029-a-flow-declares-its-own-shape.md)
+and [ADR-030](decisions/adr-030-executable-vendored-content.md); this record
+names what grew, not why.
+
+1. The manifest stops loading when a second flow exists. Seventy-eight Catalog
+   Items declare a `mount` of `code-review`, `tdd`, or `implement`, and the
+   loader required every mount to name a step of every flow. Superpowers ships
+   none of those three names. `mount` became a role each flow resolves against
+   its own steps (ADR-029).
+2. The flow gained a `chain` field. ADR-024's frontmatter guard cannot be
+   written against `steps`, because `steps` holds `mattpocock`'s twelve skills
+   and only six declare `disable-model-invocation: true` (ADR-029; ADR-024's
+   2026-08-20 correction).
+3. The loader gained the steps-to-paths rule that ADR-024 claimed already
+   existed. Verified absent on 2026-08-20. Without it the second recommendation
+   axis rests on an unguarded field.
+4. Executable files travel to the user's project. Six of the curated twelve's
+   files are mode `100755` upstream, and generation's bytes write set no mode
+   (ADR-030).
+
+Seven surfaces went false the same day and nothing caught them:
+`skills/dev-ready/SKILL.md` (Engineering Flows list, chain sentence, resolved-flow
+sentence) and `docs/cli-spec.md` (flow count, `--flow` remains-data-driven
+clause, interactive-flow step), plus the error string asserted at
+`tests/unit/test_generate_skill.py`. The contract test compares identifier lists
+only; `docs/cli-spec.md` has no test. `SKILL.md`'s chain sentence was deleted
+rather than duplicated.
+
+Superpowers does not take `.scratch/`. `writing-plans` fixes plans at
+`docs/superpowers/plans/`, and `brainstorming` fixes design documents at
+`docs/superpowers/specs/`. Its `AGENTS.md` names those two paths, and its
+`setup-project` contribution is empty.
+
+The stamp still stays at version 5. Every new field is manifest data. No
+recorded field was added, removed, or re-typed. **v0.13 and v1.0 are
+unchanged**, as are FR-48 and FR-49.

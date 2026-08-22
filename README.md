@@ -27,10 +27,11 @@ overlay:
 - Canonical project instructions in `AGENTS.md` and Canonical Content under
   `.agents/skills/`. Cursor, Codex, Cline, Zed, OpenCode, and other
   standard-compliant agents read these locations without an Agent Target.
-- One named Engineering Flow, chosen first. Today that is Matt Pocock’s; two
-  more are announced as coming soon. The flow is the method the project is
-  built around — grilling, durable specs, tracer-bullet tickets, implementation,
-  TDD, diagnosis, two-axis review, and architecture cleanup.
+- One named Engineering Flow, chosen first, from two selectable methods:
+  `mattpocock` (you start each step yourself, and the work stays in one
+  session) or `superpowers` (the agent starts each step on its own, and
+  implementation can be split across fresh subagents). `addyosmani` is
+  announced as coming soon.
 - A lean Default Set: that Engineering Flow plus the project’s own
   `docs/architecture.md` and `docs/requirements.md` skeletons. Every Enhancement
   is off by default.
@@ -49,8 +50,10 @@ overlay:
   pinned reference list gives a project-level directory of its own, and CI fails
   when the two diverge; the authoritative list is `agent_targets` in
   [`src/dev_ready/manifest.json`](src/dev_ready/manifest.json). Each selected
-  target receives ordinary Pointer Stubs at its native discovery path; the stubs
-  are neither symbolic links nor copies of Canonical Content.
+  target receives one Skill Link per skill at its native discovery path. The
+  links are machine-local and excluded from version control; `upgrade`
+  recreates them. A cloned project needs one `uvx dev-ready upgrade` before
+  its agent sees anything.
 - `.mcp.json` only when a selected Enhancement needs project-level MCP
   configuration.
 - Secret hygiene from the first commit: the generated `.env` holds per-project
@@ -67,9 +70,14 @@ users are kept.
 
 ## The development workflow you get
 
-Every generated project is built around a named Engineering Flow, chosen first.
-Today that is Matt Pocock’s; two more are announced as coming soon. The agent
-reads the flow from `AGENTS.md` on the first turn of every session.
+Every generated project is built around one of two Engineering Flows, chosen
+first. The agent reads the selected flow from `AGENTS.md` on the first turn of
+every session.
+
+- **`mattpocock`**: You start each step yourself, and the work stays in one session.
+- **`superpowers`**: The agent starts each step on its own, and implementation can be split across fresh subagents.
+
+`addyosmani` is announced as coming soon. `--yes` resolves `mattpocock`.
 
 Before any feature work, **`setup-project`** configures the login, email, and
 error reporting so nobody has to edit `.env` by hand.
@@ -100,11 +108,19 @@ generated `AGENTS.md` and `docs/agents/mattpocock.md` carry the full chain.
 Between features, `improve-codebase-architecture` is there for the structural
 work that is nobody’s ticket.
 
+`superpowers` is the other selectable method. After `setup-project`, the agent
+starts each step itself: brainstorming → using-git-worktrees → writing-plans →
+**subagent-driven-development *or* executing-plans** → test-driven-development
+→ requesting-code-review → finishing-a-development-branch. The fourth position
+is a choice of how to execute the plan, not a skipped step.
+
 ## Requirements
 
 - Python 3.12 or newer (uv can install it automatically)
 - git (Copier fetches the pinned template with git)
 - Network access to github.com during generation
+- A filesystem that can hold links (symbolic links on macOS and Linux,
+  junctions on Windows), unless no Agent Target is selected
 - Docker only to run the generated project, not to generate it
 
 ## Installation
@@ -184,7 +200,7 @@ The Category flags are:
 | Flag | Selects |
 |---|---|
 | `--categories` | `dev`, `security`, `quality`, `design`, `token-optimize`, `all`, or `none` |
-| `--flow` | Mandatory Engineering Flow; currently `mattpocock` |
+| `--flow` | Mandatory Engineering Flow; `mattpocock` or `superpowers` |
 | `--dev` | Dev Enhancements; the Category currently offers none |
 | `--security` | `security-audit` |
 | `--quality` | `react-doctor`, `webapp-testing` |
@@ -200,8 +216,7 @@ selected because every project has an Engineering Flow. Use
 lean Default Set.
 
 `--agents` defaults to `claude`, and so does `--yes`. `--agents all` selects
-every declared target, which is a great many Pointer Stub files — name the
-targets you want instead.
+every declared target — name the targets you want instead.
 
 The previous Component-shaped flags (`--skills`, `--no-skills`, `--mcp`,
 `--no-mcp`, and `--no-docs`) now exit 2 and name their Category-shaped
@@ -279,10 +294,10 @@ and published to PyPI through trusted publishing; see
 
 ## Roadmap
 
-v0.11 shipped the Engineering Flow, the setup step, the full Design Reference
-set, and plugin distribution. Next is delivery and a second flow. v1.0’s
-second template remains gated on attributable evidence of real external use. See
-the [v0.11 overview](docs/version_overview/v0.11-overview.md).
+v0.12 shipped Skill Links and a second Engineering Flow. Next is a third flow
+and Token Optimize additions. v1.0’s second template remains gated on
+attributable evidence of real external use. See the
+[v0.12 overview](docs/version_overview/v0.12-overview.md).
 
 ## License
 

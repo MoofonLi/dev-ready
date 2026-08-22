@@ -20,8 +20,8 @@ uvx dev-ready init my-app
 
 一個以 [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) 為基底的專案（FastAPI、React、SQLModel、PostgreSQL、Docker Compose），外加一層 AI 工具疊加內容，讓 coding agent 一開箱就能順利工作：
 
-- **專案指示與開發護欄** — 共用內容只寫一份在標準位置；支援標準的 agent 可直接讀取，而凡是需要自己專屬目錄的 agent，只要固定參考清單裡有它，dev-ready 就會為它寫一份指向共用內容的普通檔案，讓它讀到同一份指示。專案的 `AGENTS.md` 也會寫明這個專案實際用了哪些技術、測試與檢查各該跑哪些指令，以及它本身就是這個專案的標準來源
-- **具名的 Engineering Flow** — 每個專案都會先選定一套開發方法（今天是 Matt Pocock 的；另外兩套標成即將推出）。方法本身叫 Spec Loop
+- **專案指示與開發護欄** — 共用內容只寫一份在標準位置；支援標準的 agent 可直接讀取，而凡是需要自己專屬目錄的 agent，只要固定參考清單裡有它，dev-ready 就會為它建立一份指向共用內容的連結。該連結只存在於本機、不進 git，clone 之後跑一次 `uvx dev-ready upgrade` 就會重建，讓它讀到同一份指示。專案的 `AGENTS.md` 也會寫明這個專案實際用了哪些技術、測試與檢查各該跑哪些指令，以及它本身就是這個專案的標準來源
+- **具名的 Engineering Flow** — 每個專案都會先選定一套開發方法（兩套可選、一套標成即將推出）
 - **精簡的預設內容** — 接受預設值時，只產生這套 Engineering Flow 加上專案自己的架構與需求文件骨架；其他強化項目預設都不加入。登入、寄信與錯誤回報可以不用親手改 `.env` 就設定好
 - **依用途挑選的強化項目** — 可依開發、安全、品質、設計與 token 最佳化等類別，選擇安全稽核、React 分析、瀏覽器測試、前端設計參考、精簡 agent 回應與 codebase-memory 等能力
 - **按需產生的 MCP 設定** — 只有選到需要專案層級 MCP 設定的強化項目時才會寫入設定檔，工具版本仍然固定
@@ -35,6 +35,7 @@ uvx dev-ready init my-app
 - Python 3.12 以上（uv 可以自動幫你裝）
 - git（Copier 透過 git 取得固定版本的範本）
 - 能連到 github.com
+- 目標目錄需要能保存連結的檔案系統，除非沒有選任何 Agent Target
 - 產生專案**不需要** Docker，只有跑起來才需要
 
 ## 安裝與第一次執行

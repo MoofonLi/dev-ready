@@ -270,7 +270,7 @@ _Avoid_: agent table, path map, target registry, transcription
 
 **Standard-Compliant Agent**:
 A coding agent that reads [[Canonical Content]] at `.agents/skills/` and is
-therefore never an [[Agent Target]] — it needs no Pointer Stub and no selection.
+therefore never an [[Agent Target]] — it needs no Skill Link and no selection.
 Absence from the Agent Target Map means full support, not missing support, which
 is why the selection prompt, the generation report, and the [[Generation Skill]]'s
 interview all name these agents. The interview is the earliest of the three: it

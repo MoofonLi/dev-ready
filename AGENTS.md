@@ -5,32 +5,30 @@ This file is the single source of truth for agent rules; `CLAUDE.md` imports it 
 
 ## What this project is
 
-dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus Canonical Content for coding agents, optional Agent Target Pointer Stubs and MCP configuration, and design docs.
+dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus Canonical Content for coding agents, optional Agent Target Skill Links and MCP configuration, and design docs.
 
-Current phase: v0.11 is released (`v0.11.0` — see the v0.11 overview). It
-shipped `setup-project` (FR-39), the full Design Reference set (FR-40), MIT
-notice propagation (FR-41), Engineering Flow selection and the interactive
-rework (FR-42), corrected Flow Chain guidance (FR-43), CLI presentation
-(FR-44), and Claude/Codex plugin distribution (FR-45) — governed by ADR-024,
-ADR-026, and ADR-027. The stamp stayed at version 5. v0.12 (FR-46 Skill Links
-under ADR-028, FR-47 `superpowers`) and v0.13 (FR-48
-`addyosmani/agent-skills`, FR-49 Token Optimize additions) follow. v1.0 remains
+Current phase: v0.12 is released (`v0.12.0` — see the v0.12 overview). It
+shipped Skill Links replacing Pointer Stubs (FR-46) and `superpowers` as the
+second Engineering Flow (FR-47) — governed by ADR-028, ADR-024 as amended,
+ADR-029, and ADR-030. The stamp stayed at version 5. v0.13 (FR-48
+`addyosmani/agent-skills`, FR-49 Token Optimize additions) follows. v1.0 remains
 gated on the real-users evidence defined in `docs/version-plan.md`, which the
 2026-08-09 amendment narrowed to Branch A alone. Per-version plans live in
 `docs/handoff/<version>/<version>-plan.md`; the domain glossary is `CONTEXT.md`.
 
 **Process note:** v0.9 stopped *generating* the Handoff Protocol into user projects (ADR-020), and ADR-021 retires it here too — this repo now develops on the Spec Loop and nothing else. See "How this repo is developed" below.
 
-The v0.11 release surface is fixed: the development method is an Engineering
-Flow, asked first and named `mattpocock`; `setup-project` is unconditional
-infrastructure at the head of every chain; all 74 Design References are
-ordinary catalog items; MIT notices travel with the copied skills; the
-repository root is the Claude and Codex plugin; and a flag answers only its
-own question. The stamp stays at version 5 — nothing in v0.11 added, removed,
-or re-typed a recorded field. Pointer Stubs remain the delivery mechanism in
-shipped code; ADR-028 retires them in v0.12 in favour of one Skill Link per
-skill, with no copy mode and no new stamp field. ADR-025, which chose between
-two delivery modes, is superseded in full and was never implemented.
+The v0.12 release surface is fixed: the development method is an Engineering
+Flow, asked first, with two selectable ids (`mattpocock`, `superpowers`) and
+one announced (`addyosmani`); each selected Agent Target receives one Skill
+Link per skill, machine-local and excluded from version control;
+`setup-project` is unconditional infrastructure at the head of every chain;
+all 74 Design References are ordinary catalog items; MIT notices travel with
+the copied skills; the repository root is the Claude and Codex plugin; and a
+flag answers only its own question. The stamp stays at version 5 — nothing in
+v0.12 added, removed, or re-typed a recorded field. Pointer Stubs are retired.
+ADR-025, which chose between two delivery modes, is superseded in full and was
+never implemented.
 
 ## Read before writing code
 

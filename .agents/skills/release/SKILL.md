@@ -89,7 +89,7 @@ Never `git add .` blindly: check `git status` first and confirm nothing from `do
 git push
 ```
 
-All five jobs on main must pass: `test` (lint + unit), `vendored-drift` (including notices sync and root-ignore drift), `agent-target-drift`, `upgrade-from-release` (the N-1 cross-release gate), and `generate-and-verify` (real generation + docker compose health check, takes several minutes). Watch with `gh run watch` if `gh` is available, otherwise the repo's Actions page. Do not tag until every job is green - the tag is what publishes.
+All six jobs on main must pass: `test` (lint + unit), `vendored-drift` (including notices sync and root-ignore drift), `agent-target-drift`, `upgrade-from-release` (the N-1 cross-release gate), `generate-and-verify` (real generation + docker compose health check, takes several minutes), and `windows-lifecycle` (the full offline suite plus real generation and the N-1 lifecycle on Windows). Watch with `gh run watch` if `gh` is available, otherwise the repo's Actions page. Do not tag until every job is green - the tag is what publishes.
 
 ## Step 6 - Tag and release
 
