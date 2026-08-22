@@ -27,7 +27,7 @@ dev = [
 # twine inside pypa/gh-action-pypi-publish@v1.14.1 rejects as invalid, failing
 # the release before upload. 1.31.0 emits 2.4 and is what shipped v0.10.0.
 # Unpin only together with a publish action whose twine accepts 2.5.
-requires = ["hatchling==1.31.0"]
+requires = ["hatchling==1.32.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
