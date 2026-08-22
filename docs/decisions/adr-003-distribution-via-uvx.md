@@ -35,3 +35,59 @@ the [[Generation Skill]] from this repository's GitHub source. No npm package is
 published and no registry receives a submission; npx is only how that installer
 is launched. Rejecting npx as dev-ready's distribution channel says nothing
 about it.
+
+---
+
+## 2026-08-23 amendment — `rich` enters the runtime and the generation report is colourised, reversing FR-44's plain-text ruling
+
+Decided in the `grill-with-docs` session of 2026-08-22/23 opening v0.13, run
+against the shipped v0.12.0 screens. The 2026-08-12 amendment above stands in
+full: npx is still rejected as a channel, and the presentation complaint is
+still a separate, real requirement. What changes is the answer that requirement
+was given.
+
+FR-44 delivered questionary styling plus a re-laid-out report and ruled
+explicitly that **the report is not colourised**, on this reasoning:
+`render_report` is a pure function, terminal policy belongs to `cli`, and colour
+would mean a new permanent policy surface — TTY detection plus a `NO_COLOR`
+convention, threaded down — "bought for very little."
+
+That reasoning priced building the policy surface by hand, and the CEO's
+2026-08-22 verdict on the shipped result was that the screens are still plain.
+Both halves of the trade have moved:
+
+- **The cost is no longer ours to pay.** `rich` enters the runtime dependencies
+  by CEO decision. It carries TTY detection, the `NO_COLOR` convention, terminal
+  width, and graceful degradation to plain text as existing behaviour. FR-44's
+  objection was to authoring that policy, not to colour.
+- **The benefit was measured, not assumed.** The v0.12.0 report is 26 lines of
+  undifferentiated lowercase text in which the four next steps — the only part a
+  user must act on — sit in the middle, below a single line that names nineteen
+  standard-compliant agents.
+
+**The purity of `render_report` is preserved, not traded away.** It stays a pure
+function of its arguments and returns a string; `rich` renders into that string,
+and the TTY and `NO_COLOR` decisions stay at the `cli` boundary where FR-44
+correctly placed them. The dependency rule in `docs/architecture.md` — which has
+listed rich as "optional" since it was written — records the addition, as every
+new runtime dependency must.
+
+The chosen presentation is **whitespace and colour without frames**. Framed
+boxes are what the 2026-08-12 amendment identified as the visible signature of
+`@clack/prompts`, and they were offered and declined: a box wraps badly on a
+narrow terminal and survives a copy-paste worse than indentation does. The same
+frameless treatment applies to the flow comparison ADR-024's 2026-08-23
+amendment puts above the Engineering Flow menu, so one CLI does not carry two
+visual idioms.
+
+`questionary` keeps every interactive prompt. It owns keyboard handling,
+cancellation, and the disabled-row rendering an [[Announced Flow]] needs; `rich`
+owns the static screens — the pre-generation confirmation, the flow comparison,
+and the report. Two libraries with one boundary each, rather than one library
+doing something it is not for.
+
+Consequences: the runtime grows a third dependency, against NFR-2's
+solo-maintainer budget and ADR-005's minimal-dependency posture — accepted
+because the alternative is authoring and maintaining the same policy by hand.
+FR-44's plain-text ruling is superseded and the CHANGELOG says so; a user who
+pipes `init` to a file or sets `NO_COLOR` sees the plain text FR-44 shipped.

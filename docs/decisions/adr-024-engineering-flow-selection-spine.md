@@ -233,3 +233,80 @@ step, and the spec says so rather than leaving it to a reviewer's attention.
 **Unchanged by this correction:** the Default Set still resolves `mattpocock`,
 `--flow`'s default is still `mattpocock`, and the curation standard recorded
 above is untouched.
+
+---
+
+## 2026-08-23 amendment — the two-axis whitelist becomes a traceability rule, and the criteria get their own field
+
+Decided in the `grill-with-docs` session of 2026-08-22/23 opening v0.13, run
+against a real selection attempt: the CEO ran v0.12.0 through the Generation
+Skill, chose a flow, and reported afterwards that he still could not tell which
+one he should have picked. The 2026-08-18 amendment's purpose is unchanged — a
+flow is described by what dev-ready ships and tests, never by a comparative
+claim about an upstream project. Its instrument was wrong in both directions.
+
+### The whitelist excluded true claims and admitted nothing about the ones that matter
+
+The 2026-08-18 amendment permits exactly two axes: who invokes the method, and
+whether work is split across subagents. Measured against the plain-language
+criteria the CEO wrote for himself, the whitelist rejects sentences that are
+fully traceable and has no opinion at all on sentences that are not:
+
+- "It ships a step that verifies before it can claim to be done" names
+  `verification-before-completion`, a `superpowers` step listed in `steps`,
+  written to a path, and held byte-identical to the pin by `vendored-drift`.
+  Excluded by the whitelist.
+- "Use it when the shape of the work is still unclear" names `grill-with-docs`,
+  `grilling`, and `domain-modeling`, all `mattpocock` steps under the same
+  guard. Excluded by the whitelist.
+- "Your agent is weaker, so pick this one" names nothing dev-ready ships, is not
+  checkable even in principle, and is a claim about the reader's tooling.
+  The whitelist never contemplated it.
+
+**The rule becomes traceability rather than enumeration.** Every clause of a
+flow's selection criteria must name either a field the manifest declares for
+that flow — `invocation`, `chain`, `steps` — or a step of that flow by id.
+Claims about the reader's own agent, the reader's team, or upstream behaviour
+that dev-ready does not ship are excluded, and no future axis needs adding to
+this ADR to permit a sentence that already points at a shipped file.
+
+**The rule is executed, not asserted.** A test resolves every step id appearing
+in a flow's criteria against that flow's declared `steps` and fails the build on
+a name that is not there. Without it this amendment repeats the 2026-08-20
+correction's finding — a rule this ADR believed the loader enforced, which it
+did not — one layer up. The guard holds the file, not its meaning: a pin bump
+touching a step named in the criteria requires re-reading that step, and the
+FR says so rather than leaving it to a reviewer's attention.
+
+### The criteria are a field of their own, and one source feeds three surfaces
+
+The 2026-08-18 amendment put the criteria in the catalog entry's `description`,
+the string `prompts/collect.py` renders as `"{display_name} — {description}"`.
+One menu row is the wrong shape for the content: criteria are a short list of
+observable situations, and a list rendered into a single row is why the shipped
+sentences describe mechanism instead of fit.
+
+A development-loop entry therefore declares **`choose_when`**, an ordered list of
+short criteria, beside `description`. `description` keeps its job as the one-line
+menu label. `choose_when` is rendered on the three surfaces a user meets *before*
+choosing — the comparison the interactive prompt prints above the flow menu, the
+Generation Skill's interview, and `README.md` — from that single declaration. The
+per-flow document `docs/agents/<flow-id>.md` is deliberately not one of them: it
+is written only when its flow is selected, so it cannot help anyone choose. A
+test asserts the rendered strings on every repeating surface resolve to the
+manifest's, because two separately worded copies of one fact is how the surfaces
+drifted before.
+
+- **Considered: keeping one string and writing it better** — rejected. It bounds
+  the criteria at whatever fits one terminal row, which is the constraint that
+  produced the shipped text.
+- **Considered: relaxing to "anything true of upstream today"** — rejected for
+  the reason the 2026-08-18 amendment gives and this amendment does not disturb:
+  a claim with no shipped subject has no drift guard and goes quietly false.
+
+Consequences: `mattpocock`'s and `superpowers`' shipped descriptions are rewritten
+a second time in two versions, which is user-visible and belongs in the CHANGELOG.
+FR-48's third flow becomes a data addition on this surface rather than a rewrite
+of it. The excluded claims are excluded permanently: dev-ready does not tell a
+user that their coding agent is weak, and does not describe `addyosmani` before
+FR-48 has read it.

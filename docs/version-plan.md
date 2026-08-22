@@ -1664,3 +1664,87 @@ Superpowers does not take `.scratch/`. `writing-plans` fixes plans at
 The stamp still stays at version 5. Every new field is manifest data. No
 recorded field was added, removed, or re-typed. **v0.13 and v1.0 are
 unchanged**, as are FR-48 and FR-49.
+
+---
+
+## 2026-08-23 amendment — v0.13 widened by the v0.12 field report (CEO-confirmed, Moofon)
+
+Produced by a `grill-with-docs` session of 2026-08-22/23, run against the
+shipped v0.12.0 CLI, the installed Generation Skill, and the code they call,
+rather than against any document. Its input was the first end-to-end use of a
+released version by someone who then reported what happened. **v1.0 is
+unchanged** — FR-27, the same D-5 hard gates, and the Branch A-only evidence
+rule. **FR-48 and FR-49 are unchanged**, and FR-48 gets cheaper: FR-50 turns
+the flow-choosing text into manifest data, so a third flow adds a record rather
+than rewriting a surface. Decision records: **ADR-031**, plus amendments to
+ADR-003, ADR-023, and ADR-024. The stamp stays at version 5 — nothing here
+adds, removes, or re-types a recorded field.
+
+### Five complaints, three of them defects
+
+The report was five items. Ranked by what they cost a user rather than by how
+they were phrased:
+
+1. **The interview asked what stack the developer wanted, then asked whether
+   their frontend was React.** Every dev-ready project is FastAPI + React +
+   PostgreSQL + Docker Compose. The first question changes nothing and the third
+   has one answer. It also never asked the project's name, never asked where to
+   put it, and never asked which design language to reference — it defaulted to
+   `frontend-design` out of 74 references and disclosed the choice afterwards.
+   FR-52.
+2. **The flow choice is still unmakeable.** The user selected one and could not
+   tell whether it was right. This is the defect FR-47's recommendation existed
+   to prevent, surviving the version that shipped it. FR-50.
+3. **`init` refuses a directory the user has already made.** FR-53.
+4. **The screens are still plain**, one version after FR-44 addressed exactly
+   that. FR-51.
+5. **`README.md` is 305 lines with no image.** FR-54.
+
+### Two findings nobody was looking for
+
+- **`check` fails a generated project that has been put under version control.**
+  `.git` is in `inspection.py`'s `FORBIDDEN_PATHS`, the loop is ungated, and
+  `check` runs it through `ProjectExpectation.lifecycle`; the message tells the
+  user an upstream change broke the pin and to file an issue. Confirmed by
+  direct call, 2026-08-22. It ships inside FR-53 because merging into a
+  destination the user has already initialized would make the false verdict the
+  normal outcome.
+- **ADR-023's guard has no jurisdiction over the Generation Skill or either
+  README.** It binds claims written *into a generated project*. The single most
+  useful sentence FR-52 needs — the fixed stack — would therefore have shipped
+  unguarded onto the surface the 2026-08-22 amendment already records as having
+  gone false seven times in one day.
+
+### Two recorded decisions reversed on purpose
+
+Both reversals are of this repository's own rulings, both were argued from the
+same measurement, and both are recorded where the original ruling lives rather
+than in a new document.
+
+- **FR-44 ruled the generation report is not colourised.** Its reasoning priced
+  a *hand-authored* policy surface — TTY detection plus a `NO_COLOR` convention,
+  threaded down — as "bought for very little". The CEO put `rich` into the
+  runtime, which carries all of it, so the cost that justified the ruling no
+  longer exists. `render_report` stays pure. ADR-003, 2026-08-23 amendment.
+- **ADR-024 restricted flow criteria to two axes.** Measured against the
+  criteria the CEO wrote for himself, the whitelist excluded sentences that
+  point at byte-identical vendored files and had no opinion on sentences about
+  the reader's own agent. It becomes a traceability rule with a test.
+  ADR-024, 2026-08-23 amendment.
+
+### Recorded, not decided
+
+- The v0.13 phase cut belongs to `planning`, not to this session. FR-52 is
+  recommended first — it is the only item that makes a user receive the wrong
+  thing rather than an unpolished one — then FR-50 and FR-51 together, since
+  they rewrite the same screen.
+- Framed boxes were offered for both the report and the flow comparison and
+  declined in favour of whitespace and colour. Recorded because `@clack/prompts`
+  is the stated visual reference and framing is its signature, so the question
+  will return.
+- `react-doctor` and `webapp-testing` were considered for the Default Set on the
+  ground that they are universally applicable, and left off. ADR-018's limit was
+  not reopened; they become must-asks instead.
+- The zh-TW README changes in FR-54 because `--dir .` alters a product fact it
+  states, which is the ADR-016 condition. It does not acquire the flag tables
+  the English README is shedding.

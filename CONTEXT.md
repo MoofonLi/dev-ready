@@ -89,6 +89,21 @@ head followed by model-invoked entries, and the generated sentence says so. It
 is also the first of the two axes a flow recommendation may rest on.
 _Avoid_: trigger mode, auto-invoke, activation, enforcement
 
+**Flow Selection Criteria**:
+The short, ordered list of observable situations that tell a user which
+[[Engineering Flow]] to pick, declared per flow in the manifest as `choose_when`
+(ADR-024, as amended 2026-08-23). Every clause must name a manifest field the
+flow declares — [[Flow Invocation]], [[Flow Chain]], `steps` — or one of that
+flow's steps by id, and a test resolves each named id against the flow's own
+`steps`. Claims about the reader's coding agent, the reader's team, or upstream
+behaviour dev-ready does not ship are excluded permanently. One declaration
+feeds the three surfaces a user meets *before* choosing: the comparison printed
+above the interactive flow menu, the [[Generation Skill]]'s interview, and
+`README.md`. The per-flow document is not one of them — it is written only when
+its flow is already selected. Distinct from the flow's `description`, which is
+the one-line menu label.
+_Avoid_: flow recommendation, flow comparison, which-flow guidance, pick-this-if
+
 **Setup Step**:
 The first entry of a [[Flow Chain]] — the run-once configuration a generated
 project needs before any other step. Written into every project whichever
@@ -278,6 +293,17 @@ runs before the CLI does, so it is where the misreading is cheapest to prevent.
 _Avoid_: standard agent, generic agent, default agent, unsupported agent
 
 ### Lifecycle
+
+**Occupied Target**:
+A destination directory that already holds content when `init` runs. Accepted
+from v0.13 when no top-level entry of the destination shares a name with a
+top-level entry dev-ready is about to create; any collision is exit 4 and names
+the colliding entries (ADR-031). It is the case a developer who has already run
+`git init` is in, and it is the only case in which generation is not a single
+atomic rename: entries move one at a time, each move atomic, and a failure
+restores what dev-ready moved and never touches what was there first. An absent
+or empty destination is not an Occupied Target and keeps the original guarantee.
+_Avoid_: non-empty target, existing directory, in-place init, merge mode
 
 **Base Provenance**:
 The immutable identity of the upstream template snapshot from which a project
