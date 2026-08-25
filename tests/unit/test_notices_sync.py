@@ -23,6 +23,7 @@ _CURRENT_CATALOG_JSON = """"default_set": {
       "id": "sample-loop",
       "kind": "development-loop",
       "steps": ["sample-step"],
+      "choose_when": ["Use `steps`.", "Follow `chain`.", "Prefer `invocation`."],
       "invocation": "user",
       "chain": ["sample-step"],
       "roles": {"build": ["sample-step"]},

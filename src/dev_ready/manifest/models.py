@@ -97,6 +97,7 @@ class CatalogItem:
     mount: str | None = None
     kind: str = "enhancement"
     steps: tuple[str, ...] = ()
+    choose_when: tuple[str, ...] = ()
     paths: tuple[ItemPath, ...] = ()
     pin: str | None = None
     effect: CatalogEffect | None = None

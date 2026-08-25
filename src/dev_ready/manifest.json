@@ -865,7 +865,12 @@
           "title": "Matt Pocock's skills",
           "kind": "development-loop",
           "category": "dev",
-          "description": "You start each step yourself, and the work stays in one session.",
+          "description": "A user-driven Engineering Flow whose steps stay in one working session.",
+          "choose_when": [
+            "Choose this flow when you want to start each `chain` entry yourself.",
+            "Choose it when the work's shape needs `grill-with-docs`, `grilling`, or `domain-modeling` before specification.",
+            "Choose it when one session should carry the work through `to-spec`, `to-tickets`, and `implement`."
+          ],
           "mode": "vendor",
           "license": "MIT",
           "vendored_repo": "mattpocock/skills",
@@ -962,7 +967,12 @@
           "title": "Superpowers",
           "kind": "development-loop",
           "category": "dev",
-          "description": "The agent starts each step on its own, and implementation can be split across fresh subagents.",
+          "description": "A model-driven Engineering Flow whose implementation can fan out across fresh subagents.",
+          "choose_when": [
+            "Choose this flow when its model-driven `invocation` should start each chain entry after setup.",
+            "Choose it when implementation should fan out through `subagent-driven-development` or `executing-plans`.",
+            "Choose it when `verification-before-completion` should run before work is declared complete."
+          ],
           "mode": "vendor",
           "license": "MIT",
           "vendored_repo": "obra/superpowers",

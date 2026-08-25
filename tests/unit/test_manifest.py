@@ -51,6 +51,11 @@ VALID = {
                     "id": "sample-skill",
                     "kind": "development-loop",
                     "steps": ["sample-step"],
+                    "choose_when": [
+                        "Use the declared `steps`.",
+                        "Follow the declared `chain`.",
+                        "Prefer its `invocation` model.",
+                    ],
                     "invocation": "user",
                     "chain": ["sample-step"],
                     "roles": {"build": ["sample-step"]},
@@ -109,6 +114,11 @@ def test_parse_valid_manifest() -> None:
     assert skill.license == "MIT"
     assert skill.paths[0].src == "claude/skills/sample-skill"
     assert skill.paths[0].dest == ".agents/skills/sample-step"
+    assert skill.choose_when == (
+        "Use the declared `steps`.",
+        "Follow the declared `chain`.",
+        "Prefer its `invocation` model.",
+    )
     assert skill.invocation == "user"
     assert skill.chain == ("sample-step",)
     assert skill.roles == {"build": ("sample-step",)}
@@ -247,6 +257,7 @@ def test_declared_category_must_contain_an_item() -> None:
     security_item["id"] = "security-item"
     security_item["kind"] = "enhancement"
     security_item.pop("steps")
+    security_item.pop("choose_when")
     security_item.pop("invocation")
     security_item.pop("chain")
     security_item.pop("roles")
@@ -259,6 +270,7 @@ def test_dev_category_must_declare_a_development_loop() -> None:
     data = json.loads(json.dumps(VALID))
     del data["components"]["skills"]["items"][0]["kind"]
     del data["components"]["skills"]["items"][0]["steps"]
+    del data["components"]["skills"]["items"][0]["choose_when"]
     del data["components"]["skills"]["items"][0]["invocation"]
     del data["components"]["skills"]["items"][0]["chain"]
     del data["components"]["skills"]["items"][0]["roles"]
@@ -268,6 +280,7 @@ def test_dev_category_must_declare_a_development_loop() -> None:
 
     data["components"]["skills"]["items"][0]["kind"] = "development-loop"
     data["components"]["skills"]["items"][0]["steps"] = ["sample-step"]
+    data["components"]["skills"]["items"][0]["choose_when"] = ["Use `steps`."]
     data["components"]["skills"]["items"][0]["invocation"] = "user"
     data["components"]["skills"]["items"][0]["chain"] = ["sample-step"]
     data["components"]["skills"]["items"][0]["roles"] = {
@@ -1379,7 +1392,7 @@ def test_development_loop_accepts_legal_invocation(invocation: str) -> None:
     assert manifest.components["skills"][0].invocation == invocation
 
 
-@pytest.mark.parametrize("field", ["invocation", "chain", "roles"])
+@pytest.mark.parametrize("field", ["invocation", "chain", "choose_when", "roles"])
 def test_development_loop_requires_shape_field(field: str) -> None:
     data = json.loads(json.dumps(VALID))
     del data["components"]["skills"]["items"][0][field]
@@ -1396,11 +1409,41 @@ def test_development_loop_rejects_illegal_invocation(bad_invocation: object) -> 
         parse_manifest(json.dumps(data))
 
 
-@pytest.mark.parametrize("field", ["invocation", "chain", "roles"])
+@pytest.mark.parametrize("field", ["invocation", "chain", "choose_when", "roles"])
 def test_enhancement_cannot_declare_loop_fields(field: str) -> None:
     data = json.loads(json.dumps(VALID))
     data["components"]["mcp"]["items"][0][field] = "user" if field == "invocation" else []
     with pytest.raises(ManifestError, match=f"field '{field}' is only allowed for a development loop"):
+        parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize(
+    "bad_choose_when",
+    [[], "one criterion", [42], [""]],
+)
+def test_development_loop_rejects_invalid_choose_when(
+    bad_choose_when: object,
+) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0]["choose_when"] = bad_choose_when
+
+    with pytest.raises(ManifestError, match="choose_when"):
+        parse_manifest(json.dumps(data))
+
+
+def test_announced_flow_cannot_declare_choose_when() -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"].append(
+        {
+            "id": "future-flow",
+            "category": "dev",
+            "status": "coming-soon",
+            "description": "A future Engineering Flow.",
+            "choose_when": ["Use its `steps`."],
+        }
+    )
+
+    with pytest.raises(ManifestError, match="announced flow.*choose_when"):
         parse_manifest(json.dumps(data))
 
 
@@ -1532,6 +1575,11 @@ def test_default_manifest_loads_mattpocock_declarations() -> None:
     manifest = load_default_manifest()
     mattpocock = next(item for item in manifest.components.loops() if item.id == "mattpocock")
     assert mattpocock.invocation == "user"
+    assert mattpocock.choose_when == (
+        "Choose this flow when you want to start each `chain` entry yourself.",
+        "Choose it when the work's shape needs `grill-with-docs`, `grilling`, or `domain-modeling` before specification.",
+        "Choose it when one session should carry the work through `to-spec`, `to-tickets`, and `implement`.",
+    )
     assert mattpocock.chain == (
         "grill-with-docs",
         "to-spec",
@@ -1627,8 +1675,13 @@ def test_default_manifest_loads_superpowers_declarations() -> None:
     assert superpowers.title == "Superpowers"
     assert superpowers.display_name == "Superpowers"
     assert superpowers.invocation == "model"
+    assert superpowers.choose_when == (
+        "Choose this flow when its model-driven `invocation` should start each chain entry after setup.",
+        "Choose it when implementation should fan out through `subagent-driven-development` or `executing-plans`.",
+        "Choose it when `verification-before-completion` should run before work is declared complete.",
+    )
     assert superpowers.description == (
-        "The agent starts each step on its own, and implementation can be split across fresh subagents."
+        "A model-driven Engineering Flow whose implementation can fan out across fresh subagents."
     )
     assert superpowers.chain == (
         "brainstorming",
@@ -1646,4 +1699,3 @@ def test_default_manifest_loads_superpowers_declarations() -> None:
     }
     assert len(superpowers.steps) == 12
     assert len(superpowers.paths) == 13
-

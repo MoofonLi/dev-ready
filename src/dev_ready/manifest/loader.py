@@ -657,6 +657,7 @@ def _parse_components(
                     set(item_entry)
                     & {
                         "chain",
+                        "choose_when",
                         "inject",
                         "invocation",
                         "license",
@@ -798,7 +799,7 @@ def _parse_components(
                 )
 
             if kind == "enhancement":
-                for prohibited in ("invocation", "chain", "roles"):
+                for prohibited in ("invocation", "chain", "choose_when", "roles"):
                     if prohibited in item_entry:
                         raise ManifestError(
                             f"{source}: component '{comp_name}' item '{item_id}' field '{prohibited}' "
@@ -806,10 +807,14 @@ def _parse_components(
                         )
                 invocation = None
                 chain = ()
+                choose_when = ()
                 roles = ()
             else:
                 invocation = _parse_loop_invocation(comp_name, item_id, item_entry, source)
                 chain = _parse_loop_chain(comp_name, item_id, item_entry, steps, source)
+                choose_when = _parse_loop_choose_when(
+                    comp_name, item_id, item_entry, source
+                )
                 roles = _parse_loop_roles(comp_name, item_id, item_entry, steps, source)
                 dest_leaves = {Path(p.dest).name for p in parsed_paths}
                 for step in steps:
@@ -827,6 +832,7 @@ def _parse_components(
                     mount=mount if isinstance(mount, str) else None,
                     kind=kind,
                     steps=steps,
+                    choose_when=choose_when,
                     description=desc,
                     mode=mode,
                     license=lic,
@@ -911,6 +917,34 @@ def _parse_loop_invocation(
             f"must be 'user' or 'model', got {raw!r}"
         )
     return raw
+
+
+def _parse_loop_choose_when(
+    component: str,
+    item_id: str,
+    entry: dict[str, object],
+    source: str,
+) -> tuple[str, ...]:
+    if "choose_when" not in entry:
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' field "
+            "'choose_when' is required"
+        )
+    raw = entry.get("choose_when")
+    if not isinstance(raw, list) or not raw:
+        raise ManifestError(
+            f"{source}: component '{component}' item '{item_id}' field "
+            "'choose_when' must be a non-empty list"
+        )
+    clauses: list[str] = []
+    for clause in raw:
+        if not isinstance(clause, str) or not clause:
+            raise ManifestError(
+                f"{source}: component '{component}' item '{item_id}' field "
+                "'choose_when' entries must be non-empty strings"
+            )
+        clauses.append(clause)
+    return tuple(clauses)
 
 
 def _parse_loop_chain(
@@ -1121,4 +1155,3 @@ def _parse_catalog_path(
             f"{source}: component '{component}' item '{item_id}' path field '{field}' must be a relative path without '..', got {value!r}"
         )
     return value
-

@@ -178,7 +178,7 @@ def test_sync_all_empty_vendored_returns_zero(tmp_path: Path) -> None:
     }
   },
   "vendored": [],
-  "components": {"skills": {"items": [{"id": "sample-loop", "kind": "development-loop", "steps": ["sample-step"], "invocation": "user", "chain": ["sample-step"], "roles": {"build": ["sample-step"]}, "category": "dev", "description": "Sample loop.", "mode": "builtin", "license": "MIT", "paths": [{"src": "sample", "dest": ".agents/skills/sample-step"}]}]}, "mcp": {"items": []}, "docs": {"items": []}},
+  "components": {"skills": {"items": [{"id": "sample-loop", "kind": "development-loop", "steps": ["sample-step"], "choose_when": ["Use `steps`.", "Follow `chain`.", "Prefer `invocation`."], "invocation": "user", "chain": ["sample-step"], "roles": {"build": ["sample-step"]}, "category": "dev", "description": "Sample loop.", "mode": "builtin", "license": "MIT", "paths": [{"src": "sample", "dest": ".agents/skills/sample-step"}]}]}, "mcp": {"items": []}, "docs": {"items": []}},
   "overlay_version": "0.1.0"
 }"""
         % ("a" * 40),
