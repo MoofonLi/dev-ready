@@ -18,7 +18,7 @@ from dev_ready.manifest import load_default_manifest
 
 pytestmark = pytest.mark.network
 
-_RELEASED_VERSION = "0.11.0"
+_RELEASED_VERSION = "0.12.0"
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PROBE_PREFIX = "__DEV_READY_PROBE__="
 _PROBE_AND_RUN = f"""
@@ -183,15 +183,6 @@ def _assert_skill_projection(
     canonical_skill = root.joinpath(*CANONICAL_SKILLS_ROOT, skill_name, "SKILL.md")
     assert canonical_skill.is_file(), f"{stage} omitted canonical {skill_name} content"
     for target in projection.skill_targets:
-        if stage == "released project":
-            pointer_stub = root / projection.stub_path(target, skill_name)
-            assert pointer_stub.is_file(), (
-                f"{stage} omitted the {target.id} {skill_name} Pointer Stub"
-            )
-            assert canonical_skill.read_bytes() != pointer_stub.read_bytes(), (
-                f"{stage} duplicated canonical {skill_name} bytes into {target.id}"
-            )
-            continue
         link = root / projection.link_path(target, skill_name)
         if sys.platform == "win32":
             assert link.is_junction(), (
@@ -400,10 +391,6 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     assert (target / "docs" / "requirements.md").is_file()
     _assert_skill_projection(target, old_stamp, "implement", "released project")
     _assert_skill_projection(target, old_stamp, "setup-project", "released project")
-    for path in target.rglob("*"):
-        assert not path.is_symlink(), (
-            f"released project produced a symbolic link: {path}"
-        )
 
     edited_setup_relative = Path(
         *CANONICAL_SKILLS_ROOT,
@@ -413,11 +400,6 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     edited_setup = target / edited_setup_relative
     user_edit = b"\n<!-- user-edited setup conventions -->\n"
     edited_setup.write_bytes(edited_setup.read_bytes() + user_edit)
-    edited_stub_relative = Path(".claude") / "skills" / "tdd" / "SKILL.md"
-    edited_stub = target / edited_stub_relative
-    assert edited_stub.is_file(), "released project omitted the tdd Pointer Stub"
-    user_stub_edit = b"\n<!-- user-edited pointer stub -->\n"
-    edited_stub.write_bytes(edited_stub.read_bytes() + user_stub_edit)
 
     before_upgrade = _snapshot(target)
     old_provenance = _base_provenance(old_stamp, "old generation")
@@ -510,14 +492,6 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
     )
     assert "Skipped (user-modified)" in real_upgrade.stdout
     assert edited_setup_relative.as_posix() in real_upgrade.stdout
-    assert edited_stub.read_bytes().endswith(user_stub_edit), (
-        "upgrade overwrote the user-edited Pointer Stub"
-    )
-    assert edited_stub.parent.is_dir()
-    assert not edited_stub.parent.is_symlink()
-    assert not edited_stub.parent.is_junction()
-    assert "Preserved (obsolete, user-modified)" in real_upgrade.stdout
-    assert edited_stub_relative.as_posix() in real_upgrade.stdout
     assert "setup-all" not in _component_item_ids(new_stamp, "skills", "real upgrade")
     assert "mattpocock" in _component_item_ids(new_stamp, "skills", "real upgrade")
     assert not _component_item_ids(new_stamp, "docs", "real upgrade")
@@ -590,15 +564,13 @@ def test_upgrade_from_released_n_minus_one(tmp_path: Path) -> None:
         "post-upgrade check",
         ["check", str(target), "--json"],
         cwd=tmp_path,
-        expected_exit_codes=frozenset({7}),
     )
     post_check_report = _json_report(post_check, "post-upgrade check")
-    drifts = post_check_report.get("drifts")
-    assert isinstance(drifts, list) and drifts, (
-        "post-upgrade check did not report the preserved Pointer Stub as drift"
+    assert post_check_report.get("clean") is True, (
+        "post-upgrade check did not report a clean project"
     )
-    assert any("tdd" in str(drift) for drift in drifts), (
-        "post-upgrade check omitted the preserved tdd Pointer Stub: " + repr(drifts)
+    assert post_check_report.get("drifts") == [], (
+        "post-upgrade check reported unexpected drift"
     )
     if reference_provenance != old_provenance:
         assert "advis" in json.dumps(post_check_report).casefold(), (
