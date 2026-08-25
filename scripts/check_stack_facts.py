@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check dev-ready's generated upstream claims against the generated tree."""
+"""Check dev-ready-authored upstream claims against the generated tree."""
 
 from __future__ import annotations
 
@@ -12,24 +12,25 @@ from typing import Literal, NamedTuple
 
 
 # This is a claim-to-source mapping, not a second copy of AGENTS.md.  Claims
-# are matched case-insensitively in the generated file; source needles are the
-# upstream representation of the same fact and may use the project's names.
+# are matched case-insensitively in the authored claim file; source needles are
+# the upstream representation of the same fact and may use the project's names.
 class SourceFact(NamedTuple):
-    """The upstream path and evidence for one generated claim."""
+    """The upstream path and evidence for one authored claim."""
 
     path: str
     needles: tuple[str, ...]
     kind: Literal["file", "directory"] = "file"
 
 
-class GeneratedClaimFact(NamedTuple):
-    """One generated claim and the upstream evidence that keeps it true."""
+class ClaimFact(NamedTuple):
+    """One authored claim and the upstream evidence that keeps it true."""
 
     label: str
-    generated_path: str
+    claim_path: str
     claim_needles: tuple[str, ...]
     sources: tuple[SourceFact, ...]
     forbidden_sources: tuple[SourceFact, ...] = ()
+    claim_root: Literal["project", "repository"] = "project"
 
 
 def _file(path: str, *needles: str) -> SourceFact:
@@ -118,7 +119,7 @@ _SETUP_PROJECT_EMAIL = (
     ".agents/skills/setup-project/email-and-error-reporting.md"
 )
 SETUP_PROJECT_FACTS = (
-    GeneratedClaimFact(
+    ClaimFact(
         "setup-project superuser lifecycle",
         _SETUP_PROJECT_SKILL,
         (
@@ -142,7 +143,7 @@ SETUP_PROJECT_FACTS = (
             ),
         ),
     ),
-    GeneratedClaimFact(
+    ClaimFact(
         "setup-project required superuser settings",
         _SETUP_PROJECT_SKILL,
         ("required settings and cannot simply be deleted",),
@@ -159,7 +160,7 @@ SETUP_PROJECT_FACTS = (
             ),
         ),
     ),
-    GeneratedClaimFact(
+    ClaimFact(
         "setup-project SMTP defaults",
         _SETUP_PROJECT_EMAIL,
         ("SMTP_PORT=587", "SMTP_TLS=True", "SMTP_SSL=False"),
@@ -173,7 +174,7 @@ SETUP_PROJECT_FACTS = (
             ),
         ),
     ),
-    GeneratedClaimFact(
+    ClaimFact(
         "setup-project email and error-reporting settings",
         _SETUP_PROJECT_EMAIL,
         (
@@ -220,7 +221,7 @@ SETUP_PROJECT_FACTS = (
             _file("backend/app/core/config.py", "settings = Settings()"),
         ),
     ),
-    GeneratedClaimFact(
+    ClaimFact(
         "setup-project deployment boundary",
         _SETUP_PROJECT_SKILL,
         (
@@ -269,6 +270,28 @@ SETUP_PROJECT_FACTS = (
         (_file(".env", "DOCKER_IMAGE_BACKEND=", "DOCKER_IMAGE_FRONTEND="),),
     ),
 )
+
+REPOSITORY_CLAIM_FACTS = (
+    ClaimFact(
+        "Generation Skill fixed stack",
+        "skills/dev-ready/SKILL.md",
+        (
+            "Every dev-ready project uses FastAPI, React, PostgreSQL, and "
+            "Docker Compose",
+            "Every dev-ready project has a frontend",
+            "The frontend is React",
+        ),
+        (
+            STACK_FACTS["FastAPI"],
+            STACK_FACTS["React"],
+            STACK_FACTS["PostgreSQL"],
+            STACK_FACTS["Docker Compose"],
+        ),
+        claim_root="repository",
+    ),
+)
+
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
 # FR-38's login disclosure. The generated `README.md` tells the user which email
@@ -443,25 +466,30 @@ def _forbidden_source_problem(project_dir: Path, source: SourceFact) -> str | No
     return None
 
 
-def _generated_claim_failures(project_dir: Path) -> list[str]:
+def _claim_failures(
+    project_dir: Path,
+    repository_root: Path,
+    facts: Sequence[ClaimFact],
+) -> list[str]:
     failures: list[str] = []
-    for fact in SETUP_PROJECT_FACTS:
-        generated_path = project_dir / fact.generated_path
-        if not generated_path.is_file():
+    for fact in facts:
+        claim_root = repository_root if fact.claim_root == "repository" else project_dir
+        claim_path = claim_root / fact.claim_path
+        if not claim_path.is_file():
             failures.append(
-                f"{fact.label}: generated claim file missing: {fact.generated_path}"
+                f"{fact.label}: authored claim file missing: {fact.claim_path}"
             )
             continue
         try:
-            generated_text = generated_path.read_text(encoding="utf-8")
+            claim_text = claim_path.read_text(encoding="utf-8")
         except (OSError, UnicodeError):
             failures.append(
-                f"{fact.label}: generated claim file unreadable: {fact.generated_path}"
+                f"{fact.label}: authored claim file unreadable: {fact.claim_path}"
             )
             continue
-        if not _contains_all_needles(generated_text, fact.claim_needles):
+        if not _contains_all_needles(claim_text, fact.claim_needles):
             failures.append(
-                f"{fact.label}: generated claim missing from {fact.generated_path}"
+                f"{fact.label}: authored claim missing from {fact.claim_path}"
             )
             continue
         for source in fact.sources:
@@ -644,8 +672,12 @@ def _superuser_disclosure_failures(project_dir: Path) -> list[str]:
     return []
 
 
-def check_stack_facts(project_dir: Path) -> list[str]:
-    """Return dev-ready-generated claims that do not hold in project_dir."""
+def check_stack_facts(
+    project_dir: Path, *, repository_root: Path | None = None
+) -> list[str]:
+    """Return dev-ready-authored claims that do not hold in project_dir."""
+    if repository_root is None:
+        repository_root = _REPOSITORY_ROOT
     agents_path = project_dir / "AGENTS.md"
     if not agents_path.is_file():
         return ["AGENTS.md is missing"]
@@ -667,15 +699,20 @@ def check_stack_facts(project_dir: Path) -> list[str]:
             failures.append(claim)
 
     failures.extend(_superuser_disclosure_failures(project_dir))
+    failures.extend(
+        _claim_failures(project_dir, repository_root, REPOSITORY_CLAIM_FACTS)
+    )
     if (project_dir / ".env").is_file():
-        failures.extend(_generated_claim_failures(project_dir))
+        failures.extend(_claim_failures(project_dir, repository_root, SETUP_PROJECT_FACTS))
     return failures
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the stack-facts check for one generated project directory."""
     parser = argparse.ArgumentParser(
-        description="Check generated upstream claims against the generated project tree."
+        description=(
+            "Check dev-ready-authored upstream claims against the generated project tree."
+        )
     )
     parser.add_argument(
         "project_dir",

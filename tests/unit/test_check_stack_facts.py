@@ -51,6 +51,20 @@ SMTP_PORT=587 SMTP_TLS=True SMTP_SSL=False
 Email and error-reporting changes take effect after an application restart.
 """
 
+_FIXED_STACK_FACTS = """\
+Every dev-ready project uses FastAPI, React, PostgreSQL, and Docker Compose.
+Every dev-ready project has a frontend.
+The frontend is React.
+"""
+
+
+def _write_repository(tmp_path: Path, *, skill_text: str = _FIXED_STACK_FACTS) -> Path:
+    repository = tmp_path / "repository"
+    skill = repository / "skills" / "dev-ready" / "SKILL.md"
+    skill.parent.mkdir(parents=True)
+    skill.write_text(skill_text, encoding="utf-8")
+    return repository
+
 
 def _write_project(
     tmp_path: Path,
@@ -252,6 +266,61 @@ strict = true
 
 def test_project_with_all_mapped_facts_is_clean(tmp_path: Path) -> None:
     assert check_stack_facts.check_stack_facts(_write_project(tmp_path)) == []
+
+
+def test_repository_claim_with_upstream_evidence_is_clean(tmp_path: Path) -> None:
+    assert (
+        check_stack_facts.check_stack_facts(
+            _write_project(tmp_path), repository_root=_write_repository(tmp_path)
+        )
+        == []
+    )
+
+
+def test_repository_claim_fails_when_upstream_evidence_is_missing(
+    tmp_path: Path,
+) -> None:
+    project = _write_project(tmp_path)
+    pyproject = project / "backend" / "pyproject.toml"
+    pyproject.write_text(
+        pyproject.read_text(encoding="utf-8").replace('"psycopg", ', ""),
+        encoding="utf-8",
+    )
+
+    assert check_stack_facts.check_stack_facts(
+        project, repository_root=_write_repository(tmp_path)
+    ) == [
+        "PostgreSQL",
+        "Generation Skill fixed stack: upstream evidence missing from "
+        "backend/pyproject.toml",
+    ]
+
+
+def test_repository_claim_fails_when_authored_claim_is_missing(tmp_path: Path) -> None:
+    assert check_stack_facts.check_stack_facts(
+        _write_project(tmp_path),
+        repository_root=_write_repository(tmp_path, skill_text="No stack claim.\n"),
+    ) == [
+        "Generation Skill fixed stack: authored claim missing from "
+        "skills/dev-ready/SKILL.md"
+    ]
+
+
+def test_repository_claim_is_checked_when_generated_env_is_missing(
+    tmp_path: Path,
+) -> None:
+    project = _write_project(tmp_path, env_email=None)
+    failures = check_stack_facts.check_stack_facts(
+        project,
+        repository_root=_write_repository(tmp_path, skill_text="No stack claim.\n"),
+    )
+
+    assert len(failures) == 2
+    assert ".env is missing or unreadable" in failures[0]
+    assert failures[1] == (
+        "Generation Skill fixed stack: authored claim missing from "
+        "skills/dev-ready/SKILL.md"
+    )
 
 
 def test_missing_backend_type_checker_returns_only_that_claim(tmp_path: Path) -> None:
@@ -544,7 +613,7 @@ def test_setup_project_authored_smtp_claim_drift_is_reported(tmp_path: Path) -> 
     )
 
     assert check_stack_facts.check_stack_facts(project) == [
-        "setup-project SMTP defaults: generated claim missing from "
+        "setup-project SMTP defaults: authored claim missing from "
         ".agents/skills/setup-project/email-and-error-reporting.md"
     ]
 
@@ -696,11 +765,11 @@ def test_unreadable_generated_claim_file_has_an_accurate_diagnostic(
     failures = check_stack_facts.check_stack_facts(project)
 
     assert failures == [
-        "setup-project superuser lifecycle: generated claim file unreadable: "
+        "setup-project superuser lifecycle: authored claim file unreadable: "
         ".agents/skills/setup-project/SKILL.md",
-        "setup-project required superuser settings: generated claim file unreadable: "
+        "setup-project required superuser settings: authored claim file unreadable: "
         ".agents/skills/setup-project/SKILL.md",
-        "setup-project deployment boundary: generated claim file unreadable: "
+        "setup-project deployment boundary: authored claim file unreadable: "
         ".agents/skills/setup-project/SKILL.md",
     ]
 
@@ -715,11 +784,11 @@ def test_non_utf8_generated_claim_file_has_an_accurate_diagnostic(
     failures = check_stack_facts.check_stack_facts(project)
 
     assert failures == [
-        "setup-project superuser lifecycle: generated claim file unreadable: "
+        "setup-project superuser lifecycle: authored claim file unreadable: "
         ".agents/skills/setup-project/SKILL.md",
-        "setup-project required superuser settings: generated claim file unreadable: "
+        "setup-project required superuser settings: authored claim file unreadable: "
         ".agents/skills/setup-project/SKILL.md",
-        "setup-project deployment boundary: generated claim file unreadable: "
+        "setup-project deployment boundary: authored claim file unreadable: "
         ".agents/skills/setup-project/SKILL.md",
     ]
 

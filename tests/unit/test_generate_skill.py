@@ -102,7 +102,7 @@ def _documented_ids(text: str, label: str) -> set[str]:
         assert label.endswith(" item")
         heading = f"{label.removesuffix(' item')} items"
 
-    section = _mapping_section(text, heading)
+    section = _section(text, heading, 3)
     if re.fullmatch(r"\s*- \(none\)\s*", section):
         return set()
     entries = re.findall(
@@ -115,9 +115,11 @@ def _documented_ids(text: str, label: str) -> set[str]:
     return {identifier for identifier, _trigger in entries}
 
 
-def _mapping_section(text: str, heading: str) -> str:
+def _section(text: str, heading: str, level: int) -> str:
+    prefix = "#" * level
     match = re.search(
-        rf"^### {re.escape(heading)}\r?\n(?P<section>.*?)(?=^### |^## |\Z)",
+        rf"^{prefix} {re.escape(heading)}\r?\n"
+        rf"(?P<section>.*?)(?=^#{{1,{level}}} |\Z)",
         text,
         flags=re.MULTILINE | re.DOTALL,
     )
@@ -309,6 +311,83 @@ def test_skill_leads_with_interview_before_selection_flags() -> None:
         "--flow",
     )
     assert not any(flag in pre_interview for flag in selection_flags)
+
+
+def test_skill_declares_fixed_project_facts_without_versions() -> None:
+    facts = _section(_skill_text(), "Fixed project facts", 3)
+    normalized = " ".join(facts.split())
+
+    assert "FastAPI" in normalized
+    assert "React" in normalized
+    assert "PostgreSQL" in normalized
+    assert "Docker Compose" in normalized
+    assert "Every dev-ready project has a frontend." in normalized
+    assert "The frontend is React." in normalized
+    assert not re.search(r"\b(?:v?\d+)(?:\.\d+)+\b", facts)
+
+
+def test_interview_resolves_all_seven_must_asks_in_order() -> None:
+    interview = _section(_skill_text(), "Interview", 2)
+    normalized = " ".join(interview.split())
+    must_asks = (
+        "1. **Project name and destination**",
+        "2. **How much the developer wants to steer**",
+        "3. **Whether the project handles accounts, payments, or personal data**",
+        "4. **Whether automated React health checks or browser-level tests are wanted**",
+        "5. **Interface ambition, and which product's design language to reference**",
+        "6. **Whether context-saving behaviour is wanted**",
+        "7. **Which coding agents are in use**",
+    )
+
+    positions = [interview.index(must_ask) for must_ask in must_asks]
+    assert positions == sorted(positions)
+    assert "A Must-Ask is an obligation to resolve, not to utter." in normalized
+    assert "do not ask them to repeat" in normalized
+    assert "every Must-Ask" in normalized
+    assert "account for every Must-Ask out loud in the proposal" in normalized
+    assert "at most three follow-up questions" not in normalized
+
+
+def test_interview_asks_for_destination_and_never_reasks_fixed_stack() -> None:
+    text = _skill_text()
+    interview = _section(text, "Interview", 2)
+    fixed_facts = " ".join(_section(text, "Fixed project facts", 3).split())
+    destination = _section(text, "Resolve the destination safely", 2)
+    normalized = " ".join(interview.split())
+
+    assert "Ask the developer for both the project name and destination" in normalized
+    assert "repeat both in the proposed command" in normalized
+    assert "Choose a valid project name" not in text
+    assert "never ask the developer to choose or confirm them" in fixed_facts
+    for known_fact in ("FastAPI", "React", "PostgreSQL", "Docker Compose", "frontend"):
+        assert known_fact in fixed_facts
+    assert "non-empty" in destination
+    assert "stop and ask the user to choose another destination" in destination
+
+
+def test_interview_keeps_design_answers_independent_and_never_guesses() -> None:
+    interview = _section(_skill_text(), "Interview", 2)
+    normalized = " ".join(interview.split())
+
+    assert "two independent sub-questions" in normalized
+    assert "Neither answer implies the other" in normalized
+    assert "Match only a product name the developer states" in normalized
+    assert "never guess a near-miss identifier" in normalized
+    assert 'say "no matching Design Reference" out loud' in normalized
+
+
+def test_quality_must_asks_are_unconditional_but_stay_out_of_yes_defaults() -> None:
+    quality = _section(_skill_text(), "quality items", 3)
+    triggers = dict(
+        re.findall(r"^- `([^`]+)`:\s*(\S.*)$", quality, flags=re.MULTILINE)
+    )
+
+    assert triggers["react-doctor"] == "You want automated React health checks."
+    assert triggers["webapp-testing"] == "You want browser-level tests for the web app."
+
+    args = build_parser().parse_args(["init", "skill-test", "--yes"])
+    answers = build_answers(args, CATALOG)
+    assert {"react-doctor", "webapp-testing"}.isdisjoint(answers.skills_items)
 
 
 def test_distribution_skill_is_not_a_catalog_or_generated_overlay_asset(tmp_path: Path) -> None:

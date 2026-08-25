@@ -9,18 +9,45 @@ Use `uvx dev-ready init` only for creating a new project. Do not use it to modif
 
 ## Interview
 
-Start with one opening question: ask the developer what they are building and
-how they work with coding agents.
-Ask at most three follow-up questions, and only about choices the answer left
-ambiguous. Do not use a fixed questionnaire for every Category. Infer relevant
-Categories and items from the developer's words, and ask about context-saving
-preferences when the project description cannot determine Token Optimize.
+A Must-Ask is an obligation to resolve, not to utter. If the developer already
+answered one in their own words, do not ask them to repeat that information.
+Resolve all seven below, and account for every Must-Ask out loud in the proposal.
+This is an interview, not a fixed questionnaire.
 
-If the developer already described the project and agent choices, do not ask
-them to repeat that information. Present one proposed command with one-line
-reasons for every selected Category, item, Engineering Flow, and Agent Target.
-Hold the proposal for approval and revise it in plain language if the developer
-disagrees with a selection.
+### Fixed project facts
+
+Declare these facts; never ask the developer to choose or confirm them. Every
+dev-ready project uses FastAPI, React, PostgreSQL, and Docker Compose. Every
+dev-ready project has a frontend. The frontend is React.
+
+### Seven Must-Asks
+
+Resolve these in order:
+
+1. **Project name and destination** — Ask the developer for both the project
+   name and destination, and repeat both in the proposed command.
+2. **How much the developer wants to steer** — Select the Engineering Flow by
+   matching their answer to the exact criteria in `Engineering Flows` below.
+3. **Whether the project handles accounts, payments, or personal data** — Use
+   the answer to decide whether to select `security-audit`.
+4. **Whether automated React health checks or browser-level tests are wanted**
+   — Resolve `react-doctor` and `webapp-testing` independently.
+5. **Interface ambition, and which product's design language to reference** —
+   Treat these as two independent sub-questions: the first resolves
+   `frontend-design`; the second resolves a `design-<id>`. Neither answer
+   implies the other. Match only a product name the developer states. An
+   aesthetic without a named product is not a match: explain that, optionally
+   offer a few named candidates, and never guess a near-miss identifier. When
+   none matches, say "no matching Design Reference" out loud without dropping
+   the interface-ambition answer.
+6. **Whether context-saving behaviour is wanted** — Resolve the Token Optimize
+   items `caveman` and `code-memory` from the answer.
+7. **Which coding agents are in use** — Resolve the answer against the Agent
+   Target and standard-compliant lists as described below.
+
+Present one proposed command with one-line reasons for every selected Category,
+item, Engineering Flow, and Agent Target. Hold the proposal for approval and
+revise it in plain language if the developer disagrees with a selection.
 
 The approved command is always non-interactive and always includes `--yes`.
 The interview replaces dev-ready's own prompts; do not compose a command that
@@ -44,7 +71,10 @@ The installed skill source is `skills/dev-ready/SKILL.md`.
 
 ## Resolve the destination safely
 
-Choose a valid project name using letters, digits, `.`, `_`, or `-`, starting with a letter or digit. Resolve the exact `--dir` path before running anything.
+Ask the developer for a valid project name using letters, digits, `.`, `_`, or
+`-`, starting with a letter or digit, and for the exact destination. Repeat both
+in the proposed command, including the resolved `--dir` path, before running
+anything.
 
 Inspect the destination first. If it exists and is non-empty, stop and ask the user to choose another destination or resolve the existing content themselves. Do not delete, empty, overwrite, or automatically retry into a non-empty target.
 
@@ -88,8 +118,8 @@ Surface the failure and stop; do not guess a replacement.
 
 ### quality items
 
-- `react-doctor`: You are building or changing a React frontend and want automated React health checks.
-- `webapp-testing`: You need browser-level tests for the web app.
+- `react-doctor`: You want automated React health checks.
+- `webapp-testing`: You want browser-level tests for the web app.
 
 ### design items
 
