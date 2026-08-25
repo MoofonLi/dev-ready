@@ -6,6 +6,7 @@ import json
 import re
 import shlex
 from pathlib import Path
+from typing import Literal, NamedTuple
 
 import pytest
 
@@ -47,6 +48,27 @@ EXPECTED_RETIRED_DEV_IDS = {
     "code-review",
     "setup-all",
 }
+
+
+class RepeatedFlowSurface(NamedTuple):
+    path: Path
+    flow_id: str
+    field: Literal["description", "choose_when"]
+    value_index: int | None
+    minimum_count: int
+
+
+REPEATED_FLOW_SURFACES = (
+    RepeatedFlowSurface(SKILL_PATH, "mattpocock", "description", None, 1),
+    RepeatedFlowSurface(SKILL_PATH, "mattpocock", "choose_when", None, 1),
+    RepeatedFlowSurface(SKILL_PATH, "superpowers", "description", None, 1),
+    RepeatedFlowSurface(SKILL_PATH, "superpowers", "choose_when", None, 1),
+    RepeatedFlowSurface(README_PATHS[0], "mattpocock", "description", None, 2),
+    RepeatedFlowSurface(README_PATHS[0], "superpowers", "description", None, 2),
+    RepeatedFlowSurface(README_PATHS[1], "mattpocock", "description", None, 1),
+    RepeatedFlowSurface(README_PATHS[1], "superpowers", "description", None, 1),
+    RepeatedFlowSurface(SUBMISSION_PATH, "superpowers", "choose_when", 0, 1),
+)
 
 
 def _skill_text() -> str:
@@ -199,6 +221,23 @@ def test_skill_category_and_item_ids_match_the_current_manifest() -> None:
         )
         with pytest.raises(InvalidArgumentsError, match="mandatory Engineering Flow"):
             build_answers(args, CATALOG)
+
+
+@pytest.mark.parametrize("surface", REPEATED_FLOW_SURFACES)
+def test_repeated_flow_strings_quote_the_manifest_verbatim(
+    surface: RepeatedFlowSurface,
+) -> None:
+    flow = next(item for item in CATALOG.loops() if item.id == surface.flow_id)
+    values = (
+        (flow.description,)
+        if surface.field == "description"
+        else flow.choose_when
+    )
+    if surface.value_index is not None:
+        values = (values[surface.value_index],)
+    text = surface.path.read_text(encoding="utf-8")
+    for value in values:
+        assert text.count(value) >= surface.minimum_count, (*surface, value)
 
 
 def test_skill_installation_and_public_docs_stay_synchronized() -> None:
@@ -387,10 +426,8 @@ def test_submission_positive_cases_parse_through_the_real_cli() -> None:
     commands = _init_examples(submission)
     assert len(commands) == 6
     assert any("--flow superpowers" in command for command in commands)
-    assert (
-        "The agent starts each step on its own, and implementation can be split "
-        "across fresh subagents."
-    ) in submission
+    superpowers = next(item for item in CATALOG.loops() if item.id == "superpowers")
+    assert superpowers.choose_when[0] in submission
     for command in commands:
         tokens = shlex.split(command)
         assert tokens[:2] == ["uvx", "dev-ready"]

@@ -74,7 +74,7 @@ uvx dev-ready init dual-app --yes --agents claude,windsurf --dir ./dual-app
 A developer says, "I want the agent to start each step on its own, and
 implementation can be split across fresh subagents."
 
-The interview rule is the `superpowers` Engineering Flow criterion: "The agent starts each step on its own, and implementation can be split across fresh subagents."
+The interview rule is the `superpowers` Engineering Flow criterion: "Choose this flow when its model-driven `invocation` should start each chain entry after setup."
 Put it in `--flow`. The approved command is non-interactive and includes `--yes`:
 
 ```shell

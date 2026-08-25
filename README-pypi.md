@@ -22,9 +22,8 @@ A generated project based on
   `.agents/skills/`, readable directly by Cursor, Codex, Cline, Zed, OpenCode,
   and other standard-compliant agents.
 - A named Engineering Flow, chosen first, from two selectable methods:
-  `mattpocock` (you start each step yourself, and the work stays in one
-  session) or `superpowers` (the agent starts each step on its own, and
-  implementation can be split across fresh subagents).
+  `mattpocock`: “A user-driven Engineering Flow whose steps stay in one working session.”
+  or `superpowers`: “A model-driven Engineering Flow whose implementation can fan out across fresh subagents.”
 - A lean Default Set: that Engineering Flow plus the project’s own architecture
   and requirements skeletons. Every Enhancement is off by default.
 - A setup step in every project, so the login, email, and error reporting can

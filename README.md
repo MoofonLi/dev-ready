@@ -28,9 +28,8 @@ overlay:
   `.agents/skills/`. Cursor, Codex, Cline, Zed, OpenCode, and other
   standard-compliant agents read these locations without an Agent Target.
 - One named Engineering Flow, chosen first, from two selectable methods:
-  `mattpocock` (you start each step yourself, and the work stays in one
-  session) or `superpowers` (the agent starts each step on its own, and
-  implementation can be split across fresh subagents). `addyosmani` is
+  `mattpocock`: “A user-driven Engineering Flow whose steps stay in one working session.”
+  or `superpowers`: “A model-driven Engineering Flow whose implementation can fan out across fresh subagents.” `addyosmani` is
   announced as coming soon.
 - A lean Default Set: that Engineering Flow plus the project’s own
   `docs/architecture.md` and `docs/requirements.md` skeletons. Every Enhancement
@@ -74,8 +73,8 @@ Every generated project is built around one of two Engineering Flows, chosen
 first. The agent reads the selected flow from `AGENTS.md` on the first turn of
 every session.
 
-- **`mattpocock`**: You start each step yourself, and the work stays in one session.
-- **`superpowers`**: The agent starts each step on its own, and implementation can be split across fresh subagents.
+- **`mattpocock`**: A user-driven Engineering Flow whose steps stay in one working session.
+- **`superpowers`**: A model-driven Engineering Flow whose implementation can fan out across fresh subagents.
 
 `addyosmani` is announced as coming soon. `--yes` resolves `mattpocock`.
 

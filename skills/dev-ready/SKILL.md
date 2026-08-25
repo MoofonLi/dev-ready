@@ -63,8 +63,14 @@ start of each line is the value to place in the corresponding selection flag.
 
 ### Engineering Flows
 
-- `mattpocock`: You start each step yourself, and the work stays in one session.
-- `superpowers`: The agent starts each step on its own, and implementation can be split across fresh subagents.
+- `mattpocock`: A user-driven Engineering Flow whose steps stay in one working session.
+  - Choose this flow when you want to start each `chain` entry yourself.
+  - Choose it when the work's shape needs `grill-with-docs`, `grilling`, or `domain-modeling` before specification.
+  - Choose it when one session should carry the work through `to-spec`, `to-tickets`, and `implement`.
+- `superpowers`: A model-driven Engineering Flow whose implementation can fan out across fresh subagents.
+  - Choose this flow when its model-driven `invocation` should start each chain entry after setup.
+  - Choose it when implementation should fan out through `subagent-driven-development` or `executing-plans`.
+  - Choose it when `verification-before-completion` should run before work is declared complete.
 
 `addyosmani` is an announced Engineering Flow and cannot be selected yet. Do not
 put it in `--flow`. `--flow spec-loop` exits 2 with `Engineering Flow id 'spec-loop' was renamed to 'mattpocock'`.
