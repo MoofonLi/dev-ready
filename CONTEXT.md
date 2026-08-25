@@ -92,16 +92,18 @@ _Avoid_: trigger mode, auto-invoke, activation, enforcement
 **Flow Selection Criteria**:
 The short, ordered list of observable situations that tell a user which
 [[Engineering Flow]] to pick, declared per flow in the manifest as `choose_when`
-(ADR-024, as amended 2026-08-23). Every clause must name a manifest field the
-flow declares — [[Flow Invocation]], [[Flow Chain]], `steps` — or one of that
-flow's steps by id, and a test resolves each named id against the flow's own
-`steps`. Claims about the reader's coding agent, the reader's team, or upstream
-behaviour dev-ready does not ship are excluded permanently. One declaration
-feeds the three surfaces a user meets *before* choosing: the comparison printed
-above the interactive flow menu, the [[Generation Skill]]'s interview, and
-`README.md`. The per-flow document is not one of them — it is written only when
-its flow is already selected. Distinct from the flow's `description`, which is
-the one-line menu label.
+(ADR-024, as amended 2026-08-23 and 2026-08-25). Every clause must name a
+manifest field the flow declares — [[Flow Invocation]], [[Flow Chain]], `steps`
+— or one of that flow's steps by id, **written in backticks**: a test runs both
+directions, failing a clause that names nothing and a backticked name the flow
+does not declare. Claims about the reader's coding agent, the reader's team, or
+upstream behaviour dev-ready does not ship are excluded permanently. One
+declaration feeds the three surfaces a user meets *before* choosing: the
+comparison printed above the interactive flow menu, the [[Generation Skill]]'s
+interview, and `README.md`. The per-flow document is not one of them — it is
+written only when its flow is already selected. Distinct from the flow's
+`description`, the one-line menu label, which says what the flow *is* and never
+when to pick it.
 _Avoid_: flow recommendation, flow comparison, which-flow guidance, pick-this-if
 
 **Setup Step**:
@@ -163,6 +165,15 @@ never as second copies. From v0.12 the interview also recommends an [[Engineerin
 is why no second interviewing skill may exist — two would question the user
 twice.
 _Avoid_: setup skill, init skill, the dev-ready skill, bootstrap skill, generate skill
+
+**Must-Ask**:
+One of the fixed set of things the [[Generation Skill]]'s interview must resolve
+before it proposes a command — the only answers that can change what the command
+says. An obligation to *resolve*, not to utter: one the developer has already
+answered is not asked again, but every one is accounted for out loud in the
+proposal, so no selection is made silently. Its opposite is a known fact, which
+the skill states and never asks.
+_Avoid_: required question, mandatory prompt, questionnaire item, checklist
 
 **Enhancement**:
 A Catalog Item outside the Spec Loop, optionally declaring the [[Mount Point]]

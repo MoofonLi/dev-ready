@@ -310,3 +310,57 @@ FR-48's third flow becomes a data addition on this surface rather than a rewrite
 of it. The excluded claims are excluded permanently: dev-ready does not tell a
 user that their coding agent is weak, and does not describe `addyosmani` before
 FR-48 has read it.
+
+---
+
+## 2026-08-25 amendment — a name is written in backticks, and the guard runs in both directions
+
+Decided in the `grill-with-docs` session of 2026-08-25 opening v0.13 Phase 1,
+run against the code this ADR names. The 2026-08-23 amendment's rule is
+unchanged and is not reopened: every clause of a flow's
+[[Flow Selection Criteria]] must name a manifest field the flow declares —
+`invocation`, `chain`, `steps` — or one of that flow's steps by id. What that
+amendment did not fix is how a test recognises a name, and without that the rule
+is only half executable.
+
+### The guard as worded runs one way
+
+The 2026-08-23 amendment specifies "a test resolves every step id appearing in a
+flow's criteria against that flow's declared `steps` and fails the build on a
+name that is not there". That rejects a wrong name and says nothing about a
+clause that names nothing at all — so the sentence this ADR excludes **by name**,
+"your agent is weaker, so pick this one", passes a guard written to that
+wording. The half of the rule that was the reason for writing it is the half
+left to a reviewer.
+
+Matching bare tokens does not close it. `implement` is both a `mattpocock` step
+id and an ordinary English word, so a clause using the verb would resolve to a
+step it does not mean — a false pass, which is the failure direction that
+matters here.
+
+### The decision
+
+**A name is written in backticks, and the guard runs in both directions.** Every
+`choose_when` clause must contain at least one backticked token, and every
+backticked token in a clause must resolve either to one of that flow's own
+declared `steps` or to one of the literal field names `invocation`, `chain`,
+`steps`. A clause that names nothing fails the build; a clause naming something
+the flow does not declare fails the build.
+
+- **Considered: structured clause objects** (`{text, names: [...]}`) — rejected.
+  It re-types `choose_when` from a list of strings into nested records, and every
+  surface that renders criteria would then read a field out of a record rather
+  than print the string it was handed. The guard gains nothing over a convention
+  that is visible in the string itself.
+- **Considered: leaving the second direction to review** — rejected for the
+  reason the 2026-08-23 amendment gives for executing the rule at all. This
+  repository has twice recorded believing a rule was enforced when it was not
+  (the 2026-08-13 amendment's loader assumption, the 2026-08-20 correction's
+  `steps`/`paths` assumption); a guard that covers one direction and is described
+  as covering the rule is how that happens a third time.
+
+Consequences: the convention costs a writing rule and buys rendering. Backticks
+already render as code in `skills/dev-ready/SKILL.md` and in both READMEs, and
+they give FR-51's frameless comparison a span it can style without parsing
+prose. FR-48 inherits the rule unchanged when it authors `addyosmani`'s
+criteria, which is the property the 2026-08-23 amendment was cut to buy.
