@@ -23,6 +23,7 @@ from dev_ready.generate import (
     generate,
 )
 from dev_ready.manifest import ComponentCatalog, load_default_manifest
+from dev_ready.presentation import detect_presentation_style
 from dev_ready.prompts import (
     Answers,
     PartialAnswers,
@@ -305,13 +306,18 @@ def _build_partial_answers(
 def _run_init(args: argparse.Namespace) -> int:
     manifest = load_default_manifest()
     pin = manifest.upstream["base_template"]
+    presentation_style = detect_presentation_style(sys.stdout)
 
     if args.yes:
         answers = build_answers(args, manifest.components)
     else:
         partial = _build_partial_answers(args, manifest.components)
-        answers = collect_answers(partial, catalog=manifest.components)
-        if not confirm_generation(answers, pin):
+        answers = collect_answers(
+            partial,
+            catalog=manifest.components,
+            style=presentation_style,
+        )
+        if not confirm_generation(answers, pin, style=presentation_style):
             print("aborted: nothing was written", file=sys.stderr)
             return 1
 
@@ -326,7 +332,15 @@ def _run_init(args: argparse.Namespace) -> int:
         )
     finally:
         progress.close()
-    print(render_report(answers, pin, written, manifest.components))
+    print(
+        render_report(
+            answers,
+            pin,
+            written,
+            manifest.components,
+            style=presentation_style,
+        )
+    )
     return 0
 
 

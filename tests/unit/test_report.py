@@ -1,11 +1,13 @@
 """Unit tests for dev_ready.report (pure function; no filesystem, no network)."""
 
 from pathlib import Path
+import re
 
 import pytest
 
 from dev_ready.manifest import UpstreamPin, load_default_manifest
 from dev_ready.prompts import Answers, ProjectSelection
+from dev_ready.presentation import PresentationStyle
 from dev_ready.report import render
 from dev_ready.report import render_report
 
@@ -16,6 +18,7 @@ PIN = UpstreamPin(
     license="MIT",
 )
 CATALOG = load_default_manifest().components
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def test_report_summarises_written_paths_with_a_count_and_breakdown() -> None:
@@ -29,6 +32,7 @@ def test_report_summarises_written_paths_with_a_count_and_breakdown() -> None:
     ]
 
     report = render_report(answers, PIN, written)
+    normalized_report = " ".join(report.split())
 
     assert str(answers.target_dir) in report
     assert f"{PIN.repo}@{PIN.commit[:12]}" in report
@@ -36,7 +40,7 @@ def test_report_summarises_written_paths_with_a_count_and_breakdown() -> None:
     assert "root files: 2" in report
     assert "canonical agent content: 1" in report
     assert "documentation: 1" in report
-    assert "Agent Target artifacts: 1" in report
+    assert "Agent Target artifacts: 1" in normalized_report
     for path in written:
         assert str(path) not in report
     assert '"inventory" entries in .dev-ready.json' in report
@@ -50,9 +54,28 @@ def test_report_contains_runnable_next_steps() -> None:
 
     report = render_report(answers, PIN, [Path("CLAUDE.md")])
 
-    assert "next steps" in report
+    assert "Next Steps" in report
     assert f"cd {answers.target_dir}" in report
     assert "AGENTS.md" in report
+
+
+def test_report_colour_is_decoration_and_preserves_a_bracketed_destination() -> None:
+    answers = Answers(
+        project_name="my-app",
+        target_dir=Path("/projects/[draft]/my-app"),
+    )
+
+    plain = render_report(answers, PIN, [], style=PresentationStyle())
+    coloured = render_report(
+        answers,
+        PIN,
+        [],
+        style=PresentationStyle(color=True, width=80),
+    )
+
+    assert "\x1b" in coloured
+    assert _ANSI_ESCAPE.sub("", coloured) == plain
+    assert "/projects/[draft]/my-app" in coloured
 
 
 @pytest.mark.parametrize(
@@ -74,14 +97,30 @@ def test_report_names_setup_project_before_first_start(
     assert "before the first start" in report
 
 
-def test_location_next_steps_and_login_precede_overlay_summary() -> None:
+def test_actionable_steps_precede_selection_login_and_overlay_summary() -> None:
+    answers = Answers(
+        project_name="my-app",
+        target_dir=Path("/does/not/exist/my-app"),
+        selection=ProjectSelection.default_set(CATALOG),
+    )
+
+    report = render_report(answers, PIN, [Path("CLAUDE.md")], CATALOG)
+
+    assert report.index("location:") < report.index("Next Steps:")
+    assert report.index("Next Steps:") < report.index("Engineering Flow")
+    assert report.index("Engineering Flow") < report.index("standard-compliant agents")
+    assert report.index("standard-compliant agents") < report.index("First Login:")
+    assert report.index("First Login:") < report.index("Overlay Summary:")
+
+
+def test_report_separates_title_case_sections_with_blank_lines() -> None:
     answers = Answers(project_name="my-app", target_dir=Path("/does/not/exist/my-app"))
 
     report = render_report(answers, PIN, [Path("CLAUDE.md")])
 
-    assert report.index("location:") < report.index("next steps:")
-    assert report.index("next steps:") < report.index("first login:")
-    assert report.index("first login:") < report.index("overlay files written:")
+    assert "\n\nNext Steps:\n" in report
+    assert "\n\nFirst Login:\n" in report
+    assert "\n\nOverlay Summary:\n" in report
 
 
 def test_report_omits_flag_names_when_component_disabled() -> None:
@@ -225,9 +264,26 @@ def test_report_states_standard_compliant_agents_needing_no_target_selection() -
 
     report = render_report(answers, PIN, [], CATALOG)
 
-    assert "standard-compliant agents (read .agents/skills/ directly" in report
-    assert "cursor" in report
-    assert "codex" in report
+    assert "standard-compliant agents" in report
+    assert "read .agents/skills/ directly" in report
+    agent_summary = " ".join(
+        report[
+            report.index("standard-compliant agents") : report.index("\nagent targets")
+        ].split()
+    )
+    assert f"({len(CATALOG.standard_compliant_agents)};" in agent_summary
+    assert "codex, cursor, gemini-cli, …" in agent_summary
+    unfeatured_agents = set(CATALOG.standard_compliant_agents) - {
+        "codex",
+        "cursor",
+        "gemini-cli",
+    }
+    assert all(agent_id not in agent_summary for agent_id in unfeatured_agents)
+
+
+def test_report_example_agents_exist_in_the_standard_compliant_agent_list() -> None:
+    for agent_id in ("codex", "cursor", "gemini-cli"):
+        assert agent_id in CATALOG.standard_compliant_agents
 
 
 @pytest.mark.parametrize(
@@ -254,8 +310,8 @@ def test_report_is_plain_text_for_default_and_whole_catalog(
     assert [
         line
         for line in report.splitlines()
-        if line in {"next steps:", "first login:", "overlay summary:"}
-    ] == ["next steps:", "first login:", "overlay summary:"]
+        if line in {"Next Steps:", "First Login:", "Overlay Summary:"}
+    ] == ["Next Steps:", "First Login:", "Overlay Summary:"]
 
 
 def test_report_and_readme_template_disclose_the_same_superuser_email() -> None:

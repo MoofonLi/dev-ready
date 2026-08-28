@@ -8,6 +8,7 @@ unit tests do). See docs/architecture.md, Module Boundary.
 from pathlib import Path
 
 from dev_ready.manifest import CATALOG_COMPONENTS, ComponentCatalog, UpstreamPin
+from dev_ready.presentation import PresentationStyle, ScreenBlock, ScreenLine, render_screen
 from dev_ready.prompts import Answers
 
 __all__ = ["render_report"]
@@ -19,13 +20,18 @@ __all__ = ["render_report"]
 # whatever captured the command's output, and the file is already the right
 # place for it.
 _SUPERUSER_EMAIL = "admin@example.com"
-_CREDENTIAL_DISCLOSURE = (
-    "first login:",
-    f"  email:    {_SUPERUSER_EMAIL}",
-    "  password: generated per project; it is the FIRST_SUPERUSER_PASSWORD value in .env",
-    "  note:     the superuser is created on first start and is looked up by email,",
-    "            so editing FIRST_SUPERUSER_PASSWORD afterwards has no effect until",
-    "            the database is reset (docker compose down -v).",
+_STANDARD_AGENT_EXAMPLES = ("codex", "cursor", "gemini-cli")
+_CREDENTIAL_DISCLOSURE = ScreenBlock(
+    heading="First Login:",
+    lines=(
+        ScreenLine(f"  email:    {_SUPERUSER_EMAIL}"),
+        ScreenLine(
+            "  password: generated per project; it is the FIRST_SUPERUSER_PASSWORD value in .env"
+        ),
+        ScreenLine("  note:     the superuser is created on first start and is looked up by email,"),
+        ScreenLine("            so editing FIRST_SUPERUSER_PASSWORD afterwards has no effect until"),
+        ScreenLine("            the database is reset (docker compose down -v)."),
+    ),
 )
 
 
@@ -34,47 +40,52 @@ def render_report(
     pin: UpstreamPin,
     written: list[Path],
     catalog: ComponentCatalog | None = None,
+    *,
+    style: PresentationStyle = PresentationStyle(),
 ) -> str:
     """Render the full success message `cli.py` prints verbatim after generation."""
-    lines = [
-        f"project generated: {answers.project_name}",
-        f"location:  {answers.target_dir}",
-        f"upstream:  {pin.repo}@{pin.commit[:12]} ({pin.ref})",
-        *_render_selection(answers, catalog),
-        *_render_agent_targets(answers, catalog),
-        "",
-        *_render_next_steps(answers),
-        "",
-        *_CREDENTIAL_DISCLOSURE,
-        "",
-        *_render_overlay_summary(written),
-    ]
-    return "\n".join(lines)
+    blocks = (
+        ScreenBlock(
+            heading=f"project generated: {answers.project_name}",
+            lines=(
+                ScreenLine(f"location:  {answers.target_dir}", wrap=False),
+                ScreenLine(f"upstream:  {pin.repo}@{pin.commit[:12]} ({pin.ref})"),
+            ),
+        ),
+        _render_next_steps(answers),
+        _render_selection_block(answers, catalog),
+        _CREDENTIAL_DISCLOSURE,
+        _render_overlay_summary(written),
+    )
+    return render_screen(blocks, style=style)
 
 
-def _render_next_steps(answers: Answers) -> list[str]:
+def _render_next_steps(answers: Answers) -> ScreenBlock:
     steps = [
-        "next steps:",
-        f"  1. cd {answers.target_dir}",
-        "  2. ask your coding agent to run `/setup-project` before the first start",
-        "     (the superuser is created on that first start)",
+        ScreenLine(f"  1. cd {answers.target_dir}", wrap=False),
+        ScreenLine("  2. ask your coding agent to run `/setup-project` before the first start"),
+        ScreenLine("     (the superuser is created on that first start)"),
         # "docker compose watch" is the dev workflow for
         # fastapi/full-stack-fastapi-template as of the manifest-pinned commit.
         # Update when a manifest bump changes the upstream workflow.
-        "  3. docker compose watch   (see AGENTS.md for other commands)",
-        "  4. read AGENTS.md for the full picture",
+        ScreenLine(
+            "  3. docker compose watch   (see AGENTS.md for other commands)",
+            wrap=False,
+        ),
+        ScreenLine("  4. read AGENTS.md for the full picture"),
     ]
     if answers.agent_targets:
-        steps.extend(
-            (
+        steps.append(
+            ScreenLine(
                 "  5. after cloning, run `uvx dev-ready upgrade` to recreate "
                 "machine-local skill links",
+                wrap=False,
             )
         )
-    return steps
+    return ScreenBlock(heading="Next Steps:", lines=tuple(steps))
 
 
-def _render_overlay_summary(written: list[Path]) -> list[str]:
+def _render_overlay_summary(written: list[Path]) -> ScreenBlock:
     counts = {
         "root files": 0,
         "canonical agent content": 0,
@@ -95,20 +106,23 @@ def _render_overlay_summary(written: list[Path]) -> list[str]:
     # managed-file list, so the report names it. `dev-ready check` is a drift
     # verdict, not an inventory query: it does not print the paths, and it exits
     # 7 on drift. Naming it here would promise output that command never gives.
-    return [
-        "overlay summary:",
-        f"  overlay files written: {len(written)}",
-        f"  breakdown: {breakdown}",
-        '  full managed-file list: the "inventory" entries in .dev-ready.json',
-    ]
+    return ScreenBlock(
+        heading="Overlay Summary:",
+        lines=(
+            ScreenLine(f"  overlay files written: {len(written)}"),
+            ScreenLine(f"  breakdown: {breakdown}"),
+            ScreenLine('  full managed-file list: the "inventory" entries in .dev-ready.json'),
+        ),
+    )
 
 
-def _render_selection(
+def _render_selection_block(
     answers: Answers,
     catalog: ComponentCatalog | None,
-) -> list[str]:
+) -> ScreenBlock:
     if catalog is None:
-        return []
+        target_ids = ", ".join(sorted(answers.agent_targets)) or "(none)"
+        return ScreenBlock(heading=f"agent targets: {target_ids}", lines=())
     selected_ids = frozenset().union(
         *(answers.items(component) for component in CATALOG_COMPONENTS)
     )
@@ -117,28 +131,31 @@ def _render_selection(
         for item in catalog.all_items()
         if item.kind == "enhancement" and item.id in selected_ids
     )
-    return [
-        f"Engineering Flow (required): {answers.selection.development_loop}",
-        "documentation skeletons: architecture, requirements",
-        "enhancements: " + (", ".join(selected_enhancements) or "(none)"),
+    lines = [
+        ScreenLine("documentation skeletons: architecture, requirements"),
+        ScreenLine("enhancements: " + (", ".join(selected_enhancements) or "(none)")),
+        *(ScreenLine(line) for line in _render_agent_targets(answers, catalog)),
     ]
+    return ScreenBlock(
+        heading=f"Engineering Flow (required): {answers.selection.development_loop}",
+        lines=tuple(lines),
+    )
 
 
 def _render_agent_targets(
     answers: Answers,
-    catalog: ComponentCatalog | None,
+    catalog: ComponentCatalog,
 ) -> list[str]:
     lines: list[str] = []
-    if catalog is not None and catalog.standard_compliant_agents:
-        agents_str = ", ".join(sorted(catalog.standard_compliant_agents))
+    if catalog.standard_compliant_agents:
+        agents_str = ", ".join(_STANDARD_AGENT_EXAMPLES)
         lines.append(
-            f"standard-compliant agents (read .agents/skills/ directly — no target selection needed): {agents_str}"
+            "standard-compliant agents "
+            f"({len(catalog.standard_compliant_agents)}; read .agents/skills/ directly — "
+            f"no target selection needed): {agents_str}, …"
         )
     if not answers.agent_targets:
         lines.append("agent targets: (none)")
-        return lines
-    if catalog is None:
-        lines.append(f"agent targets: {', '.join(sorted(answers.agent_targets))}")
         return lines
     targets = catalog.agent_targets
 

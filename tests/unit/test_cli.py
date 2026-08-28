@@ -2,6 +2,7 @@
 
 import argparse
 import io
+import re
 import sys
 from pathlib import Path
 
@@ -30,6 +31,7 @@ from dev_ready.manifest import load_default_manifest
 from dev_ready.prompts import Answers
 
 CATALOG = load_default_manifest().components
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 class _TTYBuffer(io.StringIO):
@@ -105,7 +107,32 @@ def test_init_success_exits_0_and_prints_summary(
     assert "my-app" in out
     assert str(target_dir) in out
     assert "fastapi/full-stack-fastapi-template" in out
-    assert "next steps" in out
+    assert "Next Steps" in out
+
+
+def test_init_coloured_and_no_color_reports_have_the_same_facts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target_dir = tmp_path / "my-app"
+    coloured_output = _TTYBuffer()
+
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setattr(cli_module, "generate", lambda *args, **kwargs: [])
+    monkeypatch.setattr(cli_module.sys, "stdout", coloured_output)
+
+    assert main(["init", "my-app", "--yes", "--dir", str(target_dir)]) == 0
+    coloured = coloured_output.getvalue()
+
+    monkeypatch.setenv("NO_COLOR", "1")
+    plain_output = _TTYBuffer()
+    monkeypatch.setattr(cli_module.sys, "stdout", plain_output)
+
+    assert main(["init", "my-app", "--yes", "--dir", str(target_dir)]) == 0
+    plain = plain_output.getvalue()
+
+    assert "\x1b" in coloured
+    assert "\x1b" not in plain
+    assert _ANSI_ESCAPE.sub("", coloured) == plain
 
 
 def test_init_renders_stable_non_tty_progress_on_stderr_only(
@@ -137,6 +164,8 @@ def test_init_renders_stable_non_tty_progress_on_stderr_only(
     captured = capsys.readouterr()
 
     assert "[1/4]" not in captured.out
+    assert "Next Steps:" in captured.out
+    assert "\x1b" not in captured.out
     assert captured.err.splitlines() == [
         f"[1/4] Fetching base template (commit {cli_module.load_default_manifest().upstream['base_template'].commit})…",
         "[1/4] Fetching base template done (1.23s)",
@@ -884,4 +913,3 @@ def test_yes_path_never_imports_questionary(
     assert main(["init", "my-app", "--yes", "--dir", str(target_dir)]) == 0
 
     assert "questionary" not in sys.modules
-

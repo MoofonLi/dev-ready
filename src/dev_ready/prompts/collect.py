@@ -10,7 +10,8 @@ import sys
 from pathlib import Path
 
 from dev_ready.errors import AbortedError, InvalidArgumentsError
-from dev_ready.manifest import AgentTarget, ComponentCatalog, UpstreamPin
+from dev_ready.manifest import AgentTarget, CatalogItem, ComponentCatalog, UpstreamPin
+from dev_ready.presentation import PresentationStyle, ScreenBlock, ScreenLine, render_screen
 from dev_ready.prompts.answers import Answers, PartialAnswers, ProjectSelection, validate_project_name
 from dev_ready.prompts.asker import Asker
 
@@ -31,6 +32,7 @@ def collect_answers(
     *,
     catalog: ComponentCatalog | None = None,
     asker: Asker | None = None,
+    style: PresentationStyle = PresentationStyle(),
 ) -> Answers:
     """Fill in whatever `partial` left unanswered, via `asker` (or a real
     terminal prompt by default), and return a complete `Answers`.
@@ -66,7 +68,7 @@ def collect_answers(
         assert resolved_asker is not None
         if catalog is None:
             raise InvalidArgumentsError("catalog is required for Category selection")
-        development_loop = _prompt_development_loop(resolved_asker, catalog)
+        development_loop = _prompt_development_loop(resolved_asker, catalog, style)
         selected_item_ids = frozenset().union(
             *(
                 _prompt_category_items(resolved_asker, catalog, category_id)
@@ -104,7 +106,11 @@ def collect_answers(
 
 
 def confirm_generation(
-    answers: Answers, pin: UpstreamPin, *, asker: Asker | None = None
+    answers: Answers,
+    pin: UpstreamPin,
+    *,
+    asker: Asker | None = None,
+    style: PresentationStyle = PresentationStyle(),
 ) -> bool:
     """Print a summary of what will be written and ask the user to confirm.
 
@@ -118,7 +124,7 @@ def confirm_generation(
         )
 
     resolved_asker = asker if asker is not None else _default_asker()
-    print(_render_confirmation_summary(answers, pin))
+    print(_render_confirmation_summary(answers, pin, style=style))
     try:
         confirmed = resolved_asker.confirm("Proceed?", default=True)
     except KeyboardInterrupt:
@@ -126,7 +132,12 @@ def confirm_generation(
     return bool(confirmed)
 
 
-def _render_confirmation_summary(answers: Answers, pin: UpstreamPin) -> str:
+def _render_confirmation_summary(
+    answers: Answers,
+    pin: UpstreamPin,
+    *,
+    style: PresentationStyle = PresentationStyle(),
+) -> str:
     categories_line = ", ".join(sorted(answers.selection.categories)) or "(none)"
     selected_items = set().union(
         answers.items("skills"),
@@ -135,18 +146,44 @@ def _render_confirmation_summary(answers: Answers, pin: UpstreamPin) -> str:
     )
     items_line = ", ".join(sorted(selected_items)) or "(none)"
     targets_line = ", ".join(sorted(answers.agent_targets)) or "(none)"
-    return "\n".join(
-        [
-            "Ready to generate:",
-            f"  project name: {answers.project_name}",
-            f"  target dir:   {answers.target_dir}",
-            f"  upstream:     {pin.repo}@{pin.commit[:12]}",
-            f"  engineering flow: {answers.selection.development_loop}",
-            f"  categories:   {categories_line}",
-            f"  selected items: {items_line}",
-            f"  agent targets: {targets_line}",
-        ]
+    return render_screen(
+        (
+            ScreenBlock(
+                heading="Ready to generate:",
+                lines=(
+                    ScreenLine(f"  project name: {answers.project_name}"),
+                    ScreenLine(f"  target dir:   {answers.target_dir}", wrap=False),
+                    ScreenLine(f"  upstream:     {pin.repo}@{pin.commit[:12]}"),
+                    ScreenLine(
+                        f"  engineering flow: {answers.selection.development_loop}"
+                    ),
+                    ScreenLine(f"  categories:   {categories_line}"),
+                    ScreenLine(f"  selected items: {items_line}"),
+                    ScreenLine(f"  agent targets: {targets_line}"),
+                ),
+            ),
+        ),
+        style=style,
     )
+
+
+def _flow_caption(item: CatalogItem) -> str:
+    return f"{item.display_name} — {item.description}"
+
+
+def _render_flow_comparison(
+    catalog: ComponentCatalog,
+    *,
+    style: PresentationStyle = PresentationStyle(),
+) -> str:
+    comparison = tuple(
+        ScreenBlock(
+            heading=_flow_caption(item),
+            lines=tuple(ScreenLine(f"  - {criterion}") for criterion in item.choose_when),
+        )
+        for item in catalog.loops()
+    )
+    return render_screen(comparison, style=style)
 
 
 def _prompt_project_name(asker: Asker) -> str:
@@ -197,6 +234,7 @@ def _prompt_category_items(
 def _prompt_development_loop(
     asker: Asker,
     catalog: ComponentCatalog,
+    style: PresentationStyle,
 ) -> str:
     loop_ids = catalog.development_loop_ids
     if not loop_ids:
@@ -208,14 +246,12 @@ def _prompt_development_loop(
         else loop_ids
     )
     items = {item.id: item for item in catalog.loops()}
-    labels = {
-        f"{items[loop_id].display_name} — {items[loop_id].description}": loop_id
-        for loop_id in ordered_ids
-    }
+    labels = {_flow_caption(items[loop_id]): loop_id for loop_id in ordered_ids}
     announced_labels = tuple(
         f"{item.display_name} — Not yet available"
         for item in catalog.announced_loops
     )
+    print(_render_flow_comparison(catalog, style=style))
     try:
         selected = asker.select(
             "Select an Engineering Flow:",

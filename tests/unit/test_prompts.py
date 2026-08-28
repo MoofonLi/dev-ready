@@ -3,6 +3,7 @@
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from pathlib import Path
+import re
 from typing import TypeVar
 
 import pytest
@@ -28,6 +29,7 @@ from dev_ready.prompts import (
     confirm_generation,
 )
 from dev_ready.prompts._questionary_asker import QuestionaryAsker
+from dev_ready.presentation import PresentationStyle
 from dev_ready.overlay import render_stamp
 
 PIN = UpstreamPin(
@@ -37,6 +39,7 @@ PIN = UpstreamPin(
     license="MIT",
 )
 CATALOG = load_default_manifest().components
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def _agent_target_label(target: AgentTarget) -> str:
@@ -321,6 +324,59 @@ def test_flow_prompt_lists_announced_flows_as_disabled_choices() -> None:
     assert answers.selection.development_loop not in {
         item.id for item in CATALOG.announced_loops
     }
+
+
+def test_flow_prompt_prints_declared_criteria_but_no_announced_flow(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    collect_answers(
+        _partial(selection_explicit=False),
+        catalog=CATALOG,
+        asker=FakeAsker(
+            selects=[SELECTABLE_FLOW_LABEL],
+            checkboxes=[[], [], [], [], CLAUDE_AGENT_LABELS],
+        ),
+        style=PresentationStyle(),
+    )
+    comparison = capsys.readouterr().out
+    collect_answers(
+        _partial(selection_explicit=False),
+        catalog=CATALOG,
+        asker=FakeAsker(
+            selects=[SELECTABLE_FLOW_LABEL],
+            checkboxes=[[], [], [], [], CLAUDE_AGENT_LABELS],
+        ),
+        style=PresentationStyle(color=True, width=80),
+    )
+    coloured_comparison = capsys.readouterr().out
+    normalized_comparison = " ".join(comparison.split())
+
+    assert "\x1b" not in comparison
+    assert "\x1b" in coloured_comparison
+    assert _ANSI_ESCAPE.sub("", coloured_comparison) == comparison
+    for flow in CATALOG.loops():
+        assert flow.display_name in normalized_comparison
+        assert all(
+            " ".join(criterion.split()) in normalized_comparison
+            for criterion in flow.choose_when
+        )
+    assert all(
+        flow.display_name not in normalized_comparison
+        for flow in CATALOG.announced_loops
+    )
+
+
+def test_flow_comparison_is_absent_when_selection_was_resolved_by_flags(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    collect_answers(
+        _partial(selection=ProjectSelection.default_set(CATALOG)),
+        catalog=CATALOG,
+        asker=FakeAsker(),
+        style=PresentationStyle(color=True, width=80),
+    )
+
+    assert capsys.readouterr().out == ""
 
 
 def test_interactive_selects_superpowers_flow() -> None:
@@ -924,6 +980,29 @@ def test_confirm_prints_summary_with_project_name_and_pin(capsys: pytest.Capture
     out = capsys.readouterr().out
     assert "my-app" in out
     assert PIN.repo in out
+
+
+def test_confirmation_colour_is_decoration_only(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    confirm_generation(
+        _answers(),
+        PIN,
+        asker=FakeAsker(confirms=[True]),
+        style=PresentationStyle(),
+    )
+    plain = capsys.readouterr().out
+    confirm_generation(
+        _answers(),
+        PIN,
+        asker=FakeAsker(confirms=[True]),
+        style=PresentationStyle(color=True, width=80),
+    )
+    coloured = capsys.readouterr().out
+
+    assert "\x1b" not in plain
+    assert "\x1b" in coloured
+    assert _ANSI_ESCAPE.sub("", coloured) == plain
 
 
 def test_confirm_non_tty_without_injected_asker_raises_invalid_arguments(
