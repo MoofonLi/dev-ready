@@ -327,6 +327,18 @@ version, selected catalog items and their pins, and managed-file inventory.
 It can advance without changing Base Provenance.
 _Avoid_: project version, upstream currency
 
+### Presentation (ADR-003)
+
+**Static Screen**:
+A screen dev-ready prints in full and does not wait on — the pre-generation
+confirmation, the Engineering Flow comparison, and the generation report. From
+v0.13 these three are the only surfaces `rich` renders, in one frameless idiom
+of whitespace and colour. `questionary` owns every interactive prompt, and the
+progress stages, `check`, `upgrade`, and error messages stay plain text. Colour
+is stripped whenever `NO_COLOR` is set or stdout is not a terminal, so a Static
+Screen must remain fully legible with every escape sequence removed.
+_Avoid_: report screen, output panel, view, coloured output
+
 ### Distribution (ADR-027)
 
 **Plugin Manifest**:
