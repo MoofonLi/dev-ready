@@ -76,7 +76,7 @@ def test_init_real_end_to_end(
     assert "[5/4]" not in captured.err
     assert "\x1b" not in captured.err
     assert "\r" not in captured.err
-    assert "next steps" in captured.out
+    assert "Next Steps:" in captured.out
     git = shutil.which("git")
     if git is not None:
         subprocess.run(
