@@ -75,7 +75,10 @@ def test_report_colour_is_decoration_and_preserves_a_bracketed_destination() -> 
 
     assert "\x1b" in coloured
     assert _ANSI_ESCAPE.sub("", coloured) == plain
-    assert "/projects/[draft]/my-app" in coloured
+    # str(), not the literal: on Windows the separator is a backslash. The
+    # square brackets are the point — Rich must not read them as markup.
+    assert str(answers.target_dir) in coloured
+    assert "[draft]" in coloured
 
 
 @pytest.mark.parametrize(
