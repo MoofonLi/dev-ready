@@ -960,7 +960,9 @@
             "review": [
               "code-review"
             ]
-          }
+          },
+          "convention": "flows/mattpocock/convention.md",
+          "setup_contribution": "flows/mattpocock/setup.md"
         },
         {
           "id": "superpowers",
@@ -1068,7 +1070,8 @@
             "review": [
               "requesting-code-review"
             ]
-          }
+          },
+          "convention": "flows/superpowers/convention.md"
         },
         {
           "id": "addyosmani",

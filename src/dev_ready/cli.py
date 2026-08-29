@@ -25,12 +25,12 @@ from dev_ready.generate import (
 )
 from dev_ready.manifest import ComponentCatalog, load_default_manifest
 from dev_ready.presentation import detect_presentation_style
+from dev_ready.intent import Answers, PartialAnswers, ProjectSelection
 from dev_ready.prompts import (
-    Answers,
-    PartialAnswers,
-    ProjectSelection,
+    agent_targets_from_flag,
     collect_answers,
     confirm_generation,
+    selection_from_flags,
 )
 from dev_ready.report import render_report
 from dev_ready.upgrade import upgrade_project
@@ -252,7 +252,7 @@ def build_answers(
     line; the interactive path goes through `_build_partial_answers` +
     `collect_answers` instead.
     """
-    selection = ProjectSelection.from_flags(
+    selection = selection_from_flags(
         catalog=catalog,
         categories=args.categories,
         category_items=_category_items_from_args(args),
@@ -261,7 +261,7 @@ def build_answers(
     if args.agents is not None:
         selection = selection.with_agent_targets(
             catalog,
-            ProjectSelection.agent_targets_from_flag(catalog, args.agents),
+            agent_targets_from_flag(catalog, args.agents),
         )
 
     return collect_answers(
@@ -282,14 +282,14 @@ def _build_partial_answers(
     `collect_answers` prompts for whatever this leaves unanswered.
     """
     name = args.project_name
-    selection = ProjectSelection.from_flags(
+    selection = selection_from_flags(
         catalog=catalog,
         categories=args.categories,
         category_items=_category_items_from_args(args),
         development_loop=getattr(args, "development_loop", None),
     )
     agent_targets = (
-        ProjectSelection.agent_targets_from_flag(catalog, args.agents)
+        agent_targets_from_flag(catalog, args.agents)
         if args.agents is not None
         else None
     )

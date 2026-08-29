@@ -12,7 +12,7 @@ from collections.abc import Collection
 from pathlib import Path
 
 from dev_ready.manifest import CATALOG_COMPONENTS, ComponentCatalog, VendoredPin
-from dev_ready.prompts import Answers
+from dev_ready.intent import Answers
 
 
 def declared_executable_paths(

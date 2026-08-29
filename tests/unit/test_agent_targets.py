@@ -176,7 +176,7 @@ def test_real_desired_content_includes_setup_project_without_a_catalog_item(
     tmp_path: Path,
 ) -> None:
     from dev_ready.overlay import build_overlay_content
-    from dev_ready.prompts import Answers, ProjectSelection
+    from dev_ready.intent import Answers, ProjectSelection
 
     catalog = load_default_manifest().components
     content = build_overlay_content(

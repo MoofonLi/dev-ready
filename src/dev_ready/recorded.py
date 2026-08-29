@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from dev_ready.manifest import Manifest
-from dev_ready.prompts import ProjectSelection
+from dev_ready.intent import ProjectSelection
 from dev_ready.stamp import Stamp, StampItem
 
 __all__ = ["RecordedProject", "ResolvedRecordedItem"]
@@ -93,13 +93,14 @@ def _resolve(
     )
 
     return RecordedProject(
-        selection=ProjectSelection.from_recorded_items(
+        selection=ProjectSelection.from_items(
             catalog,
             skills=selected_skills,
             mcp=frozenset(item.id for item in recorded_mcp_items)
             & catalog.item_ids("mcp"),
             docs_items=selected_docs_items,
             agent_targets=frozenset(stamp.agent_targets) & catalog.agent_target_ids,
+            require_development_loop=False,
         ),
         removed_agent_targets=tuple(
             sorted(set(stamp.agent_targets) - catalog.agent_target_ids)

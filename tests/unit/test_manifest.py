@@ -212,6 +212,10 @@ def test_bundled_manifest_loads_with_announced_flows() -> None:
     assert [flow.id for flow in catalog.loops()] == ["mattpocock", "superpowers"]
     assert catalog.loops()[0].display_name == "Matt Pocock's skills"
     assert catalog.loops()[1].display_name == "Superpowers"
+    assert catalog.loops()[0].convention == "flows/mattpocock/convention.md"
+    assert catalog.loops()[0].setup_contribution == "flows/mattpocock/setup.md"
+    assert catalog.loops()[1].convention == "flows/superpowers/convention.md"
+    assert catalog.loops()[1].setup_contribution is None
     assert [flow.id for flow in catalog.announced_loops] == [
         "addyosmani",
     ]
@@ -1409,7 +1413,64 @@ def test_development_loop_rejects_illegal_invocation(bad_invocation: object) -> 
         parse_manifest(json.dumps(data))
 
 
-@pytest.mark.parametrize("field", ["invocation", "chain", "choose_when", "roles"])
+def test_development_loop_stores_optional_convention_and_setup_contribution() -> None:
+    data = json.loads(json.dumps(VALID))
+    loop = data["components"]["skills"]["items"][0]
+    loop["convention"] = "flows/sample-skill/convention.md"
+    loop["setup_contribution"] = "flows/sample-skill/setup.md"
+
+    item = parse_manifest(json.dumps(data)).components["skills"][0]
+
+    assert item.convention == "flows/sample-skill/convention.md"
+    assert item.setup_contribution == "flows/sample-skill/setup.md"
+
+
+def test_development_loop_omits_optional_extras_when_undeclared() -> None:
+    item = parse_manifest(json.dumps(VALID)).components["skills"][0]
+
+    assert item.convention is None
+    assert item.setup_contribution is None
+
+
+@pytest.mark.parametrize("field", ["convention", "setup_contribution"])
+def test_development_loop_rejects_empty_overlay_src(field: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0][field] = ""
+
+    with pytest.raises(ManifestError, match=f"path field '{field}' must be a non-empty string"):
+        parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize("field", ["convention", "setup_contribution"])
+def test_development_loop_rejects_traversal_overlay_src(field: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"][0][field] = "../secret.md"
+
+    with pytest.raises(ManifestError, match=f"path field '{field}' must be a relative path"):
+        parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize("field", ["convention", "setup_contribution"])
+def test_announced_flow_cannot_declare_overlay_extras(field: str) -> None:
+    data = json.loads(json.dumps(VALID))
+    data["components"]["skills"]["items"].append(
+        {
+            "id": "future-flow",
+            "category": "dev",
+            "status": "coming-soon",
+            "description": "A future Engineering Flow.",
+            field: f"flows/future-flow/{field}.md",
+        }
+    )
+
+    with pytest.raises(ManifestError, match=f"announced flow.*{field}"):
+        parse_manifest(json.dumps(data))
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["invocation", "chain", "choose_when", "roles", "convention", "setup_contribution"],
+)
 def test_enhancement_cannot_declare_loop_fields(field: str) -> None:
     data = json.loads(json.dumps(VALID))
     data["components"]["mcp"]["items"][0][field] = "user" if field == "invocation" else []

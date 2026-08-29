@@ -9,7 +9,7 @@ from pathlib import Path
 
 from dev_ready.manifest import CATALOG_COMPONENTS, ComponentCatalog, UpstreamPin
 from dev_ready.presentation import PresentationStyle, ScreenBlock, ScreenLine, render_screen
-from dev_ready.prompts import Answers
+from dev_ready.intent import Answers
 
 __all__ = ["render_report"]
 

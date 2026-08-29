@@ -15,7 +15,7 @@ from dev_ready.cli import build_answers, build_parser
 from dev_ready.errors import InvalidArgumentsError
 from dev_ready.manifest import load_default_manifest
 from dev_ready.overlay import build_overlay_content, render_stamp
-from dev_ready.prompts import Answers, ProjectSelection
+from dev_ready.intent import Answers, ProjectSelection
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_PATH = REPO_ROOT / "skills" / "dev-ready" / "SKILL.md"

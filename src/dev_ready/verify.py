@@ -22,7 +22,7 @@ from dev_ready.inspection import (
 )
 from dev_ready.manifest import ComponentCatalog, VendoredPin
 from dev_ready.overlay import projected_skill_link_pairs
-from dev_ready.prompts import Answers
+from dev_ready.intent import Answers
 from dev_ready.skill_links import (
     PathKind,
     classify_path,

@@ -18,7 +18,7 @@ from dev_ready.overlay.infrastructure import skill_infrastructure_paths
 from dev_ready.skill_links import PathKind, classify_path, create_skill_link
 from dev_ready.inspection import REQUIRED_UPSTREAM_PATHS
 from dev_ready.manifest import CATALOG_COMPONENTS, ComponentCatalog
-from dev_ready.prompts import ProjectSelection
+from dev_ready.intent import ProjectSelection
 
 _DIRECTORY_ENTRIES = {"backend", "frontend"}
 

@@ -13,7 +13,8 @@ from dev_ready.manifest import (
     ItemPath,
     load_default_manifest,
 )
-from dev_ready.prompts import Answers, ProjectSelection
+from dev_ready.intent import Answers, ProjectSelection
+from dev_ready.prompts import agent_targets_from_flag, selection_from_flags
 
 
 CATALOG = load_default_manifest().components
@@ -45,7 +46,7 @@ def _catalog_with_second_loop() -> ComponentCatalog:
 
 
 def test_flag_and_prompt_adapters_share_one_canonical_selection() -> None:
-    selection = ProjectSelection.from_flags(
+    selection = selection_from_flags(
         catalog=CATALOG,
         categories="all",
         category_items={
@@ -104,7 +105,7 @@ def test_categories_are_derived_from_the_selected_items() -> None:
 
 
 def test_omitted_agent_target_flag_defaults_to_claude() -> None:
-    selection = ProjectSelection.from_flags(
+    selection = selection_from_flags(
         catalog=CATALOG,
         categories="none",
         category_items={},
@@ -119,7 +120,7 @@ def test_second_loop_is_a_data_addition_with_one_resolved_default() -> None:
 
     default_selection = ProjectSelection.default_set(catalog)
     all_selection = ProjectSelection.all(catalog)
-    empty_enhancements = ProjectSelection.from_flags(
+    empty_enhancements = selection_from_flags(
         catalog=catalog,
         categories="none",
         category_items={},
@@ -128,7 +129,7 @@ def test_second_loop_is_a_data_addition_with_one_resolved_default() -> None:
         catalog,
         skills=frozenset({"alternate-loop"}),
     )
-    alternate_flag_selection = ProjectSelection.from_flags(
+    alternate_flag_selection = selection_from_flags(
         catalog=catalog,
         categories="none",
         category_items={},
@@ -145,7 +146,7 @@ def test_second_loop_is_a_data_addition_with_one_resolved_default() -> None:
     assert alternate_flag_selection.development_loop == "alternate-loop"
 
     with pytest.raises(InvalidArgumentsError, match="unknown Engineering Flow"):
-        ProjectSelection.from_flags(
+        selection_from_flags(
             catalog=catalog,
             categories="none",
             category_items={},
@@ -177,7 +178,7 @@ def test_explicit_whole_catalog_selection_still_includes_every_enhancement() -> 
 
 def test_no_selection_flags_leave_selection_unresolved() -> None:
     assert (
-        ProjectSelection.from_flags(
+        selection_from_flags(
             catalog=CATALOG,
             categories=None,
             category_items={},
@@ -213,7 +214,7 @@ def test_category_level_all_and_none(
     expected_mcp: frozenset[str],
     expected_docs: bool,
 ) -> None:
-    selection = ProjectSelection.from_flags(
+    selection = selection_from_flags(
         catalog=CATALOG,
         categories=raw,
         category_items={},
@@ -226,7 +227,7 @@ def test_category_level_all_and_none(
 
 
 def test_declining_every_category_still_resolves_the_development_loop() -> None:
-    selection = ProjectSelection.from_flags(
+    selection = selection_from_flags(
         catalog=CATALOG,
         categories="none",
         category_items={},
@@ -246,7 +247,7 @@ def test_one_category_item_flag_resolves_to_default_set_plus_that_item() -> None
             enhancements=("frontend-design",),
         ),
     )
-    selection = ProjectSelection.from_flags(
+    selection = selection_from_flags(
         catalog=catalog,
         categories=None,
         category_items={"security": "security-audit"},
@@ -270,7 +271,7 @@ def test_explicit_category_item_replaces_that_category_default() -> None:
         ),
     )
 
-    selection = ProjectSelection.from_flags(
+    selection = selection_from_flags(
         catalog=catalog,
         categories=None,
         category_items={"design": "none"},
@@ -281,12 +282,13 @@ def test_explicit_category_item_replaces_that_category_default() -> None:
 
 
 def test_recorded_selection_does_not_apply_the_phase_4_loop_migration() -> None:
-    selection = ProjectSelection.from_recorded_items(
+    selection = ProjectSelection.from_items(
         CATALOG,
         skills=frozenset({"caveman"}),
         mcp=frozenset(),
         docs_items=frozenset(),
         agent_targets=frozenset({"claude"}),
+        require_development_loop=False,
     )
 
     assert selection.development_loop == ""
@@ -296,7 +298,7 @@ def test_recorded_selection_does_not_apply_the_phase_4_loop_migration() -> None:
 
 def test_unknown_category_lists_valid_ids() -> None:
     with pytest.raises(InvalidArgumentsError) as excinfo:
-        ProjectSelection.from_flags(
+        selection_from_flags(
             catalog=CATALOG,
             categories="performance",
             category_items={},
@@ -309,7 +311,7 @@ def test_unknown_category_lists_valid_ids() -> None:
 
 def test_unknown_category_item_lists_valid_ids() -> None:
     with pytest.raises(InvalidArgumentsError) as excinfo:
-        ProjectSelection.from_flags(
+        selection_from_flags(
             catalog=CATALOG,
             categories="security",
             category_items={"security": "ghost"},
@@ -322,7 +324,7 @@ def test_unknown_category_item_lists_valid_ids() -> None:
 
 def test_category_override_must_belong_to_selected_categories() -> None:
     with pytest.raises(InvalidArgumentsError, match="--quality conflicts with --categories"):
-        ProjectSelection.from_flags(
+        selection_from_flags(
             catalog=CATALOG,
             categories="security",
             category_items={"quality": "react-doctor"},
@@ -378,7 +380,7 @@ def test_selection_resolves_transitive_requirements() -> None:
 
 
 def test_category_flag_selection_exposes_the_named_development_loop() -> None:
-    selection = ProjectSelection.from_flags(
+    selection = selection_from_flags(
         catalog=CATALOG,
         categories="dev",
         category_items={"dev": "none"},
@@ -389,7 +391,7 @@ def test_category_flag_selection_exposes_the_named_development_loop() -> None:
 
 
 def test_explicit_none_keeps_the_mandatory_loop_dependency_closure() -> None:
-    selection = ProjectSelection.from_flags(
+    selection = selection_from_flags(
         catalog=CATALOG,
         categories="dev",
         category_items={"dev": "none"},
@@ -408,14 +410,14 @@ def test_explicit_none_keeps_the_mandatory_loop_dependency_closure() -> None:
     ],
 )
 def test_agent_target_flag_selection(raw: str, expected: frozenset[str]) -> None:
-    targets = ProjectSelection.agent_targets_from_flag(CATALOG, raw)
+    targets = agent_targets_from_flag(CATALOG, raw)
 
     assert targets == expected
 
 
 def test_unknown_agent_target_does_not_list_all_valid_ids() -> None:
     with pytest.raises(InvalidArgumentsError) as excinfo:
-        ProjectSelection.agent_targets_from_flag(CATALOG, "claud")
+        agent_targets_from_flag(CATALOG, "claud")
 
     message = str(excinfo.value)
     assert "unknown agent target ids" in message
@@ -424,9 +426,28 @@ def test_unknown_agent_target_does_not_list_all_valid_ids() -> None:
 
 def test_standard_compliant_agent_target_is_rejected_with_specific_message() -> None:
     with pytest.raises(InvalidArgumentsError) as excinfo:
-        ProjectSelection.agent_targets_from_flag(CATALOG, "cursor")
+        agent_targets_from_flag(CATALOG, "cursor")
 
     message = str(excinfo.value)
     assert "cursor" in message
     assert "reads standard '.agents/skills/' directly" in message
     assert "needs no Agent Target" in message
+
+
+def test_project_selection_does_not_parse_flags() -> None:
+    assert not hasattr(ProjectSelection, "from_flags")
+    assert not hasattr(ProjectSelection, "from_recorded_items")
+    assert not hasattr(ProjectSelection, "agent_targets_from_flag")
+
+
+def test_non_terminal_modules_do_not_import_prompts() -> None:
+    src = Path(__file__).resolve().parents[2] / "src" / "dev_ready"
+    for rel in (
+        "recorded.py",
+        "inspection.py",
+        "overlay/rendering.py",
+        "overlay/__init__.py",
+        "overlay/stamp_rendering.py",
+    ):
+        text = (src / rel).read_text(encoding="utf-8")
+        assert "dev_ready.prompts" not in text, rel

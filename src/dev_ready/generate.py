@@ -24,7 +24,7 @@ from dev_ready.overlay import (
     build_overlay_content,
     projected_skill_link_pairs,
 )
-from dev_ready.prompts import Answers
+from dev_ready.intent import Answers
 from dev_ready.skill_links import (
     PathKind,
     classify_path,

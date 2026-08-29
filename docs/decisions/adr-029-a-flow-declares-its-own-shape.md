@@ -22,3 +22,52 @@
   - **Keeping the guard whole-set and weakening it to "at least one step declares the flag"** — rejected. It needs no `chain` field, and it would not notice upstream removing the flag from `implement`, which is the drift on the `mattpocock` side worth catching.
   - **Deriving the chain by name** rather than declaring it — rejected. It is the same class of mistake as deriving the subagent axis from a directory name: a claim about meaning resting on a string.
 - Consequences: `mount` values change on 78 Catalog Items. Seventy-four regenerate from one line in `scripts/sync_design_references.py:78`; four skills are edited by hand. `_FLOW_GUIDANCE` shrinks but does not disappear — the chain sentence renders from data, while each flow's convention paragraph and its `setup-project` contribution stay authored prose keyed by flow id, and `_selected_flow_guidance` still raises `OverlayError` for a flow with no entry. `mounted_enhancements` gains the resolved flow as an input, because a role cannot be resolved without knowing which flow was selected. The Generation Skill stops stating a chain at all: with `chain` as data rendered into `AGENTS.md` and `docs/agents/<flow-id>.md`, a third prose copy in `skills/dev-ready/SKILL.md` is a drift surface with no guard, and it would need editing again at FR-48. v0.12's plan called Phase 2 a data-only addition; this decision is why that is no longer true.
+
+---
+
+## 2026-08-29 amendment — Flow Convention and Setup Contribution leave Python
+
+Decided in the v0.13 Phase 4 `improve-codebase-architecture` grilling. The
+decision itself is unchanged: a flow still declares its chain and its mount
+roles as catalog data, and the generated chain sentence still renders from
+`chain` and `invocation`. What this amendment completes is the leftover the
+Consequences paragraph recorded for v0.12.
+
+v0.12 moved the structurally constrained half (`chain`, `roles`, `invocation`)
+into the manifest and left two authored paragraphs keyed by flow id in overlay
+Python. A valid catalog loop with no dict entry therefore crashed generation
+(`OverlayError: flow guidance is missing`). That is the recorded-consequence
+ADR-024 bought and the code did not deliver: adding an Engineering Flow is a
+data change plus assets, not a Python edit.
+
+- **A development-loop Catalog Item may declare `convention` and
+  `setup_contribution`.** Each is an optional non-empty source path, relative
+  to the overlay templates root, naming a literal markdown asset. Overlay reads
+  the file to fill the existing `AGENTS.md` and Setup Step tokens and never
+  copies it to a destination path. Omitted means empty extras; an empty string
+  is `ManifestError`. An Enhancement and an Announced Flow cannot declare
+  either field.
+- **The files contain only the extra prose.** Python still composes the
+  `## Engineering Flow` heading and the chain sentence from catalog data. The
+  [[Flow Convention]] is concatenated after that sentence; the
+  [[Setup Contribution]] is the Setup Step token. A missing declared file is
+  `OverlayError` at generation, the same class as any other missing overlay
+  asset, not a missing dict key.
+- **The assets live in an overlay-only package root**, one directory per flow
+  id, outside the three trees ADR-026 already split (vendored skills, flow-copied
+  project docs, original skills). Nothing in that root is a `paths` destination.
+- **Absence is empty, not an error.** A fixture loop that declares `chain` and
+  `invocation` and neither extra generates: `AGENTS.md` carries the chain
+  sentence alone, and the Setup Step carries no flow section. `superpowers`
+  declares a Flow Convention and omits the Setup Contribution; `mattpocock`
+  declares both.
+
+Considered and rejected: keeping the Python dict and only mapping a missing key
+to empty (Phase 5 would still edit Python); looking up files by flow id with no
+manifest field (a typo silently ships chain-sentence-only `AGENTS.md`); putting
+the extras under a flow's copied `docs/agents` directory (they would appear as
+project files); collapsing the convention into the per-flow explainer (that
+changes generated `AGENTS.md`, which this phase must not); adding prose fields
+on `CatalogItem` (relocates a second catalog of strings into the loader). No
+new ADR: this is the unpaid remainder of ADR-024 as named by this ADR's own
+Consequences, not a new trade-off.

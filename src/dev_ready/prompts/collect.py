@@ -12,7 +12,7 @@ from pathlib import Path
 from dev_ready.errors import AbortedError, InvalidArgumentsError
 from dev_ready.manifest import AgentTarget, CatalogItem, ComponentCatalog, UpstreamPin
 from dev_ready.presentation import PresentationStyle, ScreenBlock, ScreenLine, render_screen
-from dev_ready.prompts.answers import Answers, PartialAnswers, ProjectSelection, validate_project_name
+from dev_ready.intent import Answers, PartialAnswers, ProjectSelection, validate_project_name
 from dev_ready.prompts.asker import Asker
 
 __all__ = ["collect_answers", "confirm_generation"]

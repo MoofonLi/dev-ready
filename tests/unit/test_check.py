@@ -10,7 +10,7 @@ from dev_ready.cli import main
 from dev_ready import __version__
 from dev_ready.errors import StampInvalidError
 from dev_ready.manifest import load_default_manifest
-from dev_ready.prompts import ProjectSelection
+from dev_ready.intent import ProjectSelection
 from dev_ready.stamp import load_stamp
 from project_factory import materialize_project_structure
 from dev_ready.agent_targets import project_targets

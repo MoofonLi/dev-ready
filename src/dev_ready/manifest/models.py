@@ -106,6 +106,8 @@ class CatalogItem:
     invocation: str | None = None
     chain: tuple[str | tuple[str, ...], ...] = ()
     role_bindings: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    convention: str | None = None
+    setup_contribution: str | None = None
 
     @property
     def display_name(self) -> str:

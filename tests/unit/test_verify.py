@@ -17,7 +17,7 @@ from dev_ready.verify import (
 
 from dev_ready.manifest import load_default_manifest
 from dev_ready.overlay import apply_overlay
-from dev_ready.prompts import Answers, ProjectSelection
+from dev_ready.intent import Answers, ProjectSelection
 from project_factory import materialize_project_structure
 
 CATALOG = load_default_manifest().components

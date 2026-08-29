@@ -71,6 +71,14 @@ differs per flow, so a generated project describes its own chain and never the
 other's.
 _Avoid_: pipeline, stages, the seven steps, phase order
 
+**Flow Convention**:
+The optional extra paragraph an [[Engineering Flow]] adds after its rendered
+[[Flow Chain]] sentence in the generated `AGENTS.md`. A flow that declares none
+is described by the chain sentence alone. Declared as a catalog source path on
+the development-loop [[Catalog Item]]; it is overlay-interpolated and is never
+a file in the generated project.
+_Avoid_: flow guidance, guidance dict, convention paragraph, _FLOW_GUIDANCE
+
 **Flow Invocation**:
 Who starts a [[Flow Chain]]'s entries — the user, or the agent on its own.
 Declared per [[Engineering Flow]] in the manifest as `user` or `model`, and
@@ -117,6 +125,14 @@ normal rather than exceptional — it reads current state and offers each sectio
 separately, so a user may configure email alone months later.
 _Avoid_: init step, bootstrap, first-run wizard, install step, setup wizard
 
+**Setup Contribution**:
+The optional extra section an [[Engineering Flow]] adds to the [[Setup Step]]. A
+flow that declares none leaves the Setup Step as the shared superuser, email,
+and error-reporting interview. Declared as a catalog source path on the
+development-loop [[Catalog Item]]; it is overlay-interpolated and is never a
+file in the generated project.
+_Avoid_: setup-project snippet, setup extras, engineering_flow_setup
+
 **Workflow**:
 Reserved exclusively for GitHub Actions workflow files (`ci.yml`, `release.yml`,
 `upstream-bump.yml`). Never used for the Handoff Protocol or the Spec Loop.
@@ -150,6 +166,12 @@ entry a user cannot choose is not a Catalog Item however it is declared, which
 is what puts an [[Announced Flow]] outside the type and outside the catalog the
 loader builds.
 _Avoid_: skill entry, module, addon
+
+**Generation Intent**:
+The resolved project name, destination, catalog selection, and Agent Targets for
+one `init` or `upgrade` run. The flag adapter and the prompt adapter write the
+same model (ADR-004); overlay and lifecycle commands read it.
+_Avoid_: answers model, project selection (as a package name), canonical intent
 
 **Generation Skill**:
 The single skill this repository distributes for installation into a user's own

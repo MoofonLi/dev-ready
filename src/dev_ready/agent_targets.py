@@ -6,7 +6,7 @@ nested ignore-anchor path, and the skill names derived from desired content.
 It performs no filesystem I/O. The overlay writer, inspector, upgrade planner
 and lifecycle fixtures all read the mapping here instead of restating it.
 
-Deliberately below `prompts`: callers hand over the selected target ids, not a
+Does not import `intent`: callers hand over the selected target ids, not a
 `ProjectSelection`, so nothing in the dependency graph has to invert.
 """
 

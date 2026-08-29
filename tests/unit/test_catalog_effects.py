@@ -11,7 +11,7 @@ from dev_ready.catalog_effects import (
     parse_catalog_effect,
 )
 from dev_ready.manifest import load_default_manifest
-from dev_ready.prompts import ProjectSelection
+from dev_ready.intent import ProjectSelection
 
 
 def test_mcp_effect_applies_and_observes_through_one_interface(tmp_path: Path) -> None:

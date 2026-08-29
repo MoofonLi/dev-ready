@@ -1,13 +1,14 @@
 """Render overlay templates from a resolved project selection."""
 
 from dataclasses import dataclass
+from importlib import resources
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
 from dev_ready.agent_targets import CANONICAL_SKILLS_ROOT
 from dev_ready.errors import OverlayError
 from dev_ready.manifest import CATALOG_COMPONENTS, CatalogItem, ComponentCatalog
-from dev_ready.prompts import Answers
+from dev_ready.intent import Answers
 
 TEMPLATE_SUFFIX = ".tmpl"
 _DOCUMENTATION_ROOT = "docs"
@@ -33,33 +34,6 @@ class _FlowGuidance:
 
 
 _EMPTY_FLOW_GUIDANCE = _FlowGuidance(rules="", setup_project="")
-_FLOW_GUIDANCE: dict[str, _AuthoredFlowGuidance] = {
-    "mattpocock": _AuthoredFlowGuidance(
-        convention="""A step may reach for `tdd`, `code-review`, `diagnosing-bugs`, `codebase-design`, or `domain-modeling` as a tool; those tools are not additional chain entries.
-
-Start at `implement` when the change adds no behaviour a user can observe — a rename, a formatting fix, a dependency bump, or a test for behaviour that already works. Start at `setup-project` or `grill-with-docs` for everything else.
-
-Tracker and domain conventions are in `docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md`, and `docs/agents/domain.md`. Follow those files when a skill asks where to publish specs or tickets; domain terminology is created lazily when a real term is resolved.""",
-        setup_project="""The selected Engineering Flow also contributes **Issue tracker and domain conventions** to the section menu.
-
-## Issue tracker and domain conventions
-
-Read `docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md`, and
-`docs/agents/domain.md`. Report where specs and tickets currently live, the
-triage-label vocabulary, and whether the domain document has been initialized.
-Do not change any of those files while reporting their current state.
-
-Ask whether the user wants this convention changed. Only if they answer yes,
-explain that editing these managed files makes them user-modified, so a future
-dev-ready upgrade preserves them and stops updating them. After the user accepts
-that cost, hand off to `/setup-matt-pocock-skills`. Do not invoke that skill when
-the user only asked to inspect current state.""",
-    ),
-    "superpowers": _AuthoredFlowGuidance(
-        convention="Plans live under `docs/superpowers/plans/` and design documents live under `docs/superpowers/specs/`.",
-        setup_project="",
-    ),
-}
 
 
 def _render_chain_entry(entry: str | tuple[str, ...]) -> str:
@@ -91,23 +65,32 @@ def render_flow_rules(loop: CatalogItem, guidance: _AuthoredFlowGuidance) -> str
     return f"## Engineering Flow\n\n{chain_sentence}"
 
 
+def _read_authored_prose(relative: str | None) -> str:
+    if relative is None:
+        return ""
+    source = resources.files("dev_ready").joinpath("templates", *relative.split("/"))
+    if not source.is_file():
+        raise OverlayError(f"overlay asset missing: {relative}")
+    try:
+        return source.read_text(encoding="utf-8").rstrip("\n")
+    except OSError as error:
+        raise OverlayError(f"failed to read overlay asset for {relative}: {error}") from error
+
+
 def _selected_flow_guidance(
     answers: Answers, catalog: ComponentCatalog
 ) -> _FlowGuidance:
     flow_id = answers.selection.development_loop
     if not flow_id:
         return _EMPTY_FLOW_GUIDANCE
-    if flow_id not in _FLOW_GUIDANCE:
-        raise OverlayError(f"flow guidance is missing: {flow_id}")
-
-    guidance = _FLOW_GUIDANCE[flow_id]
-    loop = next(
-        (item for item in catalog.get("skills", ()) if item.id == flow_id),
-        None,
-    )
+    loop = next((item for item in catalog.loops() if item.id == flow_id), None)
     if loop is None:
         raise OverlayError(f"development loop {flow_id!r} not found in catalog")
 
+    guidance = _AuthoredFlowGuidance(
+        convention=_read_authored_prose(loop.convention),
+        setup_project=_read_authored_prose(loop.setup_contribution),
+    )
     rules = render_flow_rules(loop, guidance)
     return _FlowGuidance(rules=rules, setup_project=guidance.setup_project)
 

@@ -8,7 +8,7 @@ import pytest
 
 from dev_ready.inspection import ProjectExpectation, inspect_project
 from dev_ready.manifest import ComponentCatalog, ItemPath, load_default_manifest
-from dev_ready.prompts import ProjectSelection
+from dev_ready.intent import ProjectSelection
 from project_factory import materialize_project_structure
 
 

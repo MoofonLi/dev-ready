@@ -29,7 +29,7 @@ from dev_ready.overlay.rendering import TEMPLATE_SUFFIX as _TEMPLATE_SUFFIX
 from dev_ready.overlay.rendering import inject_mounted_enhancements as _inject_mounts
 from dev_ready.overlay.rendering import render_asset as _render_asset
 from dev_ready.overlay.stamp_rendering import render_stamp
-from dev_ready.prompts import Answers
+from dev_ready.intent import Answers
 
 __all__ = [
     "apply_overlay",

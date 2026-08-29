@@ -658,6 +658,7 @@ def _parse_components(
                     & {
                         "chain",
                         "choose_when",
+                        "convention",
                         "inject",
                         "invocation",
                         "license",
@@ -667,6 +668,7 @@ def _parse_components(
                         "pin",
                         "requires",
                         "roles",
+                        "setup_contribution",
                         "steps",
                         "vendored_repo",
                     }
@@ -799,7 +801,14 @@ def _parse_components(
                 )
 
             if kind == "enhancement":
-                for prohibited in ("invocation", "chain", "choose_when", "roles"):
+                for prohibited in (
+                    "invocation",
+                    "chain",
+                    "choose_when",
+                    "roles",
+                    "convention",
+                    "setup_contribution",
+                ):
                     if prohibited in item_entry:
                         raise ManifestError(
                             f"{source}: component '{comp_name}' item '{item_id}' field '{prohibited}' "
@@ -809,6 +818,8 @@ def _parse_components(
                 chain = ()
                 choose_when = ()
                 roles = ()
+                convention = None
+                setup_contribution = None
             else:
                 invocation = _parse_loop_invocation(comp_name, item_id, item_entry, source)
                 chain = _parse_loop_chain(comp_name, item_id, item_entry, steps, source)
@@ -816,6 +827,12 @@ def _parse_components(
                     comp_name, item_id, item_entry, source
                 )
                 roles = _parse_loop_roles(comp_name, item_id, item_entry, steps, source)
+                convention = _parse_optional_overlay_src(
+                    comp_name, item_id, "convention", item_entry, source
+                )
+                setup_contribution = _parse_optional_overlay_src(
+                    comp_name, item_id, "setup_contribution", item_entry, source
+                )
                 dest_leaves = {Path(p.dest).name for p in parsed_paths}
                 for step in steps:
                     if step not in dest_leaves:
@@ -844,6 +861,8 @@ def _parse_components(
                     invocation=invocation,
                     chain=chain,
                     role_bindings=roles,
+                    convention=convention,
+                    setup_contribution=setup_contribution,
                 )
             )
 
@@ -1136,6 +1155,18 @@ def _validate_catalog_requirements(
 
         for item in items:
             visit(item.id)
+
+
+def _parse_optional_overlay_src(
+    component: str,
+    item_id: str,
+    field: str,
+    entry: dict[str, object],
+    source: str,
+) -> str | None:
+    if field not in entry:
+        return None
+    return _parse_catalog_path(component, item_id, field, entry[field], source)
 
 
 def _parse_catalog_path(

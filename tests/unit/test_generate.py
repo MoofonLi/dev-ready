@@ -20,7 +20,7 @@ from dev_ready.generate import (
 )
 from dev_ready.manifest import UpstreamPin, load_default_manifest
 from dev_ready.overlay import apply_overlay
-from dev_ready.prompts import Answers, ProjectSelection
+from dev_ready.intent import Answers, ProjectSelection
 from dev_ready.verify import REQUIRED_UPSTREAM_PATHS
 
 PIN = UpstreamPin(

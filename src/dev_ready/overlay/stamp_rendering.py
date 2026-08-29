@@ -5,7 +5,7 @@ from collections.abc import Collection
 
 from dev_ready import __version__
 from dev_ready.manifest import ComponentCatalog, UpstreamPin, VendoredPin
-from dev_ready.prompts import Answers
+from dev_ready.intent import Answers
 
 
 def render_stamp(

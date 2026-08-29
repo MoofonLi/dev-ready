@@ -19,7 +19,7 @@ from dev_ready.skill_links import PathKind, classify_path, has_link_component
 from dev_ready.catalog_effects import CatalogEffectError
 from dev_ready.manifest import CATALOG_COMPONENTS, CatalogItem, ComponentCatalog
 from dev_ready.overlay.rendering import TEMPLATE_SUFFIX
-from dev_ready.prompts import ProjectSelection
+from dev_ready.intent import ProjectSelection
 
 REQUIRED_UPSTREAM_PATHS: tuple[str, ...] = (
     "backend",

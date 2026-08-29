@@ -21,12 +21,11 @@ from dev_ready.manifest import (
     UpstreamPin,
     load_default_manifest,
 )
+from dev_ready.intent import Answers, PartialAnswers, ProjectSelection
 from dev_ready.prompts import (
-    Answers,
-    PartialAnswers,
-    ProjectSelection,
     collect_answers,
     confirm_generation,
+    selection_from_flags,
 )
 from dev_ready.prompts._questionary_asker import QuestionaryAsker
 from dev_ready.presentation import PresentationStyle
@@ -925,7 +924,7 @@ def test_interactive_and_flag_paths_produce_identical_answers(tmp_path: Path) ->
 
 def test_design_skill_only_is_identical_through_flags_and_prompts(tmp_path: Path) -> None:
     target_dir = tmp_path / "design-app"
-    flag_selection = ProjectSelection.from_flags(
+    flag_selection = selection_from_flags(
         catalog=CATALOG,
         categories="design",
         category_items={"design": "frontend-design"},

@@ -6,7 +6,7 @@ import re
 import pytest
 
 from dev_ready.manifest import UpstreamPin, load_default_manifest
-from dev_ready.prompts import Answers, ProjectSelection
+from dev_ready.intent import Answers, ProjectSelection
 from dev_ready.presentation import PresentationStyle
 from dev_ready.report import render
 from dev_ready.report import render_report

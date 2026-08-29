@@ -22,7 +22,7 @@ from dev_ready.overlay import (
     projected_skill_link_pairs,
     render_ignore_anchor,
 )
-from dev_ready.prompts import Answers, ProjectSelection
+from dev_ready.intent import Answers, ProjectSelection
 from dev_ready.stamp import load_stamp
 from dev_ready.skill_links import PathKind, classify_path, create_skill_link
 from dev_ready.upgrade import upgrade_project

@@ -28,7 +28,7 @@ from dev_ready.generate import (
     ProgressStatus,
 )
 from dev_ready.manifest import load_default_manifest
-from dev_ready.prompts import Answers
+from dev_ready.intent import Answers
 
 CATALOG = load_default_manifest().components
 _ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")

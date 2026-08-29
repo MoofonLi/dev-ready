@@ -28,7 +28,7 @@ from dev_ready.skill_links import (
     remove_link_object,
 )
 from dev_ready.overlay.rendering import mounted_enhancements
-from dev_ready.prompts import Answers
+from dev_ready.intent import Answers
 from dev_ready.recorded import RecordedProject
 from dev_ready.stamp import load_stamp
 

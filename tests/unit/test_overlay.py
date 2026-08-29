@@ -20,7 +20,7 @@ from dev_ready.overlay import (
     render_ignore_anchor,
     render_stamp,
 )
-from dev_ready.prompts import Answers, ProjectSelection
+from dev_ready.intent import Answers, ProjectSelection
 
 MANIFEST = load_default_manifest()
 CATALOG = MANIFEST.components
@@ -643,34 +643,52 @@ def test_mandatory_engineering_flow_renders_independently_of_documentation_items
     assert "{{" not in agents_md
 
 
-def test_selected_flow_without_authored_guidance_fails_at_overlay_seam(
+def test_flow_without_extras_renders_chain_sentence_only(
     tmp_path: Path,
 ) -> None:
     loop = next(item for item in CATALOG.loops() if item.id == "mattpocock")
-    unmapped_loop = replace(loop, id="unmapped-flow")
-    components = {
-        component: tuple(
-            unmapped_loop if item.id == loop.id else item
-            for item in CATALOG.get(component, ())
-        )
-        for component in CATALOG
-    }
+    fixture_loop = replace(
+        loop,
+        id="fixture-flow",
+        convention=None,
+        setup_contribution=None,
+    )
     catalog = ComponentCatalog(
-        components,
+        {
+            component: tuple(
+                fixture_loop if item.id == loop.id else item
+                for item in CATALOG.get(component, ())
+            )
+            for component in CATALOG
+        },
         CATALOG.agent_targets,
         CATALOG.categories,
-        CATALOG.default_set,
+        replace(CATALOG.default_set, development_loop="fixture-flow"),
         CATALOG.standard_compliant_agents,
         CATALOG.announced_loops,
     )
     selection = ProjectSelection.from_items(
         catalog,
-        skills=frozenset({"unmapped-flow"}),
+        skills=frozenset({"fixture-flow"}),
         agent_targets=frozenset(),
     )
 
-    with pytest.raises(OverlayError, match="flow guidance is missing: unmapped-flow"):
-        build_overlay_content(Answers("my-app", tmp_path / "project", selection), catalog)
+    content = build_overlay_content(
+        Answers("my-app", tmp_path / "project", selection), catalog
+    )
+    agents_md = content["AGENTS.md"].decode("utf-8")
+    guidance = agents_md.split("## Engineering Flow\n", 1)[1].split(
+        "\n\n## Architecture documentation", 1
+    )[0]
+    assert guidance == (
+        "\nThe default Flow Chain is `setup-project` → `grill-with-docs` → "
+        "`to-spec` → `to-tickets` → `implement` → "
+        "`improve-codebase-architecture`. Every step is user-invoked."
+    )
+    setup_skill = content[".agents/skills/setup-project/SKILL.md"].decode("utf-8")
+    assert "## Issue tracker and domain conventions" not in setup_skill
+    assert "docs/agents/convention.md" not in content
+    assert "docs/agents/setup.md" not in content
 
 
 def test_engineering_flow_guidance_states_the_exact_chain_and_skip_rule(
@@ -764,6 +782,8 @@ def test_superpowers_flow_overlay_generation(tmp_path: Path) -> None:
     gitignore = content[".gitignore"].decode("utf-8")
     assert ".superpowers/" in gitignore
     assert "docs/superpowers/" not in gitignore
+    assert "docs/agents/convention.md" not in content
+    assert "docs/agents/setup.md" not in content
 
     setup_skill = content[".agents/skills/setup-project/SKILL.md"].decode("utf-8")
     assert "## Issue tracker and domain conventions" not in setup_skill
@@ -2165,46 +2185,43 @@ def test_render_chain_sentence_model_invoked_with_choice() -> None:
     )
 
 
-def test_flow_without_authored_guidance_raises_overlay_error() -> None:
-    from dev_ready.manifest.models import CatalogItem
-    from dev_ready.overlay.rendering import _selected_flow_guidance
-
-    unknown_loop = CatalogItem(
-        id="unknown-loop",
-        category="dev",
-        kind="development-loop",
-        description="Unknown loop.",
-        mode="builtin",
-        license="MIT",
-        invocation="user",
-        chain=("step-1",),
+def test_declared_convention_with_missing_asset_is_overlay_error(
+    tmp_path: Path,
+) -> None:
+    loop = next(item for item in CATALOG.loops() if item.id == "mattpocock")
+    fixture_loop = replace(
+        loop,
+        id="fixture-flow",
+        convention="flows/missing/convention.md",
+        setup_contribution=None,
     )
-    custom_catalog = ComponentCatalog(
+    catalog = ComponentCatalog(
         {
-            "skills": (*CATALOG["skills"], unknown_loop),
-            "mcp": CATALOG["mcp"],
-            "docs": CATALOG["docs"],
+            component: tuple(
+                fixture_loop if item.id == loop.id else item
+                for item in CATALOG.get(component, ())
+            )
+            for component in CATALOG
         },
         CATALOG.agent_targets,
         CATALOG.categories,
-        CATALOG.default_set,
+        replace(CATALOG.default_set, development_loop="fixture-flow"),
+        CATALOG.standard_compliant_agents,
+        CATALOG.announced_loops,
     )
-    answers = Answers(
-        project_name="my-app",
-        target_dir=Path("project"),
-        selection=ProjectSelection.from_items(
-            custom_catalog,
-            skills=frozenset({"unknown-loop"}),
-            agent_targets=frozenset(),
-        ),
+    selection = ProjectSelection.from_items(
+        catalog,
+        skills=frozenset({"fixture-flow"}),
+        agent_targets=frozenset(),
     )
-    with pytest.raises(OverlayError, match="flow guidance is missing: unknown-loop"):
-        _selected_flow_guidance(answers, custom_catalog)
+
+    with pytest.raises(OverlayError, match="overlay asset missing"):
+        build_overlay_content(
+            Answers("my-app", tmp_path / "project", selection), catalog
+        )
 
 
-def test_flow_guidance_rejects_selected_flow_missing_from_passed_catalog() -> None:
-    from dev_ready.overlay.rendering import _selected_flow_guidance
-
+def test_selected_loop_missing_from_catalog_is_overlay_error() -> None:
     answers = Answers(
         project_name="my-app",
         target_dir=Path("project"),
@@ -2228,7 +2245,7 @@ def test_flow_guidance_rejects_selected_flow_missing_from_passed_catalog() -> No
         OverlayError,
         match="development loop 'superpowers' not found in catalog",
     ):
-        _selected_flow_guidance(answers, incomplete_catalog)
+        build_overlay_content(answers, incomplete_catalog)
 
 
 def test_generated_agents_md_preserves_mattpocock_user_invoked_claim() -> None:
