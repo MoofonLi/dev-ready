@@ -80,6 +80,94 @@ def test_init_without_name_exits_2(capsys) -> None:
     assert "project name is required" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("assume_yes", [False, True])
+def test_init_defaults_name_from_explicit_destination_on_both_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    assume_yes: bool,
+) -> None:
+    target_dir = tmp_path / "app"
+    captured: list[Answers] = []
+
+    def _capture_generate(answers: Answers, *args: object, **kwargs: object) -> list[Path]:
+        captured.append(answers)
+        return []
+
+    monkeypatch.setattr(cli_module, "generate", _capture_generate)
+    monkeypatch.setattr(cli_module, "confirm_generation", lambda *args, **kwargs: True)
+    argv = ["init", "--dir", str(target_dir)]
+    if assume_yes:
+        argv.append("--yes")
+    else:
+        argv.extend(["--categories", "none"])
+
+    assert main(argv) == 0
+    assert captured[0].project_name == "app"
+    assert captured[0].target_dir == target_dir
+
+
+def test_init_explicit_name_beats_destination_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[Answers] = []
+    monkeypatch.setattr(
+        cli_module,
+        "generate",
+        lambda answers, *args, **kwargs: captured.append(answers) or [],
+    )
+
+    assert main(["init", "chosen", "--dir", str(tmp_path / "ignored"), "--yes"]) == 0
+    assert captured[0].project_name == "chosen"
+
+
+def test_init_invalid_destination_name_exits_2_non_interactively(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    invalid_target = tmp_path / "My App"
+
+    assert main(["init", "--dir", str(invalid_target), "--yes"]) == 2
+
+    error = capsys.readouterr().err
+    assert "invalid project name 'My App'" in error
+    assert not invalid_target.exists()
+
+
+@pytest.mark.parametrize("assume_yes", [False, True])
+def test_init_known_collision_fails_before_confirmation_or_generation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    assume_yes: bool,
+) -> None:
+    target_dir = tmp_path / "app"
+    (target_dir / ".claude").mkdir(parents=True)
+    confirmed = False
+    generated = False
+
+    def _unexpected_confirm(*args: object, **kwargs: object) -> bool:
+        nonlocal confirmed
+        confirmed = True
+        return True
+
+    def _unexpected_generate(*args: object, **kwargs: object) -> list[Path]:
+        nonlocal generated
+        generated = True
+        return []
+
+    monkeypatch.setattr(cli_module, "confirm_generation", _unexpected_confirm)
+    monkeypatch.setattr(cli_module, "generate", _unexpected_generate)
+    argv = ["init", "--dir", str(target_dir)]
+    if assume_yes:
+        argv.append("--yes")
+    else:
+        argv.extend(["--categories", "none"])
+
+    assert main(argv) == 4
+    assert ".claude" in capsys.readouterr().err
+    assert confirmed is False
+    assert generated is False
+
+
 @pytest.mark.parametrize("bad_name", ["../etc", "a b", "-app", "app/x", ""])
 def test_unsafe_project_names_rejected(bad_name: str) -> None:
     with pytest.raises(InvalidArgumentsError):
@@ -401,6 +489,21 @@ def test_build_answers_respects_flags(tmp_path) -> None:
     assert answers.assume_yes is True
 
 
+@pytest.mark.parametrize(("spelling", "relative"), [(".", Path()), ("new/app", Path("new/app"))])
+def test_init_parser_resolves_explicit_target_at_the_cli_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    spelling: str,
+    relative: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    args = build_parser().parse_args(["init", "my-app", "--dir", spelling])
+
+    assert args.target_dir == (tmp_path / relative).resolve()
+    assert args.target_dir.is_absolute()
+
+
 def test_parser_accepts_all_documented_flags() -> None:
     args = build_parser().parse_args(
         [
@@ -421,13 +524,25 @@ def test_parser_accepts_all_documented_flags() -> None:
     )
     assert args.command == "init"
     assert args.yes is True
-    assert args.target_dir == Path("x")
+    assert args.target_dir == Path("x").resolve()
     assert args.categories == "dev,token-optimize"
     assert args.dev == "none"
     assert args.token_optimize == "caveman"
     assert args.agents == "claude,windsurf"
     assert not hasattr(args, "no_handoff")
     assert not hasattr(args, "no_agents")
+
+
+def test_init_help_names_dot_as_an_explicit_dir_value(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        build_parser().parse_args(["init", "--help"])
+
+    assert excinfo.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "--dir" in help_text
+    assert "--dir ." in help_text
 
 
 @pytest.mark.parametrize(

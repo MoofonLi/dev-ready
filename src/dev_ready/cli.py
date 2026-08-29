@@ -21,6 +21,7 @@ from dev_ready.generate import (
     ProgressEvent,
     ProgressStatus,
     generate,
+    preflight_generation,
 )
 from dev_ready.manifest import ComponentCatalog, load_default_manifest
 from dev_ready.presentation import detect_presentation_style
@@ -51,6 +52,11 @@ _REMOVED_SELECTION_FLAGS = {
     "--no-mcp": "use --token-optimize none instead",
     "--no-docs": "use --design none instead",
 }
+
+
+def _resolved_path(value: str) -> Path:
+    """Resolve a CLI path without requiring the destination to exist."""
+    return Path(value).resolve()
 
 
 class ProgressRenderer:
@@ -172,9 +178,9 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument(
         "--dir",
         dest="target_dir",
-        type=Path,
+        type=_resolved_path,
         default=None,
-        help="Target directory (default: ./PROJECT_NAME)",
+        help="Target directory (default: ./PROJECT_NAME; use --dir . for current directory)",
     )
     init_parser.add_argument(
         "--categories",
@@ -246,11 +252,6 @@ def build_answers(
     line; the interactive path goes through `_build_partial_answers` +
     `collect_answers` instead.
     """
-    name = args.project_name
-    if not name:
-        raise InvalidArgumentsError(
-            "project name is required: dev-ready init <project-name>"
-        )
     selection = ProjectSelection.from_flags(
         catalog=catalog,
         categories=args.categories,
@@ -263,12 +264,14 @@ def build_answers(
             ProjectSelection.agent_targets_from_flag(catalog, args.agents),
         )
 
-    target_dir = args.target_dir if args.target_dir is not None else Path.cwd() / name
-    return Answers(
-        project_name=name,
-        target_dir=target_dir,
-        selection=selection,
-        assume_yes=args.yes,
+    return collect_answers(
+        PartialAnswers(
+            project_name=args.project_name,
+            target_dir=args.target_dir,
+            selection=selection,
+            assume_yes=args.yes,
+        ),
+        catalog=catalog,
     )
 
 
@@ -317,9 +320,16 @@ def _run_init(args: argparse.Namespace) -> int:
             catalog=manifest.components,
             style=presentation_style,
         )
-        if not confirm_generation(answers, pin, style=presentation_style):
-            print("aborted: nothing was written", file=sys.stderr)
-            return 1
+
+    destination = preflight_generation(answers, manifest.components)
+    if not args.yes and not confirm_generation(
+        answers,
+        pin,
+        style=presentation_style,
+        occupied_entry_count=len(destination.existing_names),
+    ):
+        print("aborted: nothing was written", file=sys.stderr)
+        return 1
 
     progress = ProgressRenderer(sys.stderr)
     try:

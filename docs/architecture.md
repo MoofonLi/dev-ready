@@ -71,6 +71,7 @@ ADRs live in `docs/decisions/`, one file per decision (moved out of this file by
 | `cli` | Argument parsing, command wiring, exit codes | contain generation logic |
 | `prompts` | Interactive/non-interactive collection of user answers into one model | perform I/O other than terminal |
 | `fetch` | Generate the upstream base via Copier at the manifest-pinned commit | know about overlay content |
+| `generate` | Sequence fetch, overlay, verification, destination preflight, and finalize. An absent or empty destination commits with one atomic root rename and is unchanged on failure; an Occupied Target commits with atomic per-entry renames and best-effort entry-wise restoration, so any residue is whole entries | perform network I/O outside `fetch`, overwrite or move pre-existing destination content, or use a copy fallback |
 | `overlay` | Apply dev-ready files onto the fetched base; templating of names/values and Mount Point injection | fetch anything from the network |
 | `manifest` | Load/validate manifest.json; single source of truth for pins. `ComponentCatalog` is the catalog interface every module takes — items, Categories, development loops, Agent Targets, Default Set | be bypassed by other modules |
 | `agent_targets` | Project the selected Agent Targets onto their native paths: rules pointers, MCP config files, retargeted MCP items and effects, Skill Link paths, nested ignore-anchor paths, and skill names from desired Canonical Content paths (ADR-015, ADR-028) | import `prompts`, touch the filesystem, or perform network I/O |
@@ -110,8 +111,11 @@ removes those link objects. `inspection` is the shared read-only classification
 seam for Canonical Content, target containers, anchors, and links, consumed by
 `verify` and `check`. When a selection projects links, `verify` materializes
 the complete set in staging with the production writer, inspects it, and
-removes those temporary links. Finalize then atomically renames staging into
-place and recreates the same links against the final Canonical Content.
+removes those temporary links. Finalize then uses one atomic root rename for an
+absent or empty destination, or atomic per-entry renames with best-effort
+restoration for an Occupied Target, and recreates the same links against the
+final Canonical Content. The first path leaves the destination unchanged on
+failure; the second can leave only whole generated entries and reports each one.
 Each selected Agent Target skills directory receives a managed nested
 `.gitignore` as the Git safety gate; the project root `.gitignore` is not
 rewritten. `upgrade` writes Canonical Content, then exact state-aware nested
@@ -120,7 +124,7 @@ retires links, and writes the stamp last.
 
 ### questionary (added phase 4)
 
-The repo's first runtime dependency, sanctioned by the "target: questionary" line above. It renders the interactive project-name text prompt, the skills/MCP/docs multi-select, and the yes/no confirmation (ADR-004). The stdlib (`input()`) is insufficient: it has no multi-select/checkbox primitive and no cross-platform line editing (arrow-key navigation, cancel-on-Ctrl-C-without-traceback) — reimplementing that is exactly the kind of undifferentiated work a dependency should absorb. Import is confined to `src/dev_ready/prompts/_questionary_asker.py`, and only via a function-local import inside `prompts/collect.py::_default_asker`, so the `--yes` flag path (which never calls into `prompts` at all) never triggers it.
+The repo's first runtime dependency, sanctioned by the "target: questionary" line above. It renders the interactive project-name text prompt, the skills/MCP/docs multi-select, and the yes/no confirmation (ADR-004). The stdlib (`input()`) is insufficient: it has no multi-select/checkbox primitive and no cross-platform line editing (arrow-key navigation, cancel-on-Ctrl-C-without-traceback) — reimplementing that is exactly the kind of undifferentiated work a dependency should absorb. Import is confined to `src/dev_ready/prompts/_questionary_asker.py`, and only via a function-local import inside `prompts/collect.py::_default_asker`; the `--yes` path passes complete intent through `collect_answers` without constructing an asker, so it never triggers the import.
 
 ## Coding Standards
 
@@ -154,7 +158,7 @@ user            cli          prompts        generate      fetch/overlay/verify  
  |               |               |               |--fetch_snapshot->staging           |
  |               |               |               |--apply_overlay-->staging           |
  |               |               |               |--verify_project->staging (links probed, then removed) |
- |               |               |               |--rename(staging)---------------->target_dir
+ |               |               |               |--finalize (atomic root or entries)---------->target_dir
  |               |               |               |--create Skill Links------------->target_dir
  |               |<--written[]---------------------|                  |                |
  |               |--render_report(answers, pin, written)                              |
@@ -175,10 +179,15 @@ user            cli          generate         fetch          target_dir     temp
  |<--"error: ..." (exit 3)                                                          |
 ```
 
-Same shape for an `OverlayError` (collision/missing asset) or a `VerificationError`
-(missing upstream path) raised later in the same `try` block: whichever step fails,
-the `finally` cleans up the staging root and `target_dir` is never created or moved
-into — see `generate()`, all-or-nothing by construction.
+Same shape for an `OverlayError` (collision/missing asset) or a
+`VerificationError` (missing upstream path) raised later in the same `try`
+block: whichever pre-finalize step fails, the `finally` cleans up the staging
+root and the destination is unchanged. At finalize the guarantee has two parts:
+an absent or empty destination still commits with one atomic rename and is
+unchanged on failure; an Occupied Target uses atomic per-entry renames with
+best-effort restoration, so a failure state is a reported set of whole
+generated entries, never a half-written file, and pre-existing content is never
+moved or removed.
 
 ### 3. `upstream-bump.yml` workflow
 

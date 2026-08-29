@@ -59,6 +59,26 @@ def test_report_contains_runnable_next_steps() -> None:
     assert "AGENTS.md" in report
 
 
+def test_report_omits_redundant_cd_and_renumbers_steps_in_current_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    answers = Answers(
+        project_name=tmp_path.name,
+        target_dir=tmp_path,
+        selection=ProjectSelection.default_set(CATALOG),
+    )
+
+    report = render_report(answers, PIN, [], CATALOG)
+
+    assert f"cd {tmp_path}" not in report
+    assert "  1. ask your coding agent to run `/setup-project`" in report
+    assert "  2. docker compose watch" in report
+    assert "  3. read AGENTS.md" in report
+    assert "  4. after cloning" in report
+    assert "  5." not in report
+
+
 def test_report_colour_is_decoration_and_preserves_a_bracketed_destination() -> None:
     answers = Answers(
         project_name="my-app",

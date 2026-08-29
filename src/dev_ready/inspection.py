@@ -50,6 +50,7 @@ class ProjectExpectation:
     selection: ProjectSelection
     exact_catalog_selection: bool
     require_lifecycle_overlay: bool
+    forbid_template_repository_paths: bool
 
     @classmethod
     def generation(cls, selection: ProjectSelection) -> ProjectExpectation:
@@ -57,6 +58,7 @@ class ProjectExpectation:
             selection=selection,
             exact_catalog_selection=True,
             require_lifecycle_overlay=False,
+            forbid_template_repository_paths=True,
         )
 
     @classmethod
@@ -65,6 +67,7 @@ class ProjectExpectation:
             selection=selection,
             exact_catalog_selection=False,
             require_lifecycle_overlay=True,
+            forbid_template_repository_paths=False,
         )
 
 
@@ -140,17 +143,18 @@ def inspect_project(
                 "documentation directory 'docs/' is missing",
             )
         )
-    for relative in FORBIDDEN_PATHS:
-        if (root / relative).exists():
-            issues.append(
-                ProjectIssue(
-                    "forbidden path present",
-                    f"target directory contains forbidden path {relative!r}",
-                    f"generated project contains forbidden path {relative!r} — an upstream/Copier "
-                    "change reintroduced a template-repo leak (.git worktree or copier.yml). "
-                    "Action: file an issue against dev-ready; do not use this pin.",
+    if expectation.forbid_template_repository_paths:
+        for relative in FORBIDDEN_PATHS:
+            if (root / relative).exists():
+                issues.append(
+                    ProjectIssue(
+                        "forbidden path present",
+                        f"target directory contains forbidden path {relative!r}",
+                        f"generated project contains forbidden path {relative!r} — an upstream/Copier "
+                        "change reintroduced a template-repo leak (.git worktree or copier.yml). "
+                        "Action: file an issue against dev-ready; do not use this pin.",
+                    )
                 )
-            )
 
     for name in CATALOG_COMPONENTS:
         selected = expectation.selection.items(name)

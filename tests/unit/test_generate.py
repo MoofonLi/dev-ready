@@ -16,6 +16,7 @@ from dev_ready.generate import (
     ProgressEvent,
     ProgressStatus,
     generate as _generate,
+    preflight_generation,
 )
 from dev_ready.manifest import UpstreamPin, load_default_manifest
 from dev_ready.overlay import apply_overlay
@@ -496,11 +497,14 @@ def test_temp_cleanup_failure_emits_a_non_stage_warning_event(
     original_rmtree(warnings[0].path)
 
 
+@pytest.mark.parametrize("occupied", [False, True])
 def test_generation_staging_is_adjacent_to_target(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, occupied: bool
 ) -> None:
     target_dir = tmp_path / "destination" / "my-app"
     target_dir.parent.mkdir()
+    if occupied:
+        (target_dir / "notes").mkdir(parents=True)
     staging_roots: list[Path] = []
 
     def _capture_fetch(
@@ -516,8 +520,9 @@ def test_generation_staging_is_adjacent_to_target(
     assert staging_roots[0].parent == target_dir.parent
 
 
-def test_finalize_uses_directory_rename_without_copy_fallback(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("occupied", [False, True])
+def test_finalize_uses_rename_without_copy_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, occupied: bool
 ) -> None:
     monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
 
@@ -526,6 +531,8 @@ def test_finalize_uses_directory_rename_without_copy_fallback(
 
     monkeypatch.setattr(generate_module.shutil, "move", _forbidden_move)
     target_dir = tmp_path / "my-app"
+    if occupied:
+        (target_dir / "notes").mkdir(parents=True)
 
     generate(_answers(target_dir), PIN, CATALOG)
 
@@ -584,7 +591,70 @@ def test_finalize_failure_exposes_no_partial_target_and_restores_empty_state(
     ] == [ProgressStatus.STARTED, ProgressStatus.FAILED]
 
 
-def test_preflight_rejects_non_empty_target_dir_before_fetch(
+@pytest.mark.parametrize("existing_name", [".git", "notes"])
+def test_generate_preserves_non_colliding_occupied_target_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    existing_name: str,
+) -> None:
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
+    target_dir = tmp_path / "my-app"
+    existing = target_dir / existing_name
+    existing.mkdir(parents=True)
+    marker = existing / "owned.txt"
+    marker.write_text("keep me\n", encoding="utf-8")
+
+    generate(_answers(target_dir), PIN, CATALOG)
+
+    assert marker.read_text(encoding="utf-8") == "keep me\n"
+    assert (target_dir / "README.md").is_file()
+    assert (target_dir / "backend" / "main.py").is_file()
+
+
+def test_preflight_rejects_a_known_overlay_collision_before_fetch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target_dir = tmp_path / "my-app"
+    (target_dir / ".claude").mkdir(parents=True)
+    fetch_called = False
+
+    def _unexpected_fetch(*args: object, **kwargs: object) -> Path:
+        nonlocal fetch_called
+        fetch_called = True
+        raise AssertionError("preflight must not fetch")
+
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _unexpected_fetch)
+
+    with pytest.raises(TargetDirectoryError, match=r"\.claude"):
+        preflight_generation(_answers(target_dir), CATALOG)
+
+    assert fetch_called is False
+
+
+def test_finalize_catches_an_upstream_collision_the_preflight_cannot_predict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target_dir = tmp_path / "my-app"
+    (target_dir / ".github").mkdir(parents=True)
+
+    def _fetch_with_unknown_top_level(
+        pin: UpstreamPin, dest: Path, template_data: dict[str, str] | None = None
+    ) -> Path:
+        _fake_fetch_ok(pin, dest, template_data)
+        (dest / ".github").mkdir()
+        (dest / ".github" / "workflow.yml").write_text("name: CI\n", encoding="utf-8")
+        return dest
+
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _fetch_with_unknown_top_level)
+
+    state = preflight_generation(_answers(target_dir), CATALOG)
+    assert state.existing_names == (".github",)
+
+    with pytest.raises(TargetDirectoryError, match=r"\.github"):
+        generate(_answers(target_dir), PIN, CATALOG)
+
+
+def test_finalize_rejects_all_top_level_collisions_without_moving_anything(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     calls: list[Path] = []
@@ -599,13 +669,233 @@ def test_preflight_rejects_non_empty_target_dir_before_fetch(
 
     target_dir = tmp_path / "my-app"
     target_dir.mkdir()
-    (target_dir / "existing.txt").write_text("keep me", encoding="utf-8")
+    readme = target_dir / "README.md"
+    readme.write_text("my readme\n", encoding="utf-8")
+    docs = target_dir / "docs"
+    docs.mkdir()
+    (docs / "unrelated.txt").write_text("mine\n", encoding="utf-8")
 
-    with pytest.raises(TargetDirectoryError):
+    with pytest.raises(TargetDirectoryError) as excinfo:
         generate(_answers(target_dir), PIN, CATALOG)
 
-    assert calls == []
-    assert (target_dir / "existing.txt").read_text(encoding="utf-8") == "keep me"
+    message = str(excinfo.value)
+    assert "README.md" in message
+    assert "docs" in message
+    assert message.index("README.md") < message.index("docs")
+    assert "Move them aside and merge them back after generation" in message
+    assert calls
+    assert readme.read_text(encoding="utf-8") == "my readme\n"
+    assert (docs / "unrelated.txt").read_text(encoding="utf-8") == "mine\n"
+    assert not (target_dir / "backend").exists()
+
+
+def test_finalize_detects_a_collision_that_appears_during_generation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
+    target_dir = tmp_path / "my-app"
+    (target_dir / ".git").mkdir(parents=True)
+    original_verify = generate_module.verify_project
+
+    def _verify_then_create_collision(*args: object, **kwargs: object) -> None:
+        original_verify(*args, **kwargs)  # type: ignore[arg-type]
+        (target_dir / "README.md").write_text("arrived late\n", encoding="utf-8")
+
+    monkeypatch.setattr(generate_module, "verify_project", _verify_then_create_collision)
+
+    with pytest.raises(TargetDirectoryError, match="README.md"):
+        generate(_answers(target_dir), PIN, CATALOG)
+
+    assert (target_dir / "README.md").read_text(encoding="utf-8") == "arrived late\n"
+    assert not (target_dir / "backend").exists()
+
+
+def test_case_variant_collision_is_detected_when_the_filesystem_is_case_insensitive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    probe = tmp_path / "case-probe"
+    probe.write_text("probe\n", encoding="utf-8")
+    if not (tmp_path / "CASE-PROBE").exists():
+        pytest.skip("test filesystem is case-sensitive")
+    probe.unlink()
+
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
+    target_dir = tmp_path / "my-app"
+    target_dir.mkdir()
+    (target_dir / "Readme.md").write_text("mine\n", encoding="utf-8")
+
+    with pytest.raises(TargetDirectoryError, match="Readme.md"):
+        generate(_answers(target_dir), PIN, CATALOG)
+
+    assert (target_dir / "Readme.md").read_text(encoding="utf-8") == "mine\n"
+
+
+def test_case_sensitivity_probe_failure_is_a_typed_target_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target_dir = tmp_path / "my-app"
+    target_dir.mkdir()
+    (target_dir / "Readme.md").write_text("mine\n", encoding="utf-8")
+
+    def _fail_probe(*args: object, **kwargs: object) -> None:
+        raise OSError("probe denied")
+
+    monkeypatch.setattr(tempfile, "NamedTemporaryFile", _fail_probe)
+
+    with pytest.raises(TargetDirectoryError, match="probe denied"):
+        preflight_generation(_answers(target_dir), CATALOG)
+
+
+def test_occupied_finalize_failure_restores_every_moved_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
+    target_dir = tmp_path / "my-app"
+    notes = target_dir / "notes"
+    notes.mkdir(parents=True)
+    marker = notes / "owned.txt"
+    marker.write_text("keep me\n", encoding="utf-8")
+    original_rename = Path.rename
+    staged_moves = 0
+
+    def _fail_third_staged_move(path: Path, target: Path) -> Path:
+        nonlocal staged_moves
+        if path.parent.name == "project":
+            staged_moves += 1
+            if staged_moves == 3:
+                raise OSError("simulated entry move failure")
+        return original_rename(path, target)
+
+    monkeypatch.setattr(Path, "rename", _fail_third_staged_move)
+
+    with pytest.raises(TargetDirectoryError, match="simulated entry move failure"):
+        generate(_answers(target_dir), PIN, CATALOG)
+
+    assert marker.read_text(encoding="utf-8") == "keep me\n"
+    assert {entry.name for entry in target_dir.iterdir()} == {"notes"}
+    assert not list(tmp_path.glob(".my-app.dev-ready-*"))
+
+
+def test_occupied_finalize_reports_every_entry_that_cannot_be_restored(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
+    target_dir = tmp_path / "my-app"
+    (target_dir / "notes").mkdir(parents=True)
+    original_rename = Path.rename
+    staged_moves: list[str] = []
+    restore_attempts: list[str] = []
+
+    def _fail_move_and_every_restore(path: Path, target: Path) -> Path:
+        if path.parent.name == "project":
+            if len(staged_moves) == 3:
+                raise OSError("simulated entry move failure")
+            staged_moves.append(path.name)
+        elif path.parent == target_dir:
+            restore_attempts.append(path.name)
+            raise OSError(f"cannot restore {path.name}")
+        return original_rename(path, target)
+
+    monkeypatch.setattr(Path, "rename", _fail_move_and_every_restore)
+
+    with pytest.raises(TargetDirectoryError) as excinfo:
+        generate(_answers(target_dir), PIN, CATALOG)
+
+    assert restore_attempts == list(reversed(staged_moves))
+    assert all(name in str(excinfo.value) for name in staged_moves)
+    assert "Manual recovery may be required" in str(excinfo.value)
+    assert "notes" not in restore_attempts
+
+
+def test_occupied_target_survives_skill_link_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
+    target_dir = tmp_path / "my-app"
+    notes = target_dir / "notes"
+    notes.mkdir(parents=True)
+    marker = notes / "owned.txt"
+    marker.write_text("keep me\n", encoding="utf-8")
+    original_create = generate_module.create_skill_link
+    created: list[Path] = []
+
+    def _fail_after_one_link(link_path: Path, canonical: Path) -> None:
+        if created:
+            raise OSError("simulated Skill Link failure")
+        original_create(link_path, canonical)
+        created.append(link_path)
+
+    monkeypatch.setattr(generate_module, "create_skill_link", _fail_after_one_link)
+
+    with pytest.raises(TargetDirectoryError, match="simulated Skill Link failure"):
+        generate(_answers(target_dir), PIN, CATALOG)
+
+    assert marker.read_text(encoding="utf-8") == "keep me\n"
+    assert {entry.name for entry in target_dir.iterdir()} == {"notes"}
+    assert all(not link.exists() for link in created)
+
+
+@pytest.mark.parametrize("initially_empty", [False, True])
+def test_atomic_target_state_is_restored_after_skill_link_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    initially_empty: bool,
+) -> None:
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
+    target_dir = tmp_path / "my-app"
+    if initially_empty:
+        target_dir.mkdir()
+    monkeypatch.setattr(
+        generate_module,
+        "create_skill_link",
+        lambda *args: (_ for _ in ()).throw(OSError("simulated Skill Link failure")),
+    )
+
+    with pytest.raises(TargetDirectoryError, match="simulated Skill Link failure"):
+        generate(_answers(target_dir), PIN, CATALOG)
+
+    assert target_dir.exists() is initially_empty
+    if initially_empty:
+        assert list(target_dir.iterdir()) == []
+
+
+def test_skill_link_failure_names_every_generated_entry_left_in_occupied_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
+    target_dir = tmp_path / "my-app"
+    notes = target_dir / "notes"
+    notes.mkdir(parents=True)
+    (notes / "owned.txt").write_text("keep me\n", encoding="utf-8")
+    monkeypatch.setattr(
+        generate_module,
+        "create_skill_link",
+        lambda *args: (_ for _ in ()).throw(OSError("simulated Skill Link failure")),
+    )
+    original_rename = Path.rename
+    restore_attempts: list[str] = []
+    unrestorable: list[str] = []
+
+    def _fail_two_restores(path: Path, target: Path) -> Path:
+        if path.parent == target_dir:
+            restore_attempts.append(path.name)
+            if len(unrestorable) < 2:
+                unrestorable.append(path.name)
+                raise OSError(f"cannot restore {path.name}")
+        return original_rename(path, target)
+
+    monkeypatch.setattr(Path, "rename", _fail_two_restores)
+
+    with pytest.raises(TargetDirectoryError) as excinfo:
+        generate(_answers(target_dir), PIN, CATALOG)
+
+    message = str(excinfo.value)
+    assert len(restore_attempts) > len(unrestorable)
+    assert all(name in message for name in unrestorable)
+    assert "Manual recovery may be required" in message
+    assert "notes" not in restore_attempts
+    assert (notes / "owned.txt").read_text(encoding="utf-8") == "keep me\n"
+    assert {entry.name for entry in target_dir.iterdir()} == {"notes", *unrestorable}
 
 
 def test_preflight_rejects_target_dir_that_is_a_file(tmp_path: Path) -> None:
@@ -655,12 +945,19 @@ def test_overlay_failure_leaves_target_untouched_and_no_leaked_temp_dirs(
     assert list(_isolated_tempdir.iterdir()) == []
 
 
+@pytest.mark.parametrize("occupied", [False, True])
 def test_success_leaves_no_leaked_temp_dirs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolated_tempdir: Path
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    _isolated_tempdir: Path,
+    occupied: bool,
 ) -> None:
     monkeypatch.setattr(generate_module, "fetch_snapshot", _fake_fetch_ok)
+    target_dir = tmp_path / "my-app"
+    if occupied:
+        (target_dir / "notes").mkdir(parents=True)
 
-    generate(_answers(tmp_path / "my-app"), PIN, CATALOG)
+    generate(_answers(target_dir), PIN, CATALOG)
 
     assert list(_isolated_tempdir.iterdir()) == []
 

@@ -13,7 +13,7 @@ Generate a new project.
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--yes` / `-y` | bool | false | Accept the lean Default Set, no prompts |
-| `--dir PATH` | path | `./PROJECT_NAME` | Target directory (must not exist or be empty) |
+| `--dir PATH` | path | `./PROJECT_NAME` | Target directory; `.` explicitly selects the current directory |
 | `--categories IDS` | string | Default Set | Category selection: comma-separated ids, `all`, or `none` |
 | `--flow ID` | string | `mattpocock` | Mandatory Engineering Flow single-select; `--development-loop` is a permanently accepted alias |
 | `--dev IDS` | string | Default Set when unnamed; `all` when named | Dev Enhancements: none currently; accepts `all` or `none`; the Engineering Flow is mandatory |
@@ -74,6 +74,12 @@ replacements named:
 | `--no-docs` | `--design none` |
 | `--no-handoff`, `--no-agents` | No replacement; dev-ready no longer generates the Handoff Protocol |
 
+When `--dir` is supplied and `PROJECT_NAME` is omitted, the project name
+defaults to the resolved destination directory's name. For example,
+`dev-ready init --dir .` inside `my-app/` uses `my-app`. An invalid directory
+name is prompted for interactively and exits 2 under `--yes`; it is never
+silently rewritten.
+
 Selections are resolved before confirmation, rendering, reporting,
 verification, and stamping. The resolved development loop and Enhancement set
 are shown to the user and recorded in `.dev-ready.json`. Explicit `none`
@@ -87,7 +93,11 @@ Independently of that selection, every project receives the `architecture` and
 explicit whole-catalog selection `--categories all` to select every
 Enhancement.
 
-Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments; 3 network/fetch failure; 4 target directory conflict; 5 generated project failed verification; 6 stamp missing or unparseable/invalid; 7 drift detected; 8 upgrade not supported (pre-v3 stamp); 9 upgrade failed (rolled back).
+Exit codes: 0 success; 1 unexpected error or user abort; 2 invalid arguments;
+3 network/fetch failure; 4 target directory conflict, including one or more
+colliding top-level entries in an occupied destination; 5 generated project
+failed verification; 6 stamp missing or unparseable/invalid; 7 drift detected;
+8 upgrade not supported (pre-v3 stamp); 9 upgrade failed (rolled back).
 
 #### Init progress output
 
@@ -113,10 +123,13 @@ as separate `warning:` lines; they are not a fifth stage. Spinner cleanup runs
 on success, expected errors, unexpected exceptions, keyboard interruption, and
 termination represented by Python as process exit.
 
-Staging is created beside the target and finalize commits it with one
-same-filesystem atomic rename after revalidating the destination. There is no
-cross-filesystem copy fallback: a finalize failure leaves no partial target and
-restores an initially empty target directory.
+Staging is created beside the target. Into an absent or empty destination,
+finalize remains one same-filesystem atomic rename after revalidating the
+destination; there is no cross-filesystem copy fallback, and any failure leaves
+the destination as it was found. Into an Occupied Target, finalize uses a
+deterministic sequence of same-filesystem atomic top-level-entry renames with
+best-effort restoration. A failure can leave only whole entries, never a
+half-written file, and names every generated entry it could not restore.
 
 When the selection projects Skill Links, verify materializes the complete
 projected set with the production writer, inspects it, and removes those
@@ -124,10 +137,12 @@ temporary links before finalize. Finalize recreates the same links after the
 atomic rename. A filesystem that cannot hold the required link kind fails
 verify (exit 5) with the attempted path, the operating-system cause, and a
 different-location remedy. A link failure after the rename restores the
-destination exactly and exits 4; a restoration failure keeps exit 4 and adds a
-manual-recovery warning. An explicit `--agents none` project projects no links
-and performs no capability probe. There is no fifth public stage and no new
-exit code.
+destination exactly for an absent or empty destination and exits 4. Into an
+Occupied Target, link-failure recovery is entry-wise and best effort, never
+touches content that was there first, and names every generated entry left in
+place. A restoration failure keeps exit 4 and adds a manual-recovery warning.
+An explicit `--agents none` project projects no links and performs no capability
+probe. There is no fifth public stage and no new exit code.
 
 ### `dev-ready check [PATH]`
 

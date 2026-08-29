@@ -61,27 +61,33 @@ def render_report(
 
 
 def _render_next_steps(answers: Answers) -> ScreenBlock:
-    steps = [
-        ScreenLine(f"  1. cd {answers.target_dir}", wrap=False),
-        ScreenLine("  2. ask your coding agent to run `/setup-project` before the first start"),
-        ScreenLine("     (the superuser is created on that first start)"),
-        # "docker compose watch" is the dev workflow for
-        # fastapi/full-stack-fastapi-template as of the manifest-pinned commit.
-        # Update when a manifest bump changes the upstream workflow.
-        ScreenLine(
-            "  3. docker compose watch   (see AGENTS.md for other commands)",
-            wrap=False,
-        ),
-        ScreenLine("  4. read AGENTS.md for the full picture"),
-    ]
+    actions: list[tuple[str, ...]] = []
+    if answers.target_dir != Path.cwd():
+        actions.append((f"cd {answers.target_dir}",))
+    actions.extend(
+        (
+            (
+                "ask your coding agent to run `/setup-project` before the first start",
+                "(the superuser is created on that first start)",
+            ),
+            # "docker compose watch" is the dev workflow for
+            # fastapi/full-stack-fastapi-template as of the manifest-pinned commit.
+            # Update when a manifest bump changes the upstream workflow.
+            ("docker compose watch   (see AGENTS.md for other commands)",),
+            ("read AGENTS.md for the full picture",),
+        )
+    )
     if answers.agent_targets:
-        steps.append(
-            ScreenLine(
-                "  5. after cloning, run `uvx dev-ready upgrade` to recreate "
+        actions.append(
+            (
+                "after cloning, run `uvx dev-ready upgrade` to recreate "
                 "machine-local skill links",
-                wrap=False,
             )
         )
+    steps: list[ScreenLine] = []
+    for number, action in enumerate(actions, start=1):
+        steps.append(ScreenLine(f"  {number}. {action[0]}", wrap=False))
+        steps.extend(ScreenLine(f"     {continuation}") for continuation in action[1:])
     return ScreenBlock(heading="Next Steps:", lines=tuple(steps))
 
 

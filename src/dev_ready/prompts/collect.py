@@ -2,8 +2,8 @@
 
 `prompts` performs no I/O other than the terminal (docs/architecture.md).
 questionary is imported lazily, only from `_default_asker`, so a caller that
-always supplies its own `asker` (tests, or the `--yes` flag path in cli.py,
-which never calls into this module at all) never triggers the import.
+never needs an asker does not trigger the import. The `--yes` path passes
+complete intent through this module but never constructs an asker.
 """
 
 import sys
@@ -41,10 +41,29 @@ def collect_answers(
     `InvalidArgumentsError` up front if a prompt would be needed but stdin
     is not a TTY (and no `asker` was injected).
     """
-    needs_name = partial.project_name is None
+    project_name = partial.project_name
+    invalid_destination_name: str | None = None
+    if project_name is None and partial.target_dir is not None:
+        candidate = partial.target_dir.name
+        try:
+            validate_project_name(candidate)
+        except InvalidArgumentsError:
+            invalid_destination_name = candidate
+        else:
+            project_name = candidate
+
+    needs_name = project_name is None
     needs_selection = partial.selection is None
 
+    if needs_name and partial.assume_yes:
+        if invalid_destination_name is not None:
+            validate_project_name(invalid_destination_name)
+        raise InvalidArgumentsError(
+            "project name is required: dev-ready init <project-name> or --dir <path>"
+        )
     if needs_name and asker is None and not _is_interactive():
+        if invalid_destination_name is not None:
+            validate_project_name(invalid_destination_name)
         raise InvalidArgumentsError(
             "project name is required: dev-ready init <project-name> "
             "(or run in an interactive terminal to be prompted, or pass --yes)"
@@ -59,10 +78,12 @@ def collect_answers(
     if (needs_name or needs_selection) and resolved_asker is None:
         resolved_asker = _default_asker()
 
-    project_name = partial.project_name
     if needs_name:
         assert resolved_asker is not None
-        project_name = _prompt_project_name(resolved_asker)
+        project_name = _prompt_project_name(
+            resolved_asker,
+            invalid_name=invalid_destination_name,
+        )
 
     if needs_selection:
         assert resolved_asker is not None
@@ -111,6 +132,7 @@ def confirm_generation(
     *,
     asker: Asker | None = None,
     style: PresentationStyle = PresentationStyle(),
+    occupied_entry_count: int = 0,
 ) -> bool:
     """Print a summary of what will be written and ask the user to confirm.
 
@@ -124,7 +146,14 @@ def confirm_generation(
         )
 
     resolved_asker = asker if asker is not None else _default_asker()
-    print(_render_confirmation_summary(answers, pin, style=style))
+    print(
+        _render_confirmation_summary(
+            answers,
+            pin,
+            style=style,
+            occupied_entry_count=occupied_entry_count,
+        )
+    )
     try:
         confirmed = resolved_asker.confirm("Proceed?", default=True)
     except KeyboardInterrupt:
@@ -137,6 +166,7 @@ def _render_confirmation_summary(
     pin: UpstreamPin,
     *,
     style: PresentationStyle = PresentationStyle(),
+    occupied_entry_count: int = 0,
 ) -> str:
     categories_line = ", ".join(sorted(answers.selection.categories)) or "(none)"
     selected_items = set().union(
@@ -146,21 +176,34 @@ def _render_confirmation_summary(
     )
     items_line = ", ".join(sorted(selected_items)) or "(none)"
     targets_line = ", ".join(sorted(answers.agent_targets)) or "(none)"
+    lines = [
+        ScreenLine(f"  project name: {answers.project_name}"),
+        ScreenLine(f"  target dir:   {answers.target_dir}", wrap=False),
+    ]
+    if occupied_entry_count:
+        noun = "entry" if occupied_entry_count == 1 else "entries"
+        lines.append(
+            ScreenLine(
+                f"  occupancy:    {answers.target_dir} already contains "
+                f"{occupied_entry_count} pre-existing top-level {noun} "
+                "that will be left in place",
+                wrap=False,
+            )
+        )
+    lines.extend(
+        (
+            ScreenLine(f"  upstream:     {pin.repo}@{pin.commit[:12]}"),
+            ScreenLine(f"  engineering flow: {answers.selection.development_loop}"),
+            ScreenLine(f"  categories:   {categories_line}"),
+            ScreenLine(f"  selected items: {items_line}"),
+            ScreenLine(f"  agent targets: {targets_line}"),
+        )
+    )
     return render_screen(
         (
             ScreenBlock(
                 heading="Ready to generate:",
-                lines=(
-                    ScreenLine(f"  project name: {answers.project_name}"),
-                    ScreenLine(f"  target dir:   {answers.target_dir}", wrap=False),
-                    ScreenLine(f"  upstream:     {pin.repo}@{pin.commit[:12]}"),
-                    ScreenLine(
-                        f"  engineering flow: {answers.selection.development_loop}"
-                    ),
-                    ScreenLine(f"  categories:   {categories_line}"),
-                    ScreenLine(f"  selected items: {items_line}"),
-                    ScreenLine(f"  agent targets: {targets_line}"),
-                ),
+                lines=tuple(lines),
             ),
         ),
         style=style,
@@ -186,8 +229,13 @@ def _render_flow_comparison(
     return render_screen(comparison, style=style)
 
 
-def _prompt_project_name(asker: Asker) -> str:
-    message = "Project name:"
+def _prompt_project_name(asker: Asker, *, invalid_name: str | None = None) -> str:
+    message = (
+        f"invalid project name {invalid_name!r}: use letters, digits, '.', '_', '-', "
+        "starting with a letter or digit. Project name:"
+        if invalid_name is not None
+        else "Project name:"
+    )
     while True:
         try:
             name = asker.text(message)

@@ -278,7 +278,6 @@ def test_skill_documents_safe_failure_and_verification_behavior() -> None:
         "exit 4",
         "exit 5",
         ".dev-ready.json",
-        "non-empty target",
         "do not delete",
         "superpowers",
         "addyosmani",
@@ -288,6 +287,8 @@ def test_skill_documents_safe_failure_and_verification_behavior() -> None:
     assert "Engineering Flow id 'spec-loop' was renamed to 'mattpocock'" in original
     assert "Engineering Flow 'addyosmani' is not yet available" in original
     assert "unknown Engineering Flow id" in original
+    assert "existing non-empty target" not in text
+    assert "if it exists and is non-empty, stop" not in text
     for removed in ("--skills", "--mcp", "--no-docs", "--no-handoff", "--no-agents"):
         assert removed in text
 
@@ -353,6 +354,7 @@ def test_interview_asks_for_destination_and_never_reasks_fixed_stack() -> None:
     interview = _section(text, "Interview", 2)
     fixed_facts = " ".join(_section(text, "Fixed project facts", 3).split())
     destination = _section(text, "Resolve the destination safely", 2)
+    normalized_destination = " ".join(destination.split())
     normalized = " ".join(interview.split())
 
     assert "Ask the developer for both the project name and destination" in normalized
@@ -361,8 +363,8 @@ def test_interview_asks_for_destination_and_never_reasks_fixed_stack() -> None:
     assert "never ask the developer to choose or confirm them" in fixed_facts
     for known_fact in ("FastAPI", "React", "PostgreSQL", "Docker Compose", "frontend"):
         assert known_fact in fixed_facts
-    assert "non-empty" in destination
-    assert "stop and ask the user to choose another destination" in destination
+    assert "let dev-ready enforce destination safety" in normalized_destination
+    assert "do not delete" in destination.casefold()
 
 
 def test_interview_keeps_design_answers_independent_and_never_guesses() -> None:

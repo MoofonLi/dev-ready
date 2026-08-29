@@ -4,6 +4,8 @@ from dataclasses import replace
 from pathlib import Path
 import shutil
 
+import pytest
+
 from dev_ready.inspection import ProjectExpectation, inspect_project
 from dev_ready.manifest import ComponentCatalog, ItemPath, load_default_manifest
 from dev_ready.prompts import ProjectSelection
@@ -12,6 +14,34 @@ from project_factory import materialize_project_structure
 
 MANIFEST = load_default_manifest()
 CATALOG = MANIFEST.components
+
+
+@pytest.mark.parametrize("forbidden_path", [".git", "copier.yml"])
+def test_forbidden_paths_apply_only_to_generation(
+    tmp_path: Path, forbidden_path: str
+) -> None:
+    path = tmp_path / forbidden_path
+    if path.suffix:
+        path.write_text("user-owned\n", encoding="utf-8")
+    else:
+        path.mkdir()
+
+    lifecycle_issues = inspect_project(
+        tmp_path,
+        CATALOG,
+        ProjectExpectation.lifecycle(ProjectSelection.empty()),
+    )
+    generation_issues = inspect_project(
+        tmp_path,
+        CATALOG,
+        ProjectExpectation.generation(ProjectSelection.empty()),
+    )
+
+    assert not any(issue.category == "forbidden path present" for issue in lifecycle_issues)
+    assert any(
+        issue.category == "forbidden path present" and forbidden_path in issue.detail
+        for issue in generation_issues
+    )
 
 
 def _catalog_with_second_loop() -> ComponentCatalog:

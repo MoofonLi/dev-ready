@@ -114,6 +114,31 @@ def test_init_real_end_to_end(
         )
 
 
+def test_init_into_git_initialised_directory_then_check_is_clean(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    git = shutil.which("git")
+    if git is None:
+        pytest.skip("git is required for the occupied-target acceptance case")
+    target_dir = tmp_path / "occupied-app"
+    target_dir.mkdir()
+    subprocess.run(
+        [git, "init"],
+        cwd=target_dir,
+        check=True,
+        capture_output=True,
+    )
+
+    assert main(["init", "--yes", "--dir", str(target_dir)]) == 0
+    assert (target_dir / ".git").is_dir()
+    stamp = json.loads((target_dir / ".dev-ready.json").read_text(encoding="utf-8"))
+    assert stamp["project_name"] == "occupied-app"
+    capsys.readouterr()
+
+    assert main(["check", str(target_dir)]) == 0
+    assert "Status: CLEAN" in capsys.readouterr().out
+
+
 @pytest.mark.skipif(not _WINDOWS, reason="junctions store absolute paths")
 def test_moved_windows_project_is_repaired_by_one_upgrade(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]

@@ -450,14 +450,21 @@ def test_check_missing_required_path(tmp_path: Path, capsys: pytest.CaptureFixtu
     assert "required path 'backend' is missing" in captured.err
 
 
-def test_check_forbidden_path_present(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_check_ignores_user_owned_git_but_still_reports_other_drift(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     _create_minimal_valid_project(tmp_path, stamp_version=2)
     (tmp_path / ".git").mkdir()
 
-    exit_code = main(["check", str(tmp_path)])
-    assert exit_code == 7
-    captured = capsys.readouterr()
-    assert "forbidden path '.git'" in captured.err
+    assert main(["check", str(tmp_path)]) == 0
+    assert "Status: CLEAN" in capsys.readouterr().out
+
+    (tmp_path / "README.md").unlink()
+
+    assert main(["check", str(tmp_path)]) == 7
+    error = capsys.readouterr().err
+    assert "required file 'README.md' is missing" in error
+    assert "forbidden path '.git'" not in error
 
 
 def test_check_read_only_assertion(tmp_path: Path) -> None:

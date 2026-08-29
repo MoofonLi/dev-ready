@@ -274,6 +274,52 @@ def test_name_prompt_result_lands_in_answers() -> None:
     assert answers.project_name == "prompted-name"
 
 
+def test_name_defaults_to_explicit_destination_directory_without_prompt(
+    tmp_path: Path,
+) -> None:
+    asker = FakeAsker(texts=["should-not-be-used"])
+
+    answers = collect_answers(
+        _partial(project_name=None, target_dir=tmp_path / "app"),
+        asker=asker,
+    )
+
+    assert answers.project_name == "app"
+    assert asker.text_calls == []
+
+
+def test_invalid_destination_directory_name_is_prompted_without_rewriting(
+    tmp_path: Path,
+) -> None:
+    asker = FakeAsker(texts=["accepted-name"])
+
+    answers = collect_answers(
+        _partial(project_name=None, target_dir=tmp_path / "My App"),
+        asker=asker,
+    )
+
+    assert answers.project_name == "accepted-name"
+    assert "My App" in asker.text_calls[0]
+
+
+def test_assume_yes_rejects_invalid_destination_name_without_prompting(
+    tmp_path: Path,
+) -> None:
+    asker = FakeAsker(texts=["should-not-be-used"])
+
+    with pytest.raises(InvalidArgumentsError, match="My App"):
+        collect_answers(
+            _partial(
+                project_name=None,
+                target_dir=tmp_path / "My App",
+                assume_yes=True,
+            ),
+            asker=asker,
+        )
+
+    assert asker.text_calls == []
+
+
 # --- Category prompt ---
 
 
@@ -980,6 +1026,36 @@ def test_confirm_prints_summary_with_project_name_and_pin(capsys: pytest.Capture
     out = capsys.readouterr().out
     assert "my-app" in out
     assert PIN.repo in out
+
+
+def test_confirmation_discloses_occupied_destination_entry_count(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    answers = _answers(project_name="my-app")
+
+    confirm_generation(
+        answers,
+        PIN,
+        asker=FakeAsker(confirms=[True]),
+        occupied_entry_count=2,
+    )
+
+    out = capsys.readouterr().out
+    assert str(answers.target_dir) in out
+    assert "2 pre-existing top-level entries that will be left in place" in out
+
+
+def test_confirmation_says_nothing_about_occupancy_for_empty_or_absent_target(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    confirm_generation(
+        _answers(),
+        PIN,
+        asker=FakeAsker(confirms=[True]),
+        occupied_entry_count=0,
+    )
+
+    assert "pre-existing top-level" not in capsys.readouterr().out
 
 
 def test_confirmation_colour_is_decoration_only(

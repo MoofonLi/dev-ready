@@ -76,7 +76,10 @@ Ask the developer for a valid project name using letters, digits, `.`, `_`, or
 in the proposed command, including the resolved `--dir` path, before running
 anything.
 
-Inspect the destination first. If it exists and is non-empty, stop and ask the user to choose another destination or resolve the existing content themselves. Do not delete, empty, overwrite, or automatically retry into a non-empty target.
+Inspect the destination first and disclose any content already there in the
+proposal. Do not decide destination safety yourself: let dev-ready enforce
+destination safety when it runs. Do not delete, empty, overwrite, or
+automatically retry after a target conflict.
 
 ## Map the interview to the catalog
 
@@ -366,7 +369,7 @@ Treat only exit 0 as success. Every nonzero exit is a failure:
 - exit 1: abort or unexpected generation error;
 - exit 2: invalid arguments, unknown item id, or conflicting flags;
 - exit 3: network, Git, or pinned-template fetch failure;
-- exit 4: target conflict, including an existing non-empty target;
+- exit 4: target conflict;
 - exit 5: generated project failed verification.
 
 Report the command, exit code, and error text. Do not hide the failure, weaken the selection, or retry destructively.
