@@ -48,7 +48,7 @@ never implemented.
 
 - Never fetch upstream "latest" at generation time; pins live in `src/dev_ready/manifest.json` only (ADR-002).
 - Network calls only in `src/dev_ready/fetch/` (module boundary table in architecture.md).
-- Generation must be all-or-nothing: no partial output directories on failure.
+- Generation is all-or-nothing into an absent or empty destination: one atomic rename, no partial output directory on failure. Into an Occupied Target (ADR-031) it is a bounded sequence of atomic per-entry moves with best-effort restoration — the failure state is always a set of whole entries, never a half-written file — and dev-ready never touches, moves, or removes content that was there first. State the guarantee in both parts wherever it is claimed.
 - Unit tests: no network, no filesystem outside tmp_path.
 - Conventional Commits.
 - English everywhere dev-ready authors, speaks, or generates — CLI output, composed project content, source, tests, and every document under `docs/` (ADR-016). Byte-identical vendored third-party snapshots retain their upstream language because translating them would break provenance; this is not a localized surface. There is no localized runtime: never add `--lang`, `DEV_READY_LANG`, locale detection, or a message catalog.
