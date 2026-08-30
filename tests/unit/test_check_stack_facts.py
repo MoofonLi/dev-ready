@@ -56,13 +56,27 @@ Every dev-ready project uses FastAPI, React, PostgreSQL, and Docker Compose.
 Every dev-ready project has a frontend.
 The frontend is React.
 """
+_README_STACK_SENTENCE = (
+    "Every generated project is FastAPI, React, PostgreSQL, and Docker Compose "
+    "at a pinned commit.\n"
+)
 
 
-def _write_repository(tmp_path: Path, *, skill_text: str = _FIXED_STACK_FACTS) -> Path:
+def _write_repository(
+    tmp_path: Path,
+    *,
+    skill_text: str = _FIXED_STACK_FACTS,
+    readme_text: str | None = _README_STACK_SENTENCE,
+    pypi_text: str | None = _README_STACK_SENTENCE,
+) -> Path:
     repository = tmp_path / "repository"
     skill = repository / "skills" / "dev-ready" / "SKILL.md"
     skill.parent.mkdir(parents=True)
     skill.write_text(skill_text, encoding="utf-8")
+    if readme_text is not None:
+        (repository / "README.md").write_text(readme_text, encoding="utf-8")
+    if pypi_text is not None:
+        (repository / "README-pypi.md").write_text(pypi_text, encoding="utf-8")
     return repository
 
 
@@ -293,6 +307,10 @@ def test_repository_claim_fails_when_upstream_evidence_is_missing(
         "PostgreSQL",
         "Generation Skill fixed stack: upstream evidence missing from "
         "backend/pyproject.toml",
+        "README stack sentence: upstream evidence missing from "
+        "backend/pyproject.toml",
+        "PyPI README stack sentence: upstream evidence missing from "
+        "backend/pyproject.toml",
     ]
 
 
@@ -303,6 +321,26 @@ def test_repository_claim_fails_when_authored_claim_is_missing(tmp_path: Path) -
     ) == [
         "Generation Skill fixed stack: authored claim missing from "
         "skills/dev-ready/SKILL.md"
+    ]
+
+
+def test_readme_stack_claim_fails_when_authored_claim_is_missing(tmp_path: Path) -> None:
+    assert check_stack_facts.check_stack_facts(
+        _write_project(tmp_path),
+        repository_root=_write_repository(tmp_path, readme_text="No stack claim.\n"),
+    ) == [
+        "README stack sentence: authored claim missing from README.md"
+    ]
+
+
+def test_pypi_readme_stack_claim_fails_when_authored_claim_is_missing(
+    tmp_path: Path,
+) -> None:
+    assert check_stack_facts.check_stack_facts(
+        _write_project(tmp_path),
+        repository_root=_write_repository(tmp_path, pypi_text="No stack claim.\n"),
+    ) == [
+        "PyPI README stack sentence: authored claim missing from README-pypi.md"
     ]
 
 

@@ -37,6 +37,7 @@ PLUGIN_COMPONENT_NAMES = frozenset(
     }
 )
 README_PATHS = (REPO_ROOT / "README.md", REPO_ROOT / "README-pypi.md")
+ZH_README_PATH = REPO_ROOT / "README.zh-TW.md"
 INSTALL_COMMAND = "npx skills add MoofonLi/dev-ready --skill dev-ready"
 ISSUES_URL = "https://github.com/MoofonLi/dev-ready/issues"
 MANIFEST = load_default_manifest()
@@ -65,10 +66,18 @@ REPEATED_FLOW_SURFACES = (
     RepeatedFlowSurface(SKILL_PATH, "superpowers", "choose_when", None, 1),
     RepeatedFlowSurface(SKILL_PATH, "addyosmani", "description", None, 1),
     RepeatedFlowSurface(SKILL_PATH, "addyosmani", "choose_when", None, 1),
-    RepeatedFlowSurface(README_PATHS[0], "mattpocock", "description", None, 2),
-    RepeatedFlowSurface(README_PATHS[0], "superpowers", "description", None, 2),
+    RepeatedFlowSurface(README_PATHS[0], "mattpocock", "description", None, 1),
+    RepeatedFlowSurface(README_PATHS[0], "mattpocock", "choose_when", None, 1),
+    RepeatedFlowSurface(README_PATHS[0], "superpowers", "description", None, 1),
+    RepeatedFlowSurface(README_PATHS[0], "superpowers", "choose_when", None, 1),
+    RepeatedFlowSurface(README_PATHS[0], "addyosmani", "description", None, 1),
+    RepeatedFlowSurface(README_PATHS[0], "addyosmani", "choose_when", None, 1),
     RepeatedFlowSurface(README_PATHS[1], "mattpocock", "description", None, 1),
+    RepeatedFlowSurface(README_PATHS[1], "mattpocock", "choose_when", None, 1),
     RepeatedFlowSurface(README_PATHS[1], "superpowers", "description", None, 1),
+    RepeatedFlowSurface(README_PATHS[1], "superpowers", "choose_when", None, 1),
+    RepeatedFlowSurface(README_PATHS[1], "addyosmani", "description", None, 1),
+    RepeatedFlowSurface(README_PATHS[1], "addyosmani", "choose_when", None, 1),
     RepeatedFlowSurface(SUBMISSION_PATH, "superpowers", "choose_when", 0, 1),
 )
 
@@ -258,6 +267,98 @@ def test_public_docs_explain_discovery_agent_use_and_support() -> None:
         assert "npx skills add MoofonLi/dev-ready --list" in text, path
         assert "Scaffold a FastAPI project with dev-ready" in text, path
         assert ISSUES_URL in text, path
+
+
+_README_LINE_CEILING = 100
+_CAPTURE_REF = "docs/assets/demo.gif"
+_FLAG_OR_EXIT_HEADER = re.compile(r"flag|exit", re.IGNORECASE)
+
+
+def _markdown_table_headers(text: str) -> list[str]:
+    headers: list[str] = []
+    lines = text.splitlines()
+    for index, line in enumerate(lines[:-1]):
+        if not line.startswith("|"):
+            continue
+        divider = lines[index + 1].strip()
+        if re.fullmatch(r"\|?[:\-| ]+\|?", divider):
+            headers.append(line)
+    return headers
+
+
+def test_readme_stays_under_the_line_ceiling() -> None:
+    lines = README_PATHS[0].read_text(encoding="utf-8").splitlines()
+    assert len(lines) < _README_LINE_CEILING
+
+
+def test_readme_references_the_recorded_capture() -> None:
+    text = README_PATHS[0].read_text(encoding="utf-8")
+    assert _CAPTURE_REF in text
+
+
+def test_all_readmes_reference_the_recorded_capture() -> None:
+    for path in (*README_PATHS, ZH_README_PATH):
+        text = path.read_text(encoding="utf-8")
+        assert _CAPTURE_REF in text, path
+
+
+def test_zh_tw_overview_states_occupied_destination_and_three_flows() -> None:
+    text = ZH_README_PATH.read_text(encoding="utf-8")
+    assert "已有內容" in text
+    assert "三套都可選" in text
+    assert "即將推出" not in text
+
+
+def test_readme_has_no_flag_or_exit_code_table() -> None:
+    for path in README_PATHS:
+        text = path.read_text(encoding="utf-8")
+        assert not any(
+            _FLAG_OR_EXIT_HEADER.search(header)
+            for header in _markdown_table_headers(text)
+        ), path
+
+
+def test_readme_names_addyosmani_and_drops_coming_soon() -> None:
+    for path in README_PATHS:
+        text = path.read_text(encoding="utf-8")
+        assert "addyosmani" in text, path
+        assert "coming soon" not in text.casefold(), path
+    assert "coming soon" not in ZH_README_PATH.read_text(encoding="utf-8").casefold()
+
+
+_PYPI_CAPTURE_URL = (
+    "https://raw.githubusercontent.com/MoofonLi/dev-ready/main/docs/assets/demo.gif"
+)
+_ABSOLUTE_LINK = re.compile(r"^(?:https?:|mailto:|#)")
+
+
+def _markdown_destinations(text: str) -> list[str]:
+    return [
+        destination
+        for destination in re.findall(r"\[[^\]]*\]\(([^)]+)\)|<((?:https?|mailto):[^>]+)>", text)
+        for destination in destination
+        if destination
+    ]
+
+
+def test_pypi_readme_references_the_capture_by_raw_url() -> None:
+    text = README_PATHS[1].read_text(encoding="utf-8")
+    assert _PYPI_CAPTURE_URL in text
+
+
+def test_pypi_readme_links_are_absolute() -> None:
+    text = README_PATHS[1].read_text(encoding="utf-8")
+    relative = [
+        destination
+        for destination in _markdown_destinations(text)
+        if not _ABSOLUTE_LINK.match(destination)
+    ]
+    assert relative == []
+
+
+def test_pypi_readme_points_at_the_v0_13_overview() -> None:
+    text = README_PATHS[1].read_text(encoding="utf-8")
+    assert "docs/version_overview/v0.13-overview.md" in text
 
 
 def test_skill_documents_safe_failure_and_verification_behavior() -> None:

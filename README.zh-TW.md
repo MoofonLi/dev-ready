@@ -14,14 +14,16 @@
 uvx dev-ready init my-app
 ```
 
-不會產生做到一半的輸出，也不會抓未經測試的「最新版」：上游範本固定在通過 CI 驗證的 commit，而且產生過程是全有全無——任何一步失敗，你的目標目錄不會被碰到。
+![A recorded interactive `dev-ready init`: Engineering Flow comparison, Category prompts, confirmation, progress stages, and the generation report.](docs/assets/demo.gif)
+
+不會產生做到一半的輸出，也不會抓未經測試的「最新版」：上游範本固定在通過 CI 驗證的 commit，而且產生過程是全有全無。目標目錄可以是空的，也可以已有內容——已在那裡的東西不會被碰到、搬走或刪掉；失敗時不會留下寫到一半的檔案。
 
 ## 你會得到什麼
 
 一個以 [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) 為基底的專案（FastAPI、React、SQLModel、PostgreSQL、Docker Compose），外加一層 AI 工具疊加內容，讓 coding agent 一開箱就能順利工作：
 
 - **專案指示與開發護欄** — 共用內容只寫一份在標準位置；支援標準的 agent 可直接讀取，而凡是需要自己專屬目錄的 agent，只要固定參考清單裡有它，dev-ready 就會為它建立一份指向共用內容的連結。該連結只存在於本機、不進 git，clone 之後跑一次 `uvx dev-ready upgrade` 就會重建，讓它讀到同一份指示。專案的 `AGENTS.md` 也會寫明這個專案實際用了哪些技術、測試與檢查各該跑哪些指令，以及它本身就是這個專案的標準來源
-- **具名的 Engineering Flow** — 每個專案都會先選定一套開發方法（兩套可選、一套標成即將推出）
+- **具名的 Engineering Flow** — 每個專案都會先選定一套開發方法（三套都可選）
 - **精簡的預設內容** — 接受預設值時，只產生這套 Engineering Flow 加上專案自己的架構與需求文件骨架；其他強化項目預設都不加入。登入、寄信與錯誤回報可以不用親手改 `.env` 就設定好
 - **依用途挑選的強化項目** — 可依開發、安全、品質、設計與 token 最佳化等類別，選擇安全稽核、React 分析、瀏覽器測試、前端設計參考、精簡 agent 回應與 codebase-memory 等能力
 - **按需產生的 MCP 設定** — 只有選到需要專案層級 MCP 設定的強化項目時才會寫入設定檔，工具版本仍然固定
@@ -53,9 +55,9 @@ pip install dev-ready
 dev-ready init my-app
 ```
 
-直接執行時會進入互動模式，先問 Engineering Flow，再依序出示每一個可選類別，最後問 agent 目標；一路按 Enter 仍會得到上面描述的精簡內容。
+直接執行時會進入互動模式，先問 Engineering Flow，再依序出示每一個可選類別，最後問 agent 目標，確認後才開始產生；一路按 Enter 仍會得到上面描述的精簡內容。
 
-產生過程中，stderr 會顯示「取得範本 → 疊加內容 → 驗證 → 完成」四個階段的進度；在終端機是動態指示器，被重導向時則是穩定的純文字行。
+產生過程中，stderr 會顯示「取得範本 → 疊加內容 → 驗證 → 完成」四個階段的進度；在終端機是動態指示器，被重導向時則是穩定的純文字行。完成後 stdout 會留下產生報告。
 
 ## 專案建立之後
 

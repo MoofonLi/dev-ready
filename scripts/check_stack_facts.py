@@ -271,6 +271,16 @@ SETUP_PROJECT_FACTS = (
     ),
 )
 
+_STACK_SENTENCE = (
+    "Every generated project is FastAPI, React, PostgreSQL, and Docker Compose"
+)
+_STACK_SOURCES = (
+    STACK_FACTS["FastAPI"],
+    STACK_FACTS["React"],
+    STACK_FACTS["PostgreSQL"],
+    STACK_FACTS["Docker Compose"],
+)
+
 REPOSITORY_CLAIM_FACTS = (
     ClaimFact(
         "Generation Skill fixed stack",
@@ -281,12 +291,21 @@ REPOSITORY_CLAIM_FACTS = (
             "Every dev-ready project has a frontend",
             "The frontend is React",
         ),
-        (
-            STACK_FACTS["FastAPI"],
-            STACK_FACTS["React"],
-            STACK_FACTS["PostgreSQL"],
-            STACK_FACTS["Docker Compose"],
-        ),
+        _STACK_SOURCES,
+        claim_root="repository",
+    ),
+    ClaimFact(
+        "README stack sentence",
+        "README.md",
+        (_STACK_SENTENCE,),
+        _STACK_SOURCES,
+        claim_root="repository",
+    ),
+    ClaimFact(
+        "PyPI README stack sentence",
+        "README-pypi.md",
+        (_STACK_SENTENCE,),
+        _STACK_SOURCES,
         claim_root="repository",
     ),
 )
