@@ -61,3 +61,59 @@ surfaces, which are edited more often and by hand. An FR that writes an upstream
 fact onto any of them pays for its guard in the same phase, and the
 "a claim that cannot be stated in mechanically checkable form is a claim that
 should not be made" test now applies to the README and the skill as well.
+
+---
+
+## 2026-08-30 amendment — a Recorded Capture is outside the guard, and nothing may rest on it alone
+
+Decided in the `grill-with-docs` session opening v0.13 Phase 6, which puts a
+terminal image at the top of `README.md` and `README.zh-TW.md` (FR-54).
+
+The 2026-08-23 amendment made the subject of this guard the claim rather than
+its destination: every factual claim about the upstream template that dev-ready
+states to a user — including in either README — is mechanically checked against
+the pinned commit. FR-54 introduces the first surface that cannot satisfy that
+rule. **A recorded terminal image is a claim no test can read.** It shows the
+flow menu, the confirmation screen, and the generation report as they were on
+the day it was recorded, and every one of those can go false at the next pin
+bump, catalog change, or presentation edit with nothing failing.
+
+The honest options were to guard it or to bound it. Guarding it means
+regenerating the capture in CI, which needs network, a real clone, a TTY, and a
+recorder binary in the job, and commits a regenerated binary on a weekly
+cadence — a churning artifact whose diffs no reviewer can read, which is a worse
+guard than none because it looks like one. So this amendment bounds it instead.
+
+**A Recorded Capture is recorded, never drawn, and carries no load-bearing
+claim.** Three rules:
+
+- **The tape is the artifact; the image is its output.** A committed tape that
+  replays the real CLI is what makes the image regenerable at a pin bump. A
+  hand-authored screenshot or a drawn mockup is precisely the artifact this ADR
+  exists to prevent and may not be substituted, including as a fallback when
+  recording is inconvenient.
+- **Every fact the capture shows must also be stated in guarded text on the same
+  page.** The image illustrates; it never informs alone. A README whose only
+  statement of a fact is inside the picture has made an unguarded claim, and the
+  fact belongs in prose the existing assertions can resolve against the manifest.
+- **Regeneration is a human step, recorded as one.** It is not run in CI and not
+  run weekly. `docs/pin-maintenance.md` and the `release` skill name re-recording
+  as a step to consider; a stale capture is a known and accepted cost, bounded by
+  the rule above to being stale *decoration* rather than a stale *claim*.
+
+- **Considered: regenerating the capture in `generate-and-verify`** — rejected
+  for the churn and reviewability reasons above.
+- **Considered: no image at all, keeping every README surface guarded** —
+  rejected. FR-54 exists because a 305-line wall of bullets does not show a
+  reader what the tool does, and the three Static Screens v0.13 built are the
+  answer. Refusing the image to preserve a clean guard record optimizes the
+  wrong thing.
+- **Considered: a new ADR** — rejected on the same ground the 2026-08-23
+  amendment rejected it.
+
+Consequences: this ADR now has a named exception, and naming it is the point —
+a future reader who finds an unchecked image at the top of the most
+drift-guarded document set in the repository would otherwise reasonably conclude
+the guard had been forgotten. The exception is narrow: it covers the capture and
+nothing else on the page, and the "state it in guarded text too" rule means the
+capture can always be deleted without the README losing a fact.
