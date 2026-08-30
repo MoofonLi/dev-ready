@@ -49,6 +49,13 @@ uv run pytest -m network
 
 Every command must pass before continuing. If anything fails, stop the release: fix it through the Spec Loop (ADR-021), and restart from this step. Do not "release now, fix later" - the release pipeline publishes to PyPI, which cannot be unpublished.
 
+If this release changed the interactive `init` surface the README capture
+shows (the flow comparison, Category prompts, confirmation, progress stages,
+or report), consider re-recording `docs/assets/demo.gif` from
+`docs/assets/demo.tape` with VHS. Regeneration is a human step, not a CI job
+(ADR-023). A stale capture is an accepted cost when that surface did not
+change.
+
 ## Step 3 - Write the version overview
 
 Only after all tests pass. `docs/version_overview/<version>-overview.md` is the durable, committed record of what the version ships, and it is the **only** per-version document this process produces: ADR-021 retired the gitignored per-phase `reports/` overviews along with the rest of the phase document set (see its 2026-08-09 amendment). Never write `docs/handoff/<version>/reports/` - that path is retired.

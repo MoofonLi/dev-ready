@@ -28,7 +28,13 @@ keeps shipping the old pin until a human updates the manifest.
 4. Real-run check: one generation into a scratch directory outside the repo with `--yes`;
    confirm the new pin appears in the generated `.mcp.json` / `frontend/package.json` and
    the `.dev-ready.json` stamp; delete the scratch directory.
-5. Open a PR with a `chore:` Conventional Commit (e.g. `chore: bump react-doctor pin to X.Y.Z`).
+5. Consider re-recording the README capture. The committed tape is
+   `docs/assets/demo.tape`; its output is `docs/assets/demo.gif`. Replay the
+   tape with VHS rather than reconstructing a recording setup. A stale image
+   is an accepted cost (ADR-023, 2026-08-30 amendment) — re-record when the
+   interactive CLI surface the capture shows has changed, not on every pin
+   bump.
+6. Open a PR with a `chore:` Conventional Commit (e.g. `chore: bump react-doctor pin to X.Y.Z`).
 
 ## Long-term
 
