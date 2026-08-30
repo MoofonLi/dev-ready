@@ -2,6 +2,58 @@
 
 All notable changes to dev-ready are documented here.
 
+## [0.13.0] — 2026-08-30
+
+### Added
+
+- **A third development method is selectable, and none is marked "coming soon"
+  any more.** Its steps are started by the agent itself, and its chain runs from
+  a written specification through planning, incremental implementation,
+  test-first work, and review, ending at shipping rather than at a finished
+  branch. Twenty steps come with it, so work headed for production can reach
+  security hardening, performance, and instrumentation beside the build ones.
+  All three offered methods are now available.
+- **A new Token Optimize item** that keeps agent answers structured and
+  scannable. The Category description widened to match what it now holds:
+  reducing context use, keeping output legible, and improving codebase recall.
+
+### Changed
+
+- **`init` accepts a destination that already has content.** Generation used to
+  refuse anything but an absent or empty directory. It now writes into an
+  occupied one, and **never touches, moves, or removes content that was there
+  first**. Exit 4 covers a new case: one or more top-level entries in the
+  destination colliding with entries the new project would create. The failure
+  state is always a set of whole entries, never a half-written file, and any
+  entry that could not be put back is named. An absent or empty destination is
+  unchanged — it still finalizes with a single atomic rename.
+- **Choosing a development method now shows criteria, not just a description.**
+  Each method carries the situations it suits, and the one-line description
+  became a short menu label. Both existing methods' descriptions are rewritten a
+  second time in two versions as a result.
+- **The pre-generation confirmation, the method comparison, and the generation
+  report are coloured.** v0.11 ruled the report plain text; that ruling is
+  superseded. These three screens are the only coloured surfaces — prompts,
+  progress, `check`, `upgrade`, and errors are unchanged. Colour is dropped
+  whenever `NO_COLOR` is set or output is not a terminal, and every screen stays
+  fully legible without it.
+- **`rich` is a new runtime dependency**, required by those three screens.
+
+### Fixed
+
+- **`check` no longer reports a project's own `.git` directory as a problem.**
+  Running `git init` in a generated project and then `check` told you an
+  upstream change had leaked template-repository files and to stop using the
+  pin. Nothing was wrong. The rule that forbids those paths belongs to
+  generation, which still enforces it; `check` and `upgrade` no longer apply it
+  to projects you have since put under version control.
+
+### Upgrade from v0.12
+
+Run `dev-ready upgrade PATH` with v0.13. **No new selection input is required**
+and the stamp stays at version 5 — the third method and the new Token Optimize
+item are available to select, not applied to existing projects.
+
 ## [0.12.0] — 2026-08-22
 
 ### Breaking changes
