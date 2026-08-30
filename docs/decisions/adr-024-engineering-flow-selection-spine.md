@@ -364,3 +364,43 @@ already render as code in `skills/dev-ready/SKILL.md` and in both READMEs, and
 they give FR-51's frameless comparison a span it can style without parsing
 prose. FR-48 inherits the rule unchanged when it authors `addyosmani`'s
 criteria, which is the property the 2026-08-23 amendment was cut to buy.
+
+---
+
+## 2026-08-30 amendment — the last announced entry goes; the machinery stays
+
+Decided in the v0.13 Phase 5 `grill-with-docs` session. FR-48 ships
+`addyosmani`, the last [[Announced Flow]], which raises a question this ADR's
+original Consequences did not separate.
+
+### Entries and machinery are not the same dead weight
+
+This ADR recorded that `status` entries "are dead weight by construction and
+must be removed as each flow ships, or the menu accumulates promises". That is
+a rule about **entries**. When the last one is deleted, four pieces of code have
+no shipped data behind them: the loader's `status` parsing and its
+`announced_loops` partition, `CatalogItem`'s and the catalog model's
+`announced_loops` collection, the disabled row the flow prompt renders, and the
+`--flow` error path that says *not yet available* rather than *unknown*.
+
+### The decision
+
+**Delete the entry. Keep the machinery.** After FR-48 no catalog item carries
+`status`, the menu offers three selectable flows and no `(coming soon)` row, and
+`--flow addyosmani` generates instead of exiting 2. The loader rule, the
+partition, the disabled-row rendering, and the exit-2 branch stay, exercised by
+their existing fixture tests.
+
+- **Considered: deleting the machinery with the entry** — rejected. The next
+  announced flow would re-derive a partition this repository has already
+  corrected once (the 2026-08-13 amendment moved announced flows out of the
+  catalog precisely because selectability is a Catalog Item's defining
+  property). Re-implementation is how that correction gets lost.
+- **Considered: keeping a placeholder entry so the path stays live** —
+  rejected, as this ADR already rejected it: the menu accumulates promises.
+
+Consequences: for the first time since v0.11 the announced-flow path is covered
+only by fixtures and not by shipped data. That is stated here so a later reader
+finds a recorded decision rather than an apparent oversight, and so a coverage
+sweep does not delete it as unreachable. [[Announced Flow]] stays a defined term
+with no current instance.

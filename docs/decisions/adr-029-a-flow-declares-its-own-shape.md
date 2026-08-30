@@ -71,3 +71,70 @@ changes generated `AGENTS.md`, which this phase must not); adding prose fields
 on `CatalogItem` (relocates a second catalog of strings into the loader). No
 new ADR: this is the unpaid remainder of ADR-024 as named by this ADR's own
 Consequences, not a new trade-off.
+
+---
+
+## 2026-08-30 amendment — a step's template source is manifest data, not its id
+
+Decided in the v0.13 Phase 5 `grill-with-docs` session, run against
+`addyosmani/agent-skills` read at `d2c37ef6225dd8726cdd369a8030307f48592d26`
+before anything was written about it. The decision itself is unchanged: a flow
+still declares its chain, its roles, and its invocation as catalog data. What
+this amendment fixes is a convention this ADR left implicit and the third flow
+falsifies.
+
+### Two upstreams claim one step id
+
+This ADR's rule "every step id must have a `paths` entry whose destination leaf
+equals it" is about the **destination**. It says nothing about the source, and
+the codebase filled that gap with a convention: a step's template files live at
+`templates/claude/skills/<step-id>/`, which
+`tests/unit/test_flow_frontmatter.py` hardcodes as `_step_skill_path`.
+
+The convention holds only while step ids are globally unique across upstreams.
+Measured 2026-08-30: `obra/superpowers` and `addyosmani/agent-skills` both ship
+a skill named `test-driven-development`, with different content. It is the only
+collision between the three flows, and one is enough — the templates namespace
+is flat, so the second upstream's file cannot be vendored without overwriting
+the first's, and the byte-identity guard would then fail for whichever flow lost.
+
+The destination is not in conflict. A user selects one flow, so
+`.agents/skills/test-driven-development` is unambiguous in any generated
+project. The conflict exists only inside dev-ready's own templates tree.
+
+### The decision
+
+**A step's template source is read from that step's `paths` entry, never
+derived from its id.** The `paths` entry already carries both halves; the
+frontmatter guard and every other consumer resolve the source through it, and
+the id → source convention is deleted rather than special-cased.
+
+**A colliding step is vendored under an upstream-qualified source directory**,
+its destination leaf unchanged. `addyosmani`'s copy is vendored to
+`templates/claude/skills/addyosmani-test-driven-development` and generated to
+`.agents/skills/test-driven-development`; superpowers' copy is untouched. The
+source name is dev-ready's bookkeeping and is not a rename of the skill: FR-16
+compares directory contents, and the shipped `SKILL.md` still declares
+`name: test-driven-development`.
+
+- **Considered: namespacing the whole templates root per flow**
+  (`templates/claude/skills/<flow-id>/<step>/`) — the better architecture and
+  rejected for this phase. It is the same seam, applied consistently rather than
+  at the collision, but it rewrites every flow's `paths`, the vendored-drift
+  job's expectations, and the Skill Link source resolution, in a phase whose job
+  is vendoring. It is a Phase 4-shaped deepening and is recorded here as the
+  next candidate rather than done now.
+- **Considered: dropping `addyosmani`'s `test-driven-development`** — rejected.
+  It is a chain entry and the `test` role; the flow cannot be described without
+  it.
+- **Considered: renaming the destination** so both could coexist in one project
+  — rejected. No project holds two flows, so it pays a user-visible cost for a
+  maintainer-side problem.
+
+Consequences: `_step_skill_path` stops existing as a convention and becomes a
+`paths` lookup, which is the same class of fix the 2026-08-29 amendment applied
+to `_FLOW_GUIDANCE` — a rule the code encoded as a Python-side assumption
+rather than as data. A fourth upstream sharing a step id with any earlier one
+now costs a source directory name and nothing else. The flat templates root
+survives this version and is named as the standing candidate for the next
+architecture pass.

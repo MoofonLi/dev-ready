@@ -54,6 +54,10 @@ as amended 2026-08-13). Read by exactly two consumers: the flow prompt, which
 renders it unselectable, and the `--flow` error path, which says *not yet
 available* rather than *unknown*. Placeholder text carries no version number,
 and each entry is deleted as its flow ships or the menu accumulates promises.
+**The entry is deleted; the machinery is not** (ADR-024, as amended 2026-08-30):
+after `addyosmani` ships no catalog item carries `status`, and the loader rule,
+the partition, the disabled row, and the exit-2 branch stay, covered by fixtures
+alone. The term therefore stays defined with no current instance.
 _Avoid_: placeholder item, disabled item, stub flow, future flow
 
 **Flow Chain**:
@@ -96,6 +100,19 @@ is user-invoked in **every** flow, so a `model` flow's chain is a user-invoked
 head followed by model-invoked entries, and the generated sentence says so. It
 is also the first of the two axes a flow recommendation may rest on.
 _Avoid_: trigger mode, auto-invoke, activation, enforcement
+
+**Step Source**:
+Where a vendored step's files live inside dev-ready's own templates tree, read
+from that step's `paths` entry and **never derived from the step id**
+(ADR-029, as amended 2026-08-30). The templates root is flat and shared across
+upstreams, so two [[Engineering Flow]]s may ship a skill of the same name —
+`obra/superpowers` and `addyosmani/agent-skills` both ship
+`test-driven-development`, with different content. The colliding one is vendored
+under an upstream-qualified source directory while its destination leaf stays
+the skill's own name: no project holds two flows, so the collision is
+dev-ready's bookkeeping and never reaches a user. Distinct from the destination,
+which [[Flow Chain]] steps and [[Skill Link]]s both resolve by id.
+_Avoid_: skill path, template path, vendor dir, skill folder
 
 **Flow Selection Criteria**:
 The short, ordered list of observable situations that tell a user which
