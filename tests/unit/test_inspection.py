@@ -152,6 +152,62 @@ def test_generation_inspection_requires_only_the_resolved_loop(tmp_path: Path) -
     assert not any("alternate-loop" in issue.detail for issue in issues)
 
 
+def test_generation_inspection_allows_selected_flow_to_own_a_shared_destination(
+    tmp_path: Path,
+) -> None:
+    selection = ProjectSelection.from_items(
+        CATALOG,
+        skills=frozenset({"superpowers"}),
+        agent_targets=frozenset(),
+    )
+    materialize_project_structure(tmp_path, CATALOG, selection)
+
+    issues = inspect_project(
+        tmp_path,
+        CATALOG,
+        ProjectExpectation.generation(selection),
+    )
+
+    assert not any(
+        issue.category == "unexpected item path"
+        and "addyosmani" in issue.detail
+        and ".agents/skills/test-driven-development" in issue.detail
+        for issue in issues
+    )
+
+
+def test_generation_inspection_rejects_unselected_assets_inside_a_shared_destination(
+    tmp_path: Path,
+) -> None:
+    selection = ProjectSelection.from_items(
+        CATALOG,
+        skills=frozenset({"addyosmani"}),
+        agent_targets=frozenset(),
+    )
+    materialize_project_structure(tmp_path, CATALOG, selection)
+    stale_asset = (
+        tmp_path
+        / ".agents"
+        / "skills"
+        / "test-driven-development"
+        / "writing-good-tests.md"
+    )
+    stale_asset.write_text("stale Superpowers asset\n", encoding="utf-8")
+
+    issues = inspect_project(
+        tmp_path,
+        CATALOG,
+        ProjectExpectation.generation(selection),
+    )
+
+    assert any(
+        issue.category == "unexpected item path"
+        and "superpowers" in issue.detail
+        and "writing-good-tests.md" in issue.detail
+        for issue in issues
+    )
+
+
 def test_inspection_reports_malformed_effect_target_as_a_fact(tmp_path: Path) -> None:
     target = tmp_path / ".mcp.json"
     target.write_text("[]", encoding="utf-8")

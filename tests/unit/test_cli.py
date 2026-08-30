@@ -679,8 +679,7 @@ def test_init_help_calls_the_public_concept_engineering_flow(
     ("arguments", "expected"),
     [
         (("--flow", "spec-loop"), "renamed to 'mattpocock'"),
-        (("--flow", "addyosmani"), "not yet available"),
-        (("--flow", "nonesuch"), "unknown Engineering Flow id 'nonesuch'; valid ids: ['mattpocock', 'superpowers']"),
+        (("--flow", "nonesuch"), "unknown Engineering Flow id 'nonesuch'; valid ids: ['addyosmani', 'mattpocock', 'superpowers']"),
         (("--dev", "spec-loop"), "retired Dev item id(s) 'spec-loop'"),
     ],
 )
@@ -694,8 +693,10 @@ def test_flow_selection_failures_are_mutually_distinguishable(
     assert expected in capsys.readouterr().err
 
 
-def test_selectable_flow_flag_superpowers(
+@pytest.mark.parametrize("flow", ["superpowers", "addyosmani"])
+def test_selectable_non_default_flow_flag(
     monkeypatch: pytest.MonkeyPatch,
+    flow: str,
 ) -> None:
     captured_answers = None
 
@@ -706,10 +707,10 @@ def test_selectable_flow_flag_superpowers(
 
     monkeypatch.setattr(cli_module, "generate", _capture)
 
-    assert main(["init", "my-app", "--yes", "--flow", "superpowers"]) == 0
+    assert main(["init", "my-app", "--yes", "--flow", flow]) == 0
     assert captured_answers is not None
-    assert captured_answers.development_loop == "superpowers"
-    assert "superpowers" in captured_answers.skills_items
+    assert captured_answers.development_loop == flow
+    assert flow in captured_answers.skills_items
     assert "mattpocock" not in captured_answers.skills_items
 
 

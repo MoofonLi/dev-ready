@@ -1257,11 +1257,147 @@
         },
         {
           "id": "addyosmani",
+          "title": "Addy Osmani's Agent Skills",
           "kind": "development-loop",
           "category": "dev",
-          "title": "Addy Osmani's Agent Skills",
-          "status": "coming-soon",
-          "description": "Addy Osmani's Engineering Flow, announced but not yet available."
+          "description": "A model-driven Engineering Flow spanning specification, implementation, production readiness, and shipping.",
+          "choose_when": [
+            "Choose this flow when `spec-driven-development` should produce a written spec before any code exists.",
+            "Choose it when the work runs to production and wants `security-and-hardening`, `performance-optimization`, and `observability-and-instrumentation` beside the build steps.",
+            "Choose it when its `chain` should end at `shipping-and-launch` rather than at a finished branch."
+          ],
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "addyosmani/agent-skills",
+          "steps": [
+            "api-and-interface-design",
+            "ci-cd-and-automation",
+            "code-review-and-quality",
+            "code-simplification",
+            "debugging-and-error-recovery",
+            "deprecation-and-migration",
+            "documentation-and-adrs",
+            "doubt-driven-development",
+            "frontend-ui-engineering",
+            "git-workflow-and-versioning",
+            "incremental-implementation",
+            "interview-me",
+            "observability-and-instrumentation",
+            "performance-optimization",
+            "planning-and-task-breakdown",
+            "security-and-hardening",
+            "shipping-and-launch",
+            "source-driven-development",
+            "spec-driven-development",
+            "test-driven-development"
+          ],
+          "paths": [
+            {
+              "src": "claude/skills/api-and-interface-design",
+              "dest": ".agents/skills/api-and-interface-design"
+            },
+            {
+              "src": "claude/skills/ci-cd-and-automation",
+              "dest": ".agents/skills/ci-cd-and-automation"
+            },
+            {
+              "src": "claude/skills/code-review-and-quality",
+              "dest": ".agents/skills/code-review-and-quality"
+            },
+            {
+              "src": "claude/skills/code-simplification",
+              "dest": ".agents/skills/code-simplification"
+            },
+            {
+              "src": "claude/skills/debugging-and-error-recovery",
+              "dest": ".agents/skills/debugging-and-error-recovery"
+            },
+            {
+              "src": "claude/skills/deprecation-and-migration",
+              "dest": ".agents/skills/deprecation-and-migration"
+            },
+            {
+              "src": "claude/skills/documentation-and-adrs",
+              "dest": ".agents/skills/documentation-and-adrs"
+            },
+            {
+              "src": "claude/skills/doubt-driven-development",
+              "dest": ".agents/skills/doubt-driven-development"
+            },
+            {
+              "src": "claude/skills/frontend-ui-engineering",
+              "dest": ".agents/skills/frontend-ui-engineering"
+            },
+            {
+              "src": "claude/skills/git-workflow-and-versioning",
+              "dest": ".agents/skills/git-workflow-and-versioning"
+            },
+            {
+              "src": "claude/skills/incremental-implementation",
+              "dest": ".agents/skills/incremental-implementation"
+            },
+            {
+              "src": "claude/skills/interview-me",
+              "dest": ".agents/skills/interview-me"
+            },
+            {
+              "src": "claude/skills/observability-and-instrumentation",
+              "dest": ".agents/skills/observability-and-instrumentation"
+            },
+            {
+              "src": "claude/skills/performance-optimization",
+              "dest": ".agents/skills/performance-optimization"
+            },
+            {
+              "src": "claude/skills/planning-and-task-breakdown",
+              "dest": ".agents/skills/planning-and-task-breakdown"
+            },
+            {
+              "src": "claude/skills/security-and-hardening",
+              "dest": ".agents/skills/security-and-hardening"
+            },
+            {
+              "src": "claude/skills/shipping-and-launch",
+              "dest": ".agents/skills/shipping-and-launch"
+            },
+            {
+              "src": "claude/skills/source-driven-development",
+              "dest": ".agents/skills/source-driven-development"
+            },
+            {
+              "src": "claude/skills/spec-driven-development",
+              "dest": ".agents/skills/spec-driven-development"
+            },
+            {
+              "src": "claude/skills/addyosmani-test-driven-development",
+              "dest": ".agents/skills/test-driven-development"
+            },
+            {
+              "src": "claude/addyosmani",
+              "dest": "docs/agents"
+            }
+          ],
+          "invocation": "model",
+          "chain": [
+            "spec-driven-development",
+            "planning-and-task-breakdown",
+            "incremental-implementation",
+            "test-driven-development",
+            "code-review-and-quality",
+            "shipping-and-launch"
+          ],
+          "roles": {
+            "build": [
+              "incremental-implementation"
+            ],
+            "test": [
+              "test-driven-development"
+            ],
+            "review": [
+              "code-review-and-quality"
+            ]
+          },
+          "convention": "flows/addyosmani/convention.md"
         },
         {
           "id": "webapp-testing",

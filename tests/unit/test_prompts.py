@@ -348,7 +348,7 @@ def test_interactive_sequence_discloses_flow_then_walks_every_category() -> None
     assert asker.checkbox_initially_selected[:4] == [[], [], [], []]
 
 
-def test_flow_prompt_lists_announced_flows_as_disabled_choices() -> None:
+def test_flow_prompt_offers_three_selectable_flows_and_no_disabled_choices() -> None:
     asker = FakeAsker(
         selects=[SELECTABLE_FLOW_LABEL],
         checkboxes=[[], [], [], [], CLAUDE_AGENT_LABELS],
@@ -359,16 +359,12 @@ def test_flow_prompt_lists_announced_flows_as_disabled_choices() -> None:
     )
 
     assert asker.select_choices == [
-        [*SELECTABLE_FLOW_LABELS, *ANNOUNCED_FLOW_LABELS]
+        SELECTABLE_FLOW_LABELS
     ]
-    assert asker.select_disabled_choices == [ANNOUNCED_FLOW_LABELS]
-    reasons = [label.rsplit(" — ", 1)[1] for label in ANNOUNCED_FLOW_LABELS]
-    assert reasons == ["Not yet available"] * len(ANNOUNCED_FLOW_LABELS)
-    assert all(not any(character.isdigit() for character in reason) for reason in reasons)
+    assert len(SELECTABLE_FLOW_LABELS) == 3
+    assert ANNOUNCED_FLOW_LABELS == []
+    assert asker.select_disabled_choices == [[]]
     assert answers.selection.development_loop == "mattpocock"
-    assert answers.selection.development_loop not in {
-        item.id for item in CATALOG.announced_loops
-    }
 
 
 def test_flow_prompt_prints_declared_criteria_but_no_announced_flow(

@@ -789,6 +789,72 @@ def test_superpowers_flow_overlay_generation(tmp_path: Path) -> None:
     assert "## Issue tracker and domain conventions" not in setup_skill
 
 
+def test_addyosmani_flow_overlay_generation(tmp_path: Path) -> None:
+    selection = ProjectSelection.from_items(
+        CATALOG,
+        skills=frozenset({"addyosmani"}),
+        mcp=frozenset(),
+        docs_items=frozenset(),
+        agent_targets=frozenset(),
+    )
+    content = build_overlay_content(
+        Answers("my-addyosmani-app", tmp_path / "addyosmani", selection), CATALOG
+    )
+
+    expected_skills = {
+        "api-and-interface-design",
+        "ci-cd-and-automation",
+        "code-review-and-quality",
+        "code-simplification",
+        "debugging-and-error-recovery",
+        "deprecation-and-migration",
+        "documentation-and-adrs",
+        "doubt-driven-development",
+        "frontend-ui-engineering",
+        "git-workflow-and-versioning",
+        "incremental-implementation",
+        "interview-me",
+        "observability-and-instrumentation",
+        "performance-optimization",
+        "planning-and-task-breakdown",
+        "security-and-hardening",
+        "shipping-and-launch",
+        "source-driven-development",
+        "spec-driven-development",
+        "test-driven-development",
+    }
+    generated_skills = {
+        Path(path).parent.name
+        for path in content
+        if path.startswith(".agents/skills/") and path.endswith("/SKILL.md")
+    }
+    assert generated_skills - {"setup-project"} == expected_skills
+    assert "addyosmani-test-driven-development" not in generated_skills
+    assert "docs/agents/addyosmani.md" in content
+    assert "docs/agents/mattpocock.md" not in content
+    assert "docs/agents/superpowers.md" not in content
+
+    agents_md = content["AGENTS.md"].decode("utf-8")
+    assert (
+        "The default Flow Chain is `setup-project` → `spec-driven-development` → "
+        "`planning-and-task-breakdown` → `incremental-implementation` → "
+        "`test-driven-development` → `code-review-and-quality` → "
+        "`shipping-and-launch`. `setup-project` is user-invoked; subsequent steps "
+        "are model-invoked."
+    ) in agents_md
+    assert "tasks/plan.md" in agents_md
+    assert "tasks/todo.md" in agents_md
+
+    setup_skill = content[".agents/skills/setup-project/SKILL.md"].decode("utf-8")
+    assert "## Issue tracker and domain conventions" not in setup_skill
+    assert "tasks/plan.md" not in setup_skill
+
+    explainer = content["docs/agents/addyosmani.md"].decode("utf-8")
+    assert "does not need to finish in one session" in explainer
+    assert "`/build`" in explainer
+    assert "`code-reviewer`" in explainer
+
+
 
 def test_readme_is_about_the_project_not_the_template(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
@@ -2262,4 +2328,3 @@ def test_generated_agents_md_preserves_mattpocock_user_invoked_claim() -> None:
     agents_md = content["AGENTS.md"].decode("utf-8")
     assert "The default Flow Chain is `setup-project` → `grill-with-docs` → `to-spec` → `to-tickets` → `implement` → `improve-codebase-architecture`. Every step is user-invoked." in agents_md
     assert "A step may reach for `tdd`, `code-review`, `diagnosing-bugs`, `codebase-design`, or `domain-modeling` as a tool" in agents_md
-

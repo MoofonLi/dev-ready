@@ -63,6 +63,8 @@ REPEATED_FLOW_SURFACES = (
     RepeatedFlowSurface(SKILL_PATH, "mattpocock", "choose_when", None, 1),
     RepeatedFlowSurface(SKILL_PATH, "superpowers", "description", None, 1),
     RepeatedFlowSurface(SKILL_PATH, "superpowers", "choose_when", None, 1),
+    RepeatedFlowSurface(SKILL_PATH, "addyosmani", "description", None, 1),
+    RepeatedFlowSurface(SKILL_PATH, "addyosmani", "choose_when", None, 1),
     RepeatedFlowSurface(README_PATHS[0], "mattpocock", "description", None, 2),
     RepeatedFlowSurface(README_PATHS[0], "superpowers", "description", None, 2),
     RepeatedFlowSurface(README_PATHS[1], "mattpocock", "description", None, 1),
@@ -285,7 +287,7 @@ def test_skill_documents_safe_failure_and_verification_behavior() -> None:
         assert required in text
     assert "--development-loop" not in original
     assert "Engineering Flow id 'spec-loop' was renamed to 'mattpocock'" in original
-    assert "Engineering Flow 'addyosmani' is not yet available" in original
+    assert "Engineering Flow 'addyosmani' is not yet available" not in original
     assert "unknown Engineering Flow id" in original
     assert "existing non-empty target" not in text
     assert "if it exists and is non-empty, stop" not in text

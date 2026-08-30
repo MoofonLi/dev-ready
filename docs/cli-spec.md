@@ -31,13 +31,13 @@ conflicts with an explicit `--categories` value that omits that Category. The
 explicit `--categories all` selection still selects every Category, and naming
 a Category without its item flag still selects all items in that Category.
 
-Dev is mandatory and currently offers two Engineering Flow options: `mattpocock`
-(the default) and `superpowers`. It is resolved for every generation, including
-`--categories none` and `--dev none`. Dev currently has no selectable Enhancements,
-so both `--dev all` and `--dev none` select no optional items. `--flow` is the
-structural single-select and remains data-driven as the manifest adds flows;
-`--development-loop` is a permanently accepted alias. Engineering Flow ids are
-never Dev Enhancement ids.
+Dev is mandatory and currently offers three Engineering Flow options:
+`mattpocock` (the default), `superpowers`, and `addyosmani`. It is resolved for
+every generation, including `--categories none` and `--dev none`. Dev currently
+has no selectable Enhancements, so both `--dev all` and `--dev none` select no
+optional items. `--flow` is the structural single-select and remains data-driven
+as the manifest adds flows; `--development-loop` is a permanently accepted
+alias. Engineering Flow ids are never Dev Enhancement ids.
 
 Unknown Category ids, unknown item ids, empty comma-separated selections, and
 conflicting Category/item flags fail before generation with an
@@ -47,8 +47,7 @@ Engineering Flow failures also exit 2 and distinguish these cases:
 
 - `spec-loop` supplied to `--flow` or `--development-loop` says that the id was
   renamed to `mattpocock`.
-- An announced but unreleased Flow, such as `addyosmani`, says that it is not
-  yet available.
+- An announced but unreleased Flow says that it is not yet available.
 - Any other unrecognised Flow id says that the Engineering Flow id is unknown.
 
 The former selectable loop identifiers are retired. Supplying any of them to

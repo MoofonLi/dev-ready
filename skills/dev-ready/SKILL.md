@@ -104,11 +104,13 @@ start of each line is the value to place in the corresponding selection flag.
   - Choose this flow when its model-driven `invocation` should start each chain entry after setup.
   - Choose it when implementation should fan out through `subagent-driven-development` or `executing-plans`.
   - Choose it when `verification-before-completion` should run before work is declared complete.
+- `addyosmani`: A model-driven Engineering Flow spanning specification, implementation, production readiness, and shipping.
+  - Choose this flow when `spec-driven-development` should produce a written spec before any code exists.
+  - Choose it when the work runs to production and wants `security-and-hardening`, `performance-optimization`, and `observability-and-instrumentation` beside the build steps.
+  - Choose it when its `chain` should end at `shipping-and-launch` rather than at a finished branch.
 
-`addyosmani` is an announced Engineering Flow and cannot be selected yet. Do not
-put it in `--flow`. `--flow spec-loop` exits 2 with `Engineering Flow id 'spec-loop' was renamed to 'mattpocock'`.
-`--flow addyosmani` exits 2 with `Engineering Flow 'addyosmani' is not yet available`.
-An unknown `--flow` id exits 2 with `unknown Engineering Flow id '<id>'; valid ids: ['mattpocock', 'superpowers']`.
+`--flow spec-loop` exits 2 with `Engineering Flow id 'spec-loop' was renamed to 'mattpocock'`.
+An unknown `--flow` id exits 2 with `unknown Engineering Flow id '<id>'; valid ids: ['addyosmani', 'mattpocock', 'superpowers']`.
 Surface the failure and stop; do not guess a replacement.
 
 ### dev items

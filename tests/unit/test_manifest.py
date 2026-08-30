@@ -206,22 +206,25 @@ def test_announced_flow_cannot_declare_materialized_content() -> None:
         parse_manifest(json.dumps(data))
 
 
-def test_bundled_manifest_loads_with_announced_flows() -> None:
+def test_bundled_manifest_loads_three_selectable_flows_and_no_announcements() -> None:
     catalog = load_default_manifest().components
 
-    assert [flow.id for flow in catalog.loops()] == ["mattpocock", "superpowers"]
+    assert [flow.id for flow in catalog.loops()] == [
+        "mattpocock",
+        "superpowers",
+        "addyosmani",
+    ]
     assert catalog.loops()[0].display_name == "Matt Pocock's skills"
     assert catalog.loops()[1].display_name == "Superpowers"
+    assert catalog.loops()[2].display_name == "Addy Osmani's Agent Skills"
     assert catalog.loops()[0].convention == "flows/mattpocock/convention.md"
     assert catalog.loops()[0].setup_contribution == "flows/mattpocock/setup.md"
     assert catalog.loops()[1].convention == "flows/superpowers/convention.md"
     assert catalog.loops()[1].setup_contribution is None
-    assert [flow.id for flow in catalog.announced_loops] == [
-        "addyosmani",
-    ]
-    assert all("coming soon" not in flow.display_name.casefold() for flow in catalog.announced_loops)
-    assert all(not any(char.isdigit() for char in flow.display_name) for flow in catalog.announced_loops)
-    assert all(not flow.paths and not flow.steps and flow.effect is None for flow in catalog.announced_loops)
+    assert catalog.loops()[2].convention == "flows/addyosmani/convention.md"
+    assert catalog.loops()[2].setup_contribution is None
+    assert catalog.announced_loops == ()
+    assert all(item.status is None for item in catalog.all_items())
 
 
 def test_catalog_item_requires_a_category() -> None:
@@ -670,7 +673,7 @@ def test_default_manifest_contains_complete_spec_loop_bundle() -> None:
     manifest = load_default_manifest()
     skills = {item.id: item for item in manifest.components["skills"]}
 
-    assert len(skills) == 7
+    assert len(skills) == 8
     assert "project-orientation" not in skills
     assert {"tdd", "diagnosing-bugs", "code-review", "setup-all"}.isdisjoint(skills)
     assert skills["mattpocock"].vendored_repo == "mattpocock/skills"

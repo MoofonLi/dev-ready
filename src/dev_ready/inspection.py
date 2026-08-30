@@ -17,7 +17,7 @@ from dev_ready.agent_targets import (
 from dev_ready.overlay.infrastructure import skill_infrastructure_paths
 from dev_ready.skill_links import PathKind, classify_path, has_link_component
 from dev_ready.catalog_effects import CatalogEffectError
-from dev_ready.manifest import CATALOG_COMPONENTS, CatalogItem, ComponentCatalog
+from dev_ready.manifest import CATALOG_COMPONENTS, CatalogItem, ComponentCatalog, ItemPath
 from dev_ready.overlay.rendering import TEMPLATE_SUFFIX
 from dev_ready.intent import ProjectSelection
 
@@ -98,6 +98,11 @@ def inspect_project(
     # Every declared target, not only the selected ones: generation must also
     # observe that an unselected Agent Target left nothing behind.
     declared = project_targets(catalog, catalog.agent_target_ids)
+    selected_catalog_assets = _selected_catalog_assets(
+        catalog,
+        expectation.selection,
+        required_development_loop,
+    )
 
     for relative in REQUIRED_UPSTREAM_PATHS:
         target = root / relative
@@ -175,7 +180,14 @@ def inspect_project(
             )
             if expected or expectation.exact_catalog_selection:
                 item_group = "development loop" if is_development_loop else name
-                _inspect_item_paths(root, item_group, item, expected, issues)
+                _inspect_item_paths(
+                    root,
+                    item_group,
+                    item,
+                    expected,
+                    issues,
+                    selected_catalog_assets,
+                )
                 _inspect_item_effect(root, item_group, item, expected, issues)
 
     _inspect_agent_target_artifacts(
@@ -444,6 +456,7 @@ def _inspect_item_paths(
     item: CatalogItem,
     expected: bool,
     issues: list[ProjectIssue],
+    selected_catalog_assets: frozenset[Path] = frozenset(),
 ) -> None:
     for item_path in item.paths:
         target = root / item_path.dest
@@ -471,9 +484,7 @@ def _inspect_item_paths(
             )
             issues.append(ProjectIssue("missing item path", detail, verification))
         elif expected:
-            source = resources.files("dev_ready").joinpath(
-                "templates", *item_path.src.split("/")
-            )
+            source = _item_path_source(item_path)
             if source.is_dir():
                 if not target.is_dir():
                     detail = (
@@ -482,12 +493,12 @@ def _inspect_item_paths(
                     )
                     issues.append(ProjectIssue("invalid item path", detail, detail))
                     continue
-                for relative in _resource_files(source):
-                    expected_file = target.joinpath(*relative.parts)
+                for asset in _item_path_assets(item_path):
+                    expected_file = root / asset
                     if not _is_safe(root, expected_file) or not expected_file.is_file():
-                        asset = (Path(item_path.dest) / relative).as_posix()
                         detail = (
-                            f"selected {name} item {item.id!r} asset {asset!r} is missing"
+                            f"selected {name} item {item.id!r} asset "
+                            f"{asset.as_posix()!r} is missing"
                         )
                         issues.append(ProjectIssue("missing item asset", detail, detail))
             elif source.is_file() and not target.is_file():
@@ -496,14 +507,12 @@ def _inspect_item_paths(
                 )
                 issues.append(ProjectIssue("missing item asset", detail, detail))
         elif not expected and present:
-            source = resources.files("dev_ready").joinpath(
-                "templates", *item_path.src.split("/")
-            )
+            source = _item_path_source(item_path)
             if source.is_dir() and target.is_dir():
                 leftover_files = [
-                    (Path(item_path.dest) / relative).as_posix()
-                    for relative in _resource_files(source)
-                    if (target / relative).exists()
+                    asset.as_posix()
+                    for asset in _item_path_assets(item_path)
+                    if (root / asset).exists() and asset not in selected_catalog_assets
                 ]
                 if leftover_files:
                     detail = (
@@ -511,12 +520,48 @@ def _inspect_item_paths(
                         f"{leftover_files[0]!r} in the output"
                     )
                     issues.append(ProjectIssue("unexpected item path", detail, detail))
-            else:
+            elif Path(item_path.dest) not in selected_catalog_assets:
                 detail = (
                     f"unselected {name} item {item.id!r} left path "
                     f"{item_path.dest!r} in the output"
                 )
                 issues.append(ProjectIssue("unexpected item path", detail, detail))
+
+
+def _selected_catalog_assets(
+    catalog: ComponentCatalog,
+    selection: ProjectSelection,
+    required_development_loop: str | None,
+) -> frozenset[Path]:
+    assets: set[Path] = set()
+    for name in CATALOG_COMPONENTS:
+        if name == "mcp":
+            continue
+        selected = selection.items(name)
+        for item in catalog.get(name, ()):
+            expected = item.id in selected or (
+                item.kind == "development-loop"
+                and item.id == required_development_loop
+            )
+            if not expected:
+                continue
+            for item_path in item.paths:
+                assets.update(_item_path_assets(item_path))
+    return frozenset(assets)
+
+
+def _item_path_source(item_path: ItemPath) -> Traversable:
+    return resources.files("dev_ready").joinpath(
+        "templates", *item_path.src.split("/")
+    )
+
+
+def _item_path_assets(item_path: ItemPath) -> tuple[Path, ...]:
+    destination = Path(item_path.dest)
+    source = _item_path_source(item_path)
+    if source.is_dir():
+        return tuple(destination / relative for relative in _resource_files(source))
+    return (destination,)
 
 
 def _resource_files(
