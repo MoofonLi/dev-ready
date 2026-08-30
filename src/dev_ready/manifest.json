@@ -18,7 +18,7 @@
       "description": "Tools and references for polished interfaces and design systems."
     },
     "token-optimize": {
-      "description": "Tools that reduce agent context use and improve codebase recall."
+      "description": "Tools that reduce agent context use, keep output legible, and improve codebase recall."
     }
   },
   "agent_targets": {
@@ -1024,6 +1024,20 @@
             {
               "src": "claude/skills/caveman",
               "dest": ".agents/skills/caveman"
+            }
+          ]
+        },
+        {
+          "id": "i-have-adhd",
+          "category": "token-optimize",
+          "description": "Answer-formatting guidance that keeps agent output structured, scannable, and actionable.",
+          "mode": "vendor",
+          "license": "MIT",
+          "vendored_repo": "ayghri/i-have-adhd",
+          "paths": [
+            {
+              "src": "claude/skills/i-have-adhd",
+              "dest": ".agents/skills/i-have-adhd"
             }
           ]
         },

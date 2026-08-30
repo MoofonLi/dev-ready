@@ -8,6 +8,7 @@ import pytest
 from dev_ready.errors import ManifestError
 from dev_ready.manifest import (
     ComponentCatalog,
+    ItemPath,
     load_default_manifest,
     load_manifest,
     parse_manifest,
@@ -544,7 +545,20 @@ def test_default_manifest_declares_category_assignments() -> None:
     assert items["webapp-testing"].category == "quality"
     assert items["frontend-design"].category == "design"
     assert items["caveman"].category == "token-optimize"
+    assert items["i-have-adhd"].category == "token-optimize"
+    assert items["i-have-adhd"].vendored_repo == "ayghri/i-have-adhd"
+    assert items["i-have-adhd"].paths == (
+        ItemPath(
+            src="claude/skills/i-have-adhd",
+            dest=".agents/skills/i-have-adhd",
+        ),
+    )
     assert items["code-memory"].category == "token-optimize"
+    assert manifest.categories["token-optimize"].description == (
+        "Tools that reduce agent context use, keep output legible, and improve "
+        "codebase recall."
+    )
+    assert "i-have-adhd" not in manifest.default_set.enhancements
 
 
 def test_default_manifest_mounts_every_design_reference_and_keeps_skill_mounts() -> None:
@@ -563,6 +577,7 @@ def test_default_manifest_mounts_every_design_reference_and_keeps_skill_mounts()
     assert len(docs_mounts) == 74
     assert set(docs_mounts.values()) == {"build"}
     assert next(item for item in catalog["skills"] if item.id == "caveman").mount is None
+    assert next(item for item in catalog["skills"] if item.id == "i-have-adhd").mount is None
     assert next(item for item in catalog["mcp"] if item.id == "code-memory").mount is None
 
 
@@ -673,7 +688,7 @@ def test_default_manifest_contains_complete_spec_loop_bundle() -> None:
     manifest = load_default_manifest()
     skills = {item.id: item for item in manifest.components["skills"]}
 
-    assert len(skills) == 8
+    assert len(skills) == 9
     assert "project-orientation" not in skills
     assert {"tdd", "diagnosing-bugs", "code-review", "setup-all"}.isdisjoint(skills)
     assert skills["mattpocock"].vendored_repo == "mattpocock/skills"

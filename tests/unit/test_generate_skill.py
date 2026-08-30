@@ -394,6 +394,18 @@ def test_quality_must_asks_are_unconditional_but_stay_out_of_yes_defaults() -> N
     assert {"react-doctor", "webapp-testing"}.isdisjoint(answers.skills_items)
 
 
+def test_token_optimize_skill_text_tracks_the_catalog_and_user_invocation() -> None:
+    section = _section(_skill_text(), "token-optimize items", 3)
+    description = MANIFEST.categories["token-optimize"].description
+
+    assert description in _skill_text()
+    assert "`i-have-adhd`" in section
+    assert "invoked by the user" in section
+
+    answers = build_answers(build_parser().parse_args(["init", "skill-test", "--yes"]), CATALOG)
+    assert "i-have-adhd" not in answers.skills_items
+
+
 def test_distribution_skill_is_not_a_catalog_or_generated_overlay_asset(tmp_path: Path) -> None:
     assert "dev-ready" not in {
         item.id for items in CATALOG.values() for item in items

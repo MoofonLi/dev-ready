@@ -872,6 +872,27 @@ def test_category_item_flag_variations() -> None:
     )
     assert ans2.mcp_items == frozenset({"code-memory"})
 
+    adhd = build_answers(
+        _init_args(
+            categories="token-optimize",
+            token_optimize="i-have-adhd",
+        ),
+        CATALOG,
+    )
+    assert adhd.skills_items == frozenset({"i-have-adhd", "mattpocock"})
+
+    everything = build_answers(
+        _init_args(
+            categories="token-optimize",
+            token_optimize="all",
+        ),
+        CATALOG,
+    )
+    assert everything.skills_items == frozenset(
+        {"caveman", "i-have-adhd", "mattpocock"}
+    )
+    assert everything.mcp_items == frozenset({"code-memory"})
+
 
 def test_unknown_item_id_exits_2(capsys) -> None:
     assert main(["init", "my-app", "--yes", "--security", "bogus"]) == 2

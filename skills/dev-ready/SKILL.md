@@ -92,7 +92,7 @@ start of each line is the value to place in the corresponding selection flag.
 - `security`: You need help finding and reducing security risks.
 - `quality`: You want stronger testing and implementation review.
 - `design`: You care about polished interfaces and design systems.
-- `token-optimize`: You want to reduce context use or improve codebase recall.
+- `token-optimize`: Tools that reduce agent context use, keep output legible, and improve codebase recall.
 
 ### Engineering Flows
 
@@ -207,6 +207,7 @@ Surface the failure and stop; do not guess a replacement.
 ### token-optimize items
 
 - `caveman`: You want short, token-conscious agent responses.
+- `i-have-adhd`: You want structured, scannable answers whose important actions stay findable; this skill is invoked by the user.
 - `code-memory`: You want the agent to preserve and retrieve concise codebase context.
 
 ### Agent Targets
