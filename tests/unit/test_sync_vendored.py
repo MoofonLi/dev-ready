@@ -288,6 +288,64 @@ def test_superpowers_snapshot_declares_every_support_path() -> None:
     assert len(pin.paths) == 24
 
 
+def test_addyosmani_snapshot_declares_the_curated_skill_directories() -> None:
+    manifest = load_default_manifest()
+    pin = next(
+        entry for entry in manifest.vendored if entry.repo == "addyosmani/agent-skills"
+    )
+    skill_directories = {path.dest for path in pin.paths if not path.dest.endswith("/LICENSE")}
+    notice_paths = {path.dest for path in pin.paths if path.dest.endswith("/LICENSE")}
+    expected_names = {
+        "api-and-interface-design",
+        "ci-cd-and-automation",
+        "code-review-and-quality",
+        "code-simplification",
+        "debugging-and-error-recovery",
+        "deprecation-and-migration",
+        "documentation-and-adrs",
+        "doubt-driven-development",
+        "frontend-ui-engineering",
+        "git-workflow-and-versioning",
+        "incremental-implementation",
+        "interview-me",
+        "observability-and-instrumentation",
+        "performance-optimization",
+        "planning-and-task-breakdown",
+        "security-and-hardening",
+        "shipping-and-launch",
+        "source-driven-development",
+        "spec-driven-development",
+        "addyosmani-test-driven-development",
+    }
+    expected_directories = {
+        f"src/dev_ready/templates/claude/skills/{name}" for name in expected_names
+    }
+
+    assert pin.commit == "d2c37ef6225dd8726cdd369a8030307f48592d26"
+    assert skill_directories == expected_directories
+    assert notice_paths == {f"{directory}/LICENSE" for directory in expected_directories}
+    assert pin.executable == ()
+
+
+def test_i_have_adhd_snapshot_declares_the_whole_skill_directory() -> None:
+    manifest = load_default_manifest()
+    pin = next(
+        entry for entry in manifest.vendored if entry.repo == "ayghri/i-have-adhd"
+    )
+
+    assert pin.commit == "cbe69fb83c08a37cf54d5ec9ec6bb88c8bc9973c"
+    assert pin.paths == (
+        ItemPath(
+            src="skills/i-have-adhd",
+            dest="src/dev_ready/templates/claude/skills/i-have-adhd",
+        ),
+        ItemPath(
+            src="LICENSE",
+            dest="src/dev_ready/templates/claude/skills/i-have-adhd/LICENSE",
+        ),
+    )
+
+
 def test_compare_executable_modes_detects_drift(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

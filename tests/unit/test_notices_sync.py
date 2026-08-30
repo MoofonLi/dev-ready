@@ -167,6 +167,25 @@ def test_superpowers_notice_names_the_complete_curated_subset() -> None:
     assert "b36e0829c6d0140e93cfef2ca599b1b07d4a7797" in notices
 
 
+def test_phase_five_notices_name_both_new_upstreams_and_their_subsets() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    notices = (repo_root / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+
+    assert "## addyosmani/agent-skills" in notices
+    assert "d2c37ef6225dd8726cdd369a8030307f48592d26" in notices
+    assert "`skills/api-and-interface-design`" in notices
+    assert "`skills/test-driven-development`" in notices
+    assert "using-agent-skills" not in notices
+    assert "context-engineering" not in notices
+    assert "browser-testing-with-devtools" not in notices
+    assert "idea-refine" not in notices
+    assert "constraint-driven-development" not in notices
+
+    assert "## ayghri/i-have-adhd" in notices
+    assert "cbe69fb83c08a37cf54d5ec9ec6bb88c8bc9973c" in notices
+    assert "`skills/i-have-adhd`" in notices
+
+
 
 def test_reference_installer_notice_records_pathless_derived_data() -> None:
     repo_root = Path(__file__).resolve().parents[2]

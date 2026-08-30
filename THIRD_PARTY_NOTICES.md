@@ -43,6 +43,22 @@ Copies of these skills written into generated projects may be modified by dev-re
 
 Copies of these skills written into generated projects may be modified by dev-ready and are distributed as derived works under the same MIT license. The vendored source snapshots in this repository remain byte-checked against the pinned commit.
 
+## addyosmani/agent-skills
+
+- License: MIT
+- Pinned Commit: d2c37ef6225dd8726cdd369a8030307f48592d26
+- Source: https://github.com/addyosmani/agent-skills
+- Subset: `skills/api-and-interface-design`, `skills/ci-cd-and-automation`, `skills/code-review-and-quality`, `skills/code-simplification`, `skills/debugging-and-error-recovery`, `skills/deprecation-and-migration`, `skills/documentation-and-adrs`, `skills/doubt-driven-development`, `skills/frontend-ui-engineering`, `skills/git-workflow-and-versioning`, `skills/incremental-implementation`, `skills/interview-me`, `skills/observability-and-instrumentation`, `skills/performance-optimization`, `skills/planning-and-task-breakdown`, `skills/security-and-hardening`, `skills/shipping-and-launch`, `skills/source-driven-development`, `skills/spec-driven-development`, and `skills/test-driven-development` vendored into `src/dev_ready/templates/claude/skills/`.
+- Notice paths: the upstream `LICENSE` is vendored into each of those twenty skill directories and travels with each generated copy.
+
+## ayghri/i-have-adhd
+
+- License: MIT
+- Pinned Commit: cbe69fb83c08a37cf54d5ec9ec6bb88c8bc9973c
+- Source: https://github.com/ayghri/i-have-adhd
+- Subset: the whole `skills/i-have-adhd` directory, including its `agents/` runtime configuration files, vendored into `src/dev_ready/templates/claude/skills/i-have-adhd`.
+- Notice path: the upstream `LICENSE` is vendored into that skill directory and travels with the generated copy.
+
 ## cloudflare/security-audit-skill
 
 - License: MIT

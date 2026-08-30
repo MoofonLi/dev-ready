@@ -803,6 +803,188 @@
           "dest": "src/dev_ready/templates/claude/skills/writing-plans/LICENSE"
         }
       ]
+    },
+    {
+      "repo": "addyosmani/agent-skills",
+      "commit": "d2c37ef6225dd8726cdd369a8030307f48592d26",
+      "license": "MIT",
+      "paths": [
+        {
+          "src": "skills/api-and-interface-design",
+          "dest": "src/dev_ready/templates/claude/skills/api-and-interface-design"
+        },
+        {
+          "src": "skills/ci-cd-and-automation",
+          "dest": "src/dev_ready/templates/claude/skills/ci-cd-and-automation"
+        },
+        {
+          "src": "skills/code-review-and-quality",
+          "dest": "src/dev_ready/templates/claude/skills/code-review-and-quality"
+        },
+        {
+          "src": "skills/code-simplification",
+          "dest": "src/dev_ready/templates/claude/skills/code-simplification"
+        },
+        {
+          "src": "skills/debugging-and-error-recovery",
+          "dest": "src/dev_ready/templates/claude/skills/debugging-and-error-recovery"
+        },
+        {
+          "src": "skills/deprecation-and-migration",
+          "dest": "src/dev_ready/templates/claude/skills/deprecation-and-migration"
+        },
+        {
+          "src": "skills/documentation-and-adrs",
+          "dest": "src/dev_ready/templates/claude/skills/documentation-and-adrs"
+        },
+        {
+          "src": "skills/doubt-driven-development",
+          "dest": "src/dev_ready/templates/claude/skills/doubt-driven-development"
+        },
+        {
+          "src": "skills/frontend-ui-engineering",
+          "dest": "src/dev_ready/templates/claude/skills/frontend-ui-engineering"
+        },
+        {
+          "src": "skills/git-workflow-and-versioning",
+          "dest": "src/dev_ready/templates/claude/skills/git-workflow-and-versioning"
+        },
+        {
+          "src": "skills/incremental-implementation",
+          "dest": "src/dev_ready/templates/claude/skills/incremental-implementation"
+        },
+        {
+          "src": "skills/interview-me",
+          "dest": "src/dev_ready/templates/claude/skills/interview-me"
+        },
+        {
+          "src": "skills/observability-and-instrumentation",
+          "dest": "src/dev_ready/templates/claude/skills/observability-and-instrumentation"
+        },
+        {
+          "src": "skills/performance-optimization",
+          "dest": "src/dev_ready/templates/claude/skills/performance-optimization"
+        },
+        {
+          "src": "skills/planning-and-task-breakdown",
+          "dest": "src/dev_ready/templates/claude/skills/planning-and-task-breakdown"
+        },
+        {
+          "src": "skills/security-and-hardening",
+          "dest": "src/dev_ready/templates/claude/skills/security-and-hardening"
+        },
+        {
+          "src": "skills/shipping-and-launch",
+          "dest": "src/dev_ready/templates/claude/skills/shipping-and-launch"
+        },
+        {
+          "src": "skills/source-driven-development",
+          "dest": "src/dev_ready/templates/claude/skills/source-driven-development"
+        },
+        {
+          "src": "skills/spec-driven-development",
+          "dest": "src/dev_ready/templates/claude/skills/spec-driven-development"
+        },
+        {
+          "src": "skills/test-driven-development",
+          "dest": "src/dev_ready/templates/claude/skills/addyosmani-test-driven-development"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/api-and-interface-design/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/ci-cd-and-automation/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/code-review-and-quality/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/code-simplification/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/debugging-and-error-recovery/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/deprecation-and-migration/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/documentation-and-adrs/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/doubt-driven-development/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/frontend-ui-engineering/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/git-workflow-and-versioning/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/incremental-implementation/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/interview-me/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/observability-and-instrumentation/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/performance-optimization/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/planning-and-task-breakdown/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/security-and-hardening/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/shipping-and-launch/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/source-driven-development/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/spec-driven-development/LICENSE"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/addyosmani-test-driven-development/LICENSE"
+        }
+      ]
+    },
+    {
+      "repo": "ayghri/i-have-adhd",
+      "commit": "cbe69fb83c08a37cf54d5ec9ec6bb88c8bc9973c",
+      "license": "MIT",
+      "paths": [
+        {
+          "src": "skills/i-have-adhd",
+          "dest": "src/dev_ready/templates/claude/skills/i-have-adhd"
+        },
+        {
+          "src": "LICENSE",
+          "dest": "src/dev_ready/templates/claude/skills/i-have-adhd/LICENSE"
+        }
+      ]
     }
   ],
   "components": {
