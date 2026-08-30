@@ -29,8 +29,13 @@ def _flatten_chain(chain: tuple[str | tuple[str, ...], ...]) -> tuple[str, ...]:
     return tuple(flat)
 
 
-def _step_skill_path(step: str, templates_root: Path = _TEMPLATES_ROOT) -> Path:
-    return templates_root / "claude" / "skills" / step / "SKILL.md"
+def _step_skill_path(
+    loop: CatalogItem, step: str, templates_root: Path = _TEMPLATES_ROOT
+) -> Path:
+    item_path = next(path for path in loop.paths if Path(path.dest).name == step)
+    source = templates_root / item_path.src
+    assert source.is_dir(), f"step source {item_path.src!r} does not exist"
+    return source / "SKILL.md"
 
 
 def check_flow_invocation(
@@ -39,14 +44,14 @@ def check_flow_invocation(
     """Assert that a development loop's shipped skill files match its declared invocation model."""
     if loop.invocation == "user":
         for step in _flatten_chain(loop.chain):
-            source = _step_skill_path(step, templates_root)
+            source = _step_skill_path(loop, step, templates_root)
             lines = _frontmatter(source).splitlines()
             assert (
                 "disable-model-invocation: true" in lines
             ), f"user-invoked loop {loop.id!r} chain step {step!r} must carry 'disable-model-invocation: true'"
     elif loop.invocation == "model":
         for step in loop.steps:
-            source = _step_skill_path(step, templates_root)
+            source = _step_skill_path(loop, step, templates_root)
             lines = _frontmatter(source).splitlines()
             assert (
                 "disable-model-invocation: true" not in lines
@@ -165,6 +170,58 @@ def test_user_invoked_flow_ignores_non_chain_step_missing_flag(
     )
 
     check_flow_invocation(loop, templates_root=tmp_path)
+
+
+def test_flow_resolves_step_source_from_its_paths_entry(tmp_path: Path) -> None:
+    skill_dir = tmp_path / "claude" / "skills" / "qualified-step-source"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: step-chain\ndisable-model-invocation: true\n---\nBody\n",
+        encoding="utf-8",
+    )
+
+    loop = CatalogItem(
+        id="test-loop",
+        category="dev",
+        kind="development-loop",
+        description="Test loop.",
+        mode="builtin",
+        license="MIT",
+        steps=("step-chain",),
+        paths=(
+            ItemPath(
+                src="claude/skills/qualified-step-source",
+                dest=".agents/skills/step-chain",
+            ),
+        ),
+        invocation="user",
+        chain=("step-chain",),
+    )
+
+    check_flow_invocation(loop, templates_root=tmp_path)
+
+
+def test_flow_fails_loudly_when_declared_step_source_is_missing(
+    tmp_path: Path,
+) -> None:
+    missing_source = "claude/skills/missing-step-source"
+    loop = CatalogItem(
+        id="test-loop",
+        category="dev",
+        kind="development-loop",
+        description="Test loop.",
+        mode="builtin",
+        license="MIT",
+        steps=("step-chain",),
+        paths=(
+            ItemPath(src=missing_source, dest=".agents/skills/step-chain"),
+        ),
+        invocation="user",
+        chain=("step-chain",),
+    )
+
+    with pytest.raises(AssertionError, match=missing_source):
+        check_flow_invocation(loop, templates_root=tmp_path)
 
 
 def test_model_invoked_flow_fails_when_any_step_carries_flag(
