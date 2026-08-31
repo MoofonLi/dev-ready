@@ -7,28 +7,27 @@ This file is the single source of truth for agent rules; `CLAUDE.md` imports it 
 
 dev-ready is a Python CLI (`uvx dev-ready`) that scaffolds FastAPI projects pre-configured for AI-assisted development: base template from fastapi/full-stack-fastapi-template at a manifest-pinned commit, plus Canonical Content for coding agents, optional Agent Target Skill Links and MCP configuration, and design docs.
 
-Current phase: v0.12 is released (`v0.12.0` — see the v0.12 overview). It
-shipped Skill Links replacing Pointer Stubs (FR-46) and `superpowers` as the
-second Engineering Flow (FR-47) — governed by ADR-028, ADR-024 as amended,
-ADR-029, and ADR-030. The stamp stayed at version 5. v0.13 (FR-48
-`addyosmani/agent-skills`, FR-49 Token Optimize additions) follows. v1.0 remains
-gated on the real-users evidence defined in `docs/version-plan.md`, which the
-2026-08-09 amendment narrowed to Branch A alone. Per-version plans live in
+Current phase: v0.13 is released (`v0.13.0` — see the v0.13 overview). It
+shipped `addyosmani` as the third Engineering Flow (FR-48), Token Optimize
+`i-have-adhd` (FR-49), Flow Selection Criteria and the interview that quotes
+them (FR-50, FR-52), the CLI presentation second pass (FR-51), generation
+into an Occupied Target (FR-53), and the README rewrite (FR-54) — governed
+by ADR-024 as amended, ADR-003 as amended, ADR-031, and ADR-023 as amended
+2026-08-30. The stamp stayed at version 5. v1.0 remains gated on the
+real-users evidence defined in `docs/version-plan.md`, which the 2026-08-09
+amendment narrowed to Branch A alone. Per-version plans live in
 `docs/handoff/<version>/<version>-plan.md`; the domain glossary is `CONTEXT.md`.
 
 **Process note:** v0.9 stopped *generating* the Handoff Protocol into user projects (ADR-020), and ADR-021 retires it here too — this repo now develops on the Spec Loop and nothing else. See "How this repo is developed" below.
 
-The v0.12 release surface is fixed: the development method is an Engineering
-Flow, asked first, with two selectable ids (`mattpocock`, `superpowers`) and
-one announced (`addyosmani`); each selected Agent Target receives one Skill
-Link per skill, machine-local and excluded from version control;
-`setup-project` is unconditional infrastructure at the head of every chain;
-all 74 Design References are ordinary catalog items; MIT notices travel with
-the copied skills; the repository root is the Claude and Codex plugin; and a
-flag answers only its own question. The stamp stays at version 5 — nothing in
-v0.12 added, removed, or re-typed a recorded field. Pointer Stubs are retired.
-ADR-025, which chose between two delivery modes, is superseded in full and was
-never implemented.
+The v0.13 release surface is fixed: three selectable Engineering Flows
+(`mattpocock`, `superpowers`, `addyosmani`); occupied destinations accepted
+with top-level collision as exit 4; the three Static Screens coloured with
+`rich`; a README under a guarded ceiling with a Recorded Capture; each
+selected Agent Target receives one Skill Link per skill, machine-local and
+excluded from version control; `setup-project` is unconditional infrastructure
+at the head of every chain. The stamp stays at version 5 — nothing in v0.13
+added, removed, or re-typed a recorded field. Pointer Stubs remain retired.
 
 ## Read before writing code
 
