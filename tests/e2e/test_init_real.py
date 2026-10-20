@@ -139,6 +139,30 @@ def test_init_into_git_initialised_directory_then_check_is_clean(
     assert "Status: CLEAN" in capsys.readouterr().out
 
 
+def test_init_applies_project_names_and_fresh_secrets(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    generated_secrets: list[dict[str, str]] = []
+    secret_keys = ("SECRET_KEY", "POSTGRES_PASSWORD", "FIRST_SUPERUSER_PASSWORD")
+    for name in ("first-app", "second-app"):
+        target = tmp_path / name
+        assert main(["init", name, "--yes", "--dir", str(target)]) == 0
+        capsys.readouterr()
+        settings = dict(
+            line.split("=", 1)
+            for line in (target / ".env").read_text(encoding="utf-8").splitlines()
+            if line and not line.startswith("#") and "=" in line
+        )
+        assert settings["PROJECT_NAME"].strip("\"'") == name
+        secrets = {key: settings[key].strip("\"'") for key in secret_keys}
+        assert all(value and value != "changethis" for value in secrets.values())
+        generated_secrets.append(secrets)
+
+    assert all(
+        generated_secrets[0][key] != generated_secrets[1][key] for key in secret_keys
+    )
+
+
 @pytest.mark.skipif(not _WINDOWS, reason="junctions store absolute paths")
 def test_moved_windows_project_is_repaired_by_one_upgrade(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]

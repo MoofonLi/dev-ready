@@ -7,6 +7,8 @@ is the project's first setup.
 Read `.env` and report the current `SMTP_HOST`, `SMTP_USER`,
 `EMAILS_FROM_EMAIL`, and whether `SMTP_PASSWORD` and `SENTRY_DSN` are set. Never
 print a stored password.
+Optional entries absent from `.env` are unset; add them only when configuring
+the corresponding section.
 
 For whichever of the two sections the user selected, ask one shared gate
 question: "Configure the selected email and error-reporting sections now?" The
@@ -38,10 +40,32 @@ Write the supplied values to `.env`, preserving unrelated entries. If the SMTP
 password was blank, preserve its current value and remind the user to edit that
 one entry by hand. Never echo a supplied or stored password.
 
-When Email sending is selected, leave the pinned template's normal transport
-settings unchanged: `SMTP_PORT=587`, `SMTP_TLS=True`, and `SMTP_SSL=False`. If
-the provider requires implicit TLS, tell the user to edit those three existing
-`.env` entries together as one provider-specific change, using the port and
-TLS/SSL values from the provider's documentation.
+The generated `.env` uses local email-capture settings: `SMTP_PORT=1025` and
+`SMTP_TLS=False`; the backend defaults to `SMTP_SSL=False` when that entry is
+absent. Leave these settings unchanged when using the local capture service.
+
+For a backend running directly on the host, configure an external provider
+using its documented transport settings. A STARTTLS provider commonly needs
+`SMTP_PORT=587`, `SMTP_TLS=True`, and `SMTP_SSL=False`; implicit TLS needs the
+provider's SSL port and TLS/SSL values instead. Update or add all three `.env`
+entries together; do not reuse the local capture port for an external provider.
+
+Base Compose does not forward these three transport settings. For a container
+deployment, they must also be mapped into the backend environment, shared
+with `prestart`, before recreating the services. An `.env` edit alone does not
+configure container transport. Leave deployment changes to the deployment
+step; point to `deployment.md` and explain the required mappings, for example:
+
+```yaml
+SMTP_PORT: ${SMTP_PORT:-587}
+SMTP_TLS: ${SMTP_TLS:-true}
+SMTP_SSL: ${SMTP_SSL:-false}
+```
+
+Local Compose captures email with Mailcatcher: `compose.override.yml`
+overrides the SMTP host, port, and TLS settings. Changing `.env` alone does
+not switch that local Compose service to an external provider. Deployment
+configuration belongs in `deployment.md`.
 
 Email and error-reporting changes take effect after an application restart.
+Recreate Compose services when changing their environment.
