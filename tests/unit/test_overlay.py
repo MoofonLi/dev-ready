@@ -459,6 +459,9 @@ def test_setup_project_offers_email_and_error_reporting_as_individual_sections(
     assert "SMTP_PORT=587" in walk
     assert "SMTP_TLS=True" in walk
     assert "SMTP_SSL=False" in walk
+    assert "SMTP_PORT=1025" in walk
+    assert "SMTP_TLS=False" in walk
+    assert "Local Compose captures email with Mailcatcher" in walk
     assert "data loss" not in walk.lower()
     assert "{{" not in walk
     assert "}}" not in walk

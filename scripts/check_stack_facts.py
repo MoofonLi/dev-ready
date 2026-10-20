@@ -155,17 +155,17 @@ SETUP_PROJECT_FACTS = (
             ),
             _file(
                 "compose.yml",
-                "FIRST_SUPERUSER: ${FIRST_SUPERUSER?Variable not set}",
-                "FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD?Variable not set}",
+                "FIRST_SUPERUSER: ${FIRST_SUPERUSER:?Variable not set}",
+                "FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:?Variable not set}",
             ),
         ),
     ),
     ClaimFact(
         "setup-project SMTP defaults",
         _SETUP_PROJECT_EMAIL,
-        ("SMTP_PORT=587", "SMTP_TLS=True", "SMTP_SSL=False"),
+        ("SMTP_PORT=1025", "SMTP_TLS=False", "SMTP_SSL=False"),
         (
-            _file(".env", "SMTP_PORT=587", "SMTP_TLS=True", "SMTP_SSL=False"),
+            _file(".env", "SMTP_PORT=1025", "SMTP_TLS=False"),
             _file(
                 "backend/app/core/config.py",
                 "SMTP_PORT: int = 587",
@@ -173,6 +173,33 @@ SETUP_PROJECT_FACTS = (
                 "SMTP_SSL: bool = False",
             ),
         ),
+    ),
+    ClaimFact(
+        "setup-project local Compose email capture",
+        _SETUP_PROJECT_EMAIL,
+        ("Local Compose captures email with Mailcatcher",),
+        (
+            _file(
+                "compose.override.yml",
+                'SMTP_HOST: "mailcatcher"',
+                'SMTP_PORT: "1025"',
+                'SMTP_TLS: "false"',
+                "mailcatcher:",
+            ),
+        ),
+    ),
+    ClaimFact(
+        "setup-project Compose transport boundary",
+        _SETUP_PROJECT_EMAIL,
+        ("Base Compose does not forward these three transport settings",),
+        (
+            _file(
+                "compose.yml",
+                "environment: &backend-environment",
+                "environment: *backend-environment",
+            ),
+        ),
+        (_file("compose.yml", "SMTP_PORT:", "SMTP_TLS:", "SMTP_SSL:", "env_file:"),),
     ),
     ClaimFact(
         "setup-project email and error-reporting settings",
@@ -189,18 +216,15 @@ SETUP_PROJECT_FACTS = (
             _file(
                 ".env",
                 "SMTP_HOST=",
-                "SMTP_USER=",
-                "SMTP_PASSWORD=",
                 "EMAILS_FROM_EMAIL=",
-                "SENTRY_DSN=",
             ),
             _file(
                 "compose.yml",
                 "SMTP_HOST: ${SMTP_HOST}",
-                "SMTP_USER: ${SMTP_USER}",
-                "SMTP_PASSWORD: ${SMTP_PASSWORD}",
+                "SMTP_USER: ${SMTP_USER:-}",
+                "SMTP_PASSWORD: ${SMTP_PASSWORD:-}",
                 "EMAILS_FROM_EMAIL: ${EMAILS_FROM_EMAIL}",
-                "SENTRY_DSN: ${SENTRY_DSN}",
+                "SENTRY_DSN: ${SENTRY_DSN:-}",
             ),
             _file(
                 "backend/app/utils.py",
@@ -218,7 +242,13 @@ SETUP_PROJECT_FACTS = (
                 "if settings.SENTRY_DSN and settings.ENVIRONMENT != \"local\"",
                 "sentry_sdk.init(dsn=str(settings.SENTRY_DSN)",
             ),
-            _file("backend/app/core/config.py", "settings = Settings()"),
+            _file(
+                "backend/app/core/config.py",
+                "SMTP_USER: str | None = None",
+                "SMTP_PASSWORD: str | None = None",
+                "SENTRY_DSN: HttpUrl | None = None",
+                "settings = Settings()",
+            ),
         ),
     ),
     ClaimFact(
@@ -227,29 +257,20 @@ SETUP_PROJECT_FACTS = (
         (
             "Do not ask for the deployment domain, frontend host, CORS origins, "
             "environment name, or container image variables",
-            "The generated local values are already wired into the backend and "
-            "Compose configuration",
+            "Local defaults come from the backend and Compose configuration",
             "Container image variables are not present in this template's `.env`",
             "Point deployment work to `deployment.md` instead",
         ),
         (
-            _file(
-                ".env",
-                "DOMAIN=",
-                "FRONTEND_HOST=",
-                "ENVIRONMENT=",
-                "BACKEND_CORS_ORIGINS=",
-            ),
+            _file(".env", "ENVIRONMENT=local"),
             _file(
                 "compose.yml",
-                "FRONTEND_HOST: ${FRONTEND_HOST?Variable not set}",
-                "ENVIRONMENT: ${ENVIRONMENT}",
-                "BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS}",
-                "traefik.http.routers.backend-http.rule=Host(`${DOMAIN?Variable not set}`)",
+                "BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-}",
+                "traefik.http.routers.backend-http.rule=Host(`${DOMAIN:-localhost}`)",
             ),
             _file(
                 "backend/app/core/config.py",
-                "FRONTEND_HOST: str",
+                'FRONTEND_HOST: str = "http://localhost:5173"',
                 "ENVIRONMENT: Literal",
                 "BACKEND_CORS_ORIGINS: Annotated",
                 "self.BACKEND_CORS_ORIGINS",
@@ -262,7 +283,6 @@ SETUP_PROJECT_FACTS = (
             ),
             _file(
                 "deployment.md",
-                "Set the `ENVIRONMENT`",
                 "Set the `DOMAIN`",
                 "`BACKEND_CORS_ORIGINS`",
             ),

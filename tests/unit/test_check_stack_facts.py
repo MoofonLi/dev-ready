@@ -41,13 +41,16 @@ The backend creates the superuser on first start and looks it up by email.
 The startup initializer runs on every start.
 FIRST_SUPERUSER and FIRST_SUPERUSER_PASSWORD are required settings and cannot simply be deleted.
 Do not ask for the deployment domain, frontend host, CORS origins, environment name, or container image variables.
-The generated local values are already wired into the backend and Compose configuration.
+Local defaults come from the backend and Compose configuration.
 Container image variables are not present in this template's `.env`.
 Point deployment work to `deployment.md` instead.
 """
 _EMAIL_AND_ERROR_REPORTING = """\
 SMTP_HOST SMTP_USER SMTP_PASSWORD EMAILS_FROM_EMAIL SENTRY_DSN
 SMTP_PORT=587 SMTP_TLS=True SMTP_SSL=False
+SMTP_PORT=1025 SMTP_TLS=False
+Local Compose captures email with Mailcatcher.
+Base Compose does not forward these three transport settings.
 Email and error-reporting changes take effect after an application restart.
 """
 
@@ -106,11 +109,9 @@ def _write_project(
         (project / ".env").write_text(
             f"SECRET_KEY=generated\nFIRST_SUPERUSER={env_email}\n"
             "FIRST_SUPERUSER_PASSWORD=generated\n"
-            "SMTP_HOST=\nSMTP_USER=\nSMTP_PASSWORD=\n"
+            "SMTP_HOST=localhost\n"
             "EMAILS_FROM_EMAIL=info@example.com\n"
-            "SMTP_TLS=True\nSMTP_SSL=False\nSMTP_PORT=587\n"
-            "SENTRY_DSN=\nDOMAIN=localhost\nFRONTEND_HOST=http://localhost:5173\n"
-            "ENVIRONMENT=local\nBACKEND_CORS_ORIGINS=http://localhost\n",
+            "SMTP_TLS=False\nSMTP_PORT=1025\nENVIRONMENT=local\n",
             encoding="utf-8",
         )
     (project / ".agents" / "skills" / "setup-project" / "SKILL.md").write_text(
@@ -239,27 +240,29 @@ strict = true
         "  traefik:\n"
         "  prestart:\n"
         "    command: bash scripts/prestart.sh\n"
-        "    environment:\n"
-        "      FRONTEND_HOST: ${FRONTEND_HOST?Variable not set}\n"
-        "      ENVIRONMENT: ${ENVIRONMENT}\n"
-        "      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS}\n"
-        "      FIRST_SUPERUSER: ${FIRST_SUPERUSER?Variable not set}\n"
-        "      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD?Variable not set}\n"
+        "    environment: &backend-environment\n"
+        "      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-}\n"
+        "      FIRST_SUPERUSER: ${FIRST_SUPERUSER:?Variable not set}\n"
+        "      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:?Variable not set}\n"
         "      SMTP_HOST: ${SMTP_HOST}\n"
-        "      SMTP_USER: ${SMTP_USER}\n"
-        "      SMTP_PASSWORD: ${SMTP_PASSWORD}\n"
+        "      SMTP_USER: ${SMTP_USER:-}\n"
+        "      SMTP_PASSWORD: ${SMTP_PASSWORD:-}\n"
         "      EMAILS_FROM_EMAIL: ${EMAILS_FROM_EMAIL}\n"
-        "      SENTRY_DSN: ${SENTRY_DSN}\n"
+        "      SENTRY_DSN: ${SENTRY_DSN:-}\n"
         "  backend:\n"
+        "    environment: *backend-environment\n"
         "    depends_on:\n"
         "      prestart:\n"
         "        condition: service_completed_successfully\n"
         "    labels:\n"
-        "      - traefik.http.routers.backend-http.rule=Host(`${DOMAIN?Variable not set}`)\n",
+        "      - traefik.http.routers.backend-http.rule=Host(`${DOMAIN:-localhost}`)\n",
         encoding="utf-8",
     )
     (project / "compose.override.yml").write_text(
-        "services:\n  db:\n  mailcatcher:\n  watch:\n", encoding="utf-8"
+        "services:\n  db:\n  mailcatcher:\n  watch:\n"
+        '  backend:\n    environment:\n      SMTP_HOST: "mailcatcher"\n'
+        '      SMTP_PORT: "1025"\n      SMTP_TLS: "false"\n',
+        encoding="utf-8",
     )
     (project / ".github" / "workflows" / "test-backend.yml").write_text(
         "coverage report --fail-under=90\n", encoding="utf-8"
@@ -271,7 +274,7 @@ strict = true
         "// generated\n", encoding="utf-8"
     )
     (project / "deployment.md").write_text(
-        "# Deployment\nSet the `ENVIRONMENT`.\nSet the `DOMAIN`.\n"
+        "# Deployment\nSet the `DOMAIN`.\n"
         "Configure `BACKEND_CORS_ORIGINS`.\n",
         encoding="utf-8",
     )
@@ -627,7 +630,7 @@ def test_setup_project_smtp_defaults_drift_is_reported(tmp_path: Path) -> None:
     project = _write_project(tmp_path)
     env_path = project / ".env"
     env_path.write_text(
-        env_path.read_text(encoding="utf-8").replace("SMTP_PORT=587", "SMTP_PORT=465"),
+        env_path.read_text(encoding="utf-8").replace("SMTP_PORT=1025", "SMTP_PORT=465"),
         encoding="utf-8",
     )
 
@@ -646,7 +649,7 @@ def test_setup_project_authored_smtp_claim_drift_is_reported(tmp_path: Path) -> 
         / "email-and-error-reporting.md"
     )
     guidance.write_text(
-        guidance.read_text(encoding="utf-8").replace("SMTP_PORT=587", "SMTP_PORT=465"),
+        guidance.read_text(encoding="utf-8").replace("SMTP_PORT=1025", "SMTP_PORT=465"),
         encoding="utf-8",
     )
 
@@ -695,7 +698,7 @@ def test_setup_project_error_reporting_setting_drift_is_reported(
     compose = project / "compose.yml"
     compose.write_text(
         compose.read_text(encoding="utf-8").replace(
-            "      SENTRY_DSN: ${SENTRY_DSN}\n", ""
+            "      SENTRY_DSN: ${SENTRY_DSN:-}\n", ""
         ),
         encoding="utf-8",
     )
