@@ -200,8 +200,8 @@
     "base_template": {
       "repo": "fastapi/full-stack-fastapi-template",
       "ref": "master",
-      "commit": "8893c6807ac8fa13f0797fa60ca478a75f02ca65",
-      "verified_at": "2026-10-21",
+      "commit": "aabb90126964a164e02aff39e7c385bb0598236d",
+      "verified_at": "2026-11-09",
       "license": "MIT",
       "exclude": [
         ".git",
